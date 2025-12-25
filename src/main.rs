@@ -79,6 +79,8 @@ fn create_router(state: AppState) -> Router {
         .merge(api::federation_routes())
         // Content syndication routes (RSS, Atom, oEmbed)
         .merge(api::syndication_routes())
+        // API documentation
+        .merge(api::docs_routes())
         // HTML handler routes
         .merge(handlers::routes())
         // Static file serving

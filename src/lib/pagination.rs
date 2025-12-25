@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 
 /// Default page size
 pub const DEFAULT_PAGE_SIZE: u32 = 20;
@@ -7,7 +8,7 @@ pub const DEFAULT_PAGE_SIZE: u32 = 20;
 pub const MAX_PAGE_SIZE: u32 = 100;
 
 /// Pagination query parameters
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct PaginationParams {
     /// Page number (1-indexed)
     #[serde(default = "default_page")]
@@ -55,7 +56,7 @@ pub struct PaginatedResponse<T> {
 }
 
 /// Pagination metadata
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PaginationMeta {
     pub page: u32,
     pub page_size: u32,
