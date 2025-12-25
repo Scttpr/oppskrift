@@ -41,20 +41,61 @@
                 </p>
                 {% endif %}
 
+                {# Follow Stats #}
+                <div class="mt-3 flex items-center gap-4 text-sm">
+                    <span class="text-gray-700 dark:text-gray-300">
+                        <strong>{{ follow_counts.followers_count }}</strong>
+                        <span class="text-gray-500 dark:text-gray-400">followers</span>
+                    </span>
+                    <span class="text-gray-700 dark:text-gray-300">
+                        <strong>{{ follow_counts.following_count }}</strong>
+                        <span class="text-gray-500 dark:text-gray-400">following</span>
+                    </span>
+                </div>
+
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                     Member since {{ profile.created_at.format("%B %Y") }}
                 </p>
             </div>
 
             {# Actions #}
-            {% if is_own_profile %}
-            <a
-                href="/settings"
-                class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
-            >
-                Edit Profile
-            </a>
-            {% endif %}
+            <div class="flex items-center gap-2">
+                {% if is_own_profile %}
+                <a
+                    href="/users/{{ profile.id }}/saved"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                    Saved Recipes
+                </a>
+                <a
+                    href="/settings"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                    Edit Profile
+                </a>
+                {% else %}
+                {# Follow/Unfollow Button #}
+                {% if is_following %}
+                <button
+                    hx-delete="/api/v1/users/{{ profile.id }}/follow"
+                    hx-swap="outerHTML"
+                    hx-target="this"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                    Following
+                </button>
+                {% else %}
+                <button
+                    hx-post="/api/v1/users/{{ profile.id }}/follow"
+                    hx-swap="outerHTML"
+                    hx-target="this"
+                    class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                >
+                    Follow
+                </button>
+                {% endif %}
+                {% endif %}
+            </div>
         </div>
     </header>
 
