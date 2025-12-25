@@ -1,0 +1,51 @@
+# Rust
+target/
+debug/
+release/
+*.rs.bk
+*.rlib
+*.prof*
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# Tailwind CSS
+tailwindcss
+static/css/main.css
+
+# Test coverage
+coverage/
+*.profraw
+*.profdata
+
+# SQLx offline mode
+.sqlx/
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+
+# Added by cargo
+
+/target
