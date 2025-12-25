@@ -238,14 +238,14 @@ Based on plan.md project structure:
 
 ### Implementation for US4
 
-- [ ] T110 [US4] Add visibility filter to RecipeService.list_public method in src/services/recipe_service.rs
-- [ ] T111 [US4] Add visibility filter to BookService.list_public method in src/services/book_service.rs
-- [ ] T112 [US4] Add authorization check in RecipeService.get_by_id (return 404 for private + not owner)
-- [ ] T113 [US4] Add authorization check in BookService.get_by_id (return 404 for private + not owner)
-- [ ] T114 [US4] Add visibility toggle to recipe form in templates/recipes/form.html
-- [ ] T115 [US4] Add visibility toggle to book form in templates/books/form.html
-- [ ] T116 [US4] Add visibility badge to recipe_card and book_card components
-- [ ] T117 [US4] Filter private recipes from book view for non-owners
+- [x] T110 [US4] Add visibility filter to RecipeService.list_public method in src/services/recipe_service.rs
+- [x] T111 [US4] Add visibility filter to BookService.list_public method in src/services/book_service.rs
+- [x] T112 [US4] Add authorization check in RecipeService.get_by_id (return 404 for private + not owner)
+- [x] T113 [US4] Add authorization check in BookService.get_by_id (return 404 for private + not owner)
+- [x] T114 [US4] Add visibility toggle to recipe form in templates/recipes/form.html
+- [x] T115 [US4] Add visibility toggle to book form in templates/books/form.html
+- [x] T116 [US4] Add visibility badge to recipe_card and book_card components
+- [x] T117 [US4] Filter private recipes from book view for non-owners
 
 **Checkpoint**: User Story 4 complete - privacy controls working
 
@@ -257,16 +257,16 @@ Based on plan.md project structure:
 
 **Dependencies**: All entities from US1-US3
 
-- [ ] T118 Implement ActivityPub Actor for User in src/lib/activitypub/actor.rs
-- [ ] T119 Implement ActivityPub Object for Recipe in src/lib/activitypub/recipe.rs
-- [ ] T120 Implement ActivityPub Collection for RecipeBook in src/lib/activitypub/book.rs
-- [ ] T121 Implement WebFinger endpoint in src/api/webfinger.rs
-- [ ] T122 Implement ActivityPub inbox handler in src/api/activitypub.rs
-- [ ] T123 Implement ActivityPub outbox handler in src/api/activitypub.rs
-- [ ] T124 Generate ap_id for new entities in services
-- [ ] T125 Implement HTTP signature verification for incoming activities
-- [ ] T126 Implement HTTP signature signing for outgoing activities
-- [ ] T127 Create background job for federation delivery in src/jobs/federation.rs
+- [x] T118 Implement ActivityPub Actor for User in src/lib/activitypub/actor.rs
+- [x] T119 Implement ActivityPub Object for Recipe in src/lib/activitypub/recipe.rs
+- [x] T120 Implement ActivityPub Collection for RecipeBook in src/lib/activitypub/book.rs
+- [x] T121 Implement WebFinger endpoint in src/api/webfinger.rs
+- [x] T122 Implement ActivityPub inbox handler in src/api/activitypub.rs
+- [x] T123 Implement ActivityPub outbox handler in src/api/activitypub.rs
+- [x] T124 Generate ap_id for new entities in services
+- [x] T125 Implement HTTP signature verification for incoming activities
+- [x] T126 Implement HTTP signature signing for outgoing activities
+- [x] T127 Create background job for federation delivery in src/jobs/federation.rs
 
 **Checkpoint**: Federation infrastructure ready
 
