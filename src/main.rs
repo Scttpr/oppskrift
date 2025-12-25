@@ -72,8 +72,8 @@ fn create_router(state: AppState) -> Router {
     Router::new()
         // Health check endpoint
         .route("/health", get(health_check))
-        // API routes will be mounted here
-        // .nest("/api/v1", api::routes())
+        // API routes
+        .nest("/api/v1", api::routes())
         // HTML handler routes will be mounted here
         // .nest("/", handlers::routes())
         // Static file serving
