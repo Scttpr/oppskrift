@@ -81,7 +81,7 @@ impl RecipeService {
         .map_err(AppError::from)
     }
 
-    /// Get a recipe by ID
+    /// Get a recipe by ID (internal, no visibility check)
     pub async fn get_by_id(pool: &PgPool, id: Uuid) -> AppResult<Recipe> {
         sqlx::query_as!(
             Recipe,
@@ -100,6 +100,25 @@ impl RecipeService {
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Recipe {} not found", id)))
+    }
+
+    /// Get a recipe by ID with visibility check
+    /// Returns 404 for private recipes if viewer is not the author
+    pub async fn get_by_id_authorized(
+        pool: &PgPool,
+        id: Uuid,
+        viewer_id: Option<Uuid>,
+    ) -> AppResult<Recipe> {
+        let recipe = Self::get_by_id(pool, id).await?;
+
+        // Check visibility: private recipes only visible to author
+        if recipe.visibility == Visibility::Private {
+            if viewer_id != Some(recipe.author_id) {
+                return Err(AppError::NotFound(format!("Recipe {} not found", id)));
+            }
+        }
+
+        Ok(recipe)
     }
 
     /// Update a recipe

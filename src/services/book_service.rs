@@ -46,7 +46,7 @@ impl BookService {
         .map_err(AppError::from)
     }
 
-    /// Get a recipe book by ID
+    /// Get a recipe book by ID (internal, no visibility check)
     pub async fn get_by_id(pool: &PgPool, id: Uuid) -> AppResult<RecipeBook> {
         sqlx::query_as!(
             RecipeBook,
@@ -63,6 +63,25 @@ impl BookService {
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Recipe book {} not found", id)))
+    }
+
+    /// Get a recipe book by ID with visibility check
+    /// Returns 404 for private books if viewer is not the owner
+    pub async fn get_by_id_authorized(
+        pool: &PgPool,
+        id: Uuid,
+        viewer_id: Option<Uuid>,
+    ) -> AppResult<RecipeBook> {
+        let book = Self::get_by_id(pool, id).await?;
+
+        // Check visibility: private books only visible to owner
+        if book.visibility == Visibility::Private {
+            if viewer_id != Some(book.owner_id) {
+                return Err(AppError::NotFound(format!("Recipe book {} not found", id)));
+            }
+        }
+
+        Ok(book)
     }
 
     /// Update a recipe book
@@ -277,7 +296,7 @@ impl BookService {
         Ok(())
     }
 
-    /// Get recipes in a book
+    /// Get recipes in a book (all recipes, for owner)
     pub async fn get_recipes_in_book(
         pool: &PgPool,
         book_id: Uuid,
@@ -311,6 +330,53 @@ impl BookService {
 
         let total: i64 = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM book_recipe_entries WHERE book_id = $1",
+            book_id
+        )
+        .fetch_one(pool)
+        .await?
+        .unwrap_or(0);
+
+        Ok(PaginatedResponse::new(recipes, params.page, limit, total as u64))
+    }
+
+    /// Get public recipes in a book (for non-owners, filters out private recipes)
+    pub async fn get_public_recipes_in_book(
+        pool: &PgPool,
+        book_id: Uuid,
+        params: &PaginationParams,
+    ) -> AppResult<PaginatedResponse<RecipeSummary>> {
+        let limit = params.limit();
+        let offset = params.offset();
+
+        let recipes = sqlx::query_as!(
+            RecipeSummary,
+            r#"
+            SELECT
+                r.id, r.author_id, r.title, r.description,
+                r.prep_time_min, r.cook_time_min,
+                r.difficulty as "difficulty: crate::models::Difficulty",
+                r.created_at,
+                ri.url as primary_image_url
+            FROM recipes r
+            INNER JOIN book_recipe_entries e ON e.recipe_id = r.id
+            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
+            WHERE e.book_id = $1 AND r.visibility = 'public'
+            ORDER BY e.position
+            LIMIT $2 OFFSET $3
+            "#,
+            book_id,
+            limit as i64,
+            offset as i64
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let total: i64 = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) FROM book_recipe_entries e
+            INNER JOIN recipes r ON r.id = e.recipe_id
+            WHERE e.book_id = $1 AND r.visibility = 'public'
+            "#,
             book_id
         )
         .fetch_one(pool)
