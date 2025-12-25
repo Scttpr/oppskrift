@@ -1,0 +1,43 @@
+{# Book Card Component
+   Usage: {% include "components/book_card.html" %}
+   Variables: book (RecipeBookSummary)
+#}
+<article class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+    <a href="/books/{{ book.id }}" class="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+        {# Cover Image #}
+        <div class="aspect-[4/3] bg-gray-200 dark:bg-gray-700 relative">
+            {% if book.cover_image_url %}
+            <img
+                src="{{ book.cover_image_url }}"
+                alt="{{ book.title }}"
+                class="w-full h-full object-cover"
+                loading="lazy"
+            />
+            {% else %}
+            <div class="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+                <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+            </div>
+            {% endif %}
+
+            {# Recipe Count Badge #}
+            <span class="absolute bottom-2 right-2 px-2 py-1 text-xs font-medium rounded-full bg-gray-900/75 text-white">
+                {{ book.recipe_count }} recipe{% if book.recipe_count != 1 %}s{% endif %}
+            </span>
+        </div>
+
+        {# Book Info #}
+        <div class="p-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white line-clamp-2">
+                {{ book.title }}
+            </h3>
+
+            {% if book.description %}
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                {{ book.description }}
+            </p>
+            {% endif %}
+        </div>
+    </a>
+</article>
