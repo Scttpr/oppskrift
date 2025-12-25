@@ -18,8 +18,8 @@ pub enum AppError {
     #[error("Unauthorized")]
     Unauthorized,
 
-    #[error("Forbidden")]
-    Forbidden,
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
 
     #[error("Conflict: {0}")]
     Conflict(String),
@@ -51,7 +51,7 @@ impl IntoResponse for AppError {
             AppError::Unauthorized => {
                 (StatusCode::UNAUTHORIZED, "unauthorized", "Unauthorized".to_string())
             }
-            AppError::Forbidden => (StatusCode::FORBIDDEN, "forbidden", "Forbidden".to_string()),
+            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, "forbidden", msg.clone()),
             AppError::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone()),
             AppError::Validation(msg) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, "validation_error", msg.clone())
