@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" class="{% block html_class %}{% endblock %}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{% block meta_description %}Oppskrift - A federated recipe sharing platform{% endblock %}">
+    <title>{% block title %}Oppskrift{% endblock %}</title>
+
+    <!-- Tailwind CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="/static">
+
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <!-- Skip Links for Keyboard Navigation (Constitution IV) -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <a href="#main-nav" class="skip-link">Skip to navigation</a>
+
+    <!-- Header / Banner Landmark -->
+    <header role="banner" class="bg-white dark:bg-gray-800 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex-shrink-0">
+                    <a href="/" class="text-xl font-bold text-primary-600 dark:text-primary-400">
+                        Oppskrift
+                    </a>
+                </div>
+
+                <!-- Navigation Landmark -->
+                <nav id="main-nav" role="navigation" aria-label="Main navigation" class="hidden md:flex space-x-8">
+                    <a href="/recipes" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        Recipes
+                    </a>
+                    <a href="/books" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        Books
+                    </a>
+                    <a href="/feed" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        Feed
+                    </a>
+                    {% block nav_items %}{% endblock %}
+                </nav>
+
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
+                    {% block user_menu %}
+                    <a href="/login" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        Sign In
+                    </a>
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Landmark -->
+    <main id="main-content" role="main" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer / Contentinfo Landmark -->
+    <footer role="contentinfo" class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="text-gray-500 dark:text-gray-400 text-sm">
+                    &copy; {% block copyright_year %}2025{% endblock %} Oppskrift.
+                    <a href="/about" class="hover:text-primary-600">About</a> |
+                    <a href="/privacy" class="hover:text-primary-600">Privacy</a> |
+                    <a href="/terms" class="hover:text-primary-600">Terms</a>
+                </div>
+                <div class="text-gray-500 dark:text-gray-400 text-sm mt-4 md:mt-0">
+                    Powered by <a href="https://activitypub.rocks/" class="hover:text-primary-600">ActivityPub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- HTMX -->
+    <script src="/static/js/htmx.min.js"></script>
+
+    <!-- HTMX Configuration -->
+    <script>
+        // Configure HTMX for accessibility
+        htmx.config.defaultSwapStyle = 'innerHTML';
+        htmx.config.historyCacheSize = 10;
+
+        // Announce dynamic content changes to screen readers
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            const target = event.detail.target;
+            if (target.getAttribute('aria-live')) {
+                // Content will be announced automatically
+            }
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
