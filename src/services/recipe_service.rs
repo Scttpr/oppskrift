@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::lib::error::{AppError, AppResult};
-use crate::lib::pagination::{Page, PageParams};
+use crate::lib::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{
     CreateIngredient, CreateInstructionStep, CreateRecipe, Difficulty, Ingredient,
     InstructionStep, Recipe, RecipeSummary, UpdateRecipe, Visibility,
@@ -156,9 +156,10 @@ impl RecipeService {
     pub async fn list_by_author(
         pool: &PgPool,
         author_id: Uuid,
-        params: PageParams,
-    ) -> AppResult<Page<RecipeSummary>> {
-        let offset = (params.page.saturating_sub(1)) * params.per_page;
+        params: &PaginationParams,
+    ) -> AppResult<PaginatedResponse<RecipeSummary>> {
+        let limit = params.limit();
+        let offset = params.offset();
 
         let recipes = sqlx::query_as!(
             RecipeSummary,
@@ -176,7 +177,7 @@ impl RecipeService {
             LIMIT $2 OFFSET $3
             "#,
             author_id,
-            params.per_page as i64,
+            limit as i64,
             offset as i64
         )
         .fetch_all(pool)
@@ -190,17 +191,21 @@ impl RecipeService {
         .await?
         .unwrap_or(0);
 
-        Ok(Page {
-            items: recipes,
-            total: total as u64,
-            page: params.page,
-            per_page: params.per_page,
-        })
+        Ok(PaginatedResponse::new(
+            recipes,
+            params.page,
+            limit,
+            total as u64,
+        ))
     }
 
     /// List public recipes
-    pub async fn list_public(pool: &PgPool, params: PageParams) -> AppResult<Page<RecipeSummary>> {
-        let offset = (params.page.saturating_sub(1)) * params.per_page;
+    pub async fn list_public(
+        pool: &PgPool,
+        params: &PaginationParams,
+    ) -> AppResult<PaginatedResponse<RecipeSummary>> {
+        let limit = params.limit();
+        let offset = params.offset();
 
         let recipes = sqlx::query_as!(
             RecipeSummary,
@@ -217,7 +222,7 @@ impl RecipeService {
             ORDER BY r.created_at DESC
             LIMIT $1 OFFSET $2
             "#,
-            params.per_page as i64,
+            limit as i64,
             offset as i64
         )
         .fetch_all(pool)
@@ -230,12 +235,12 @@ impl RecipeService {
         .await?
         .unwrap_or(0);
 
-        Ok(Page {
-            items: recipes,
-            total: total as u64,
-            page: params.page,
-            per_page: params.per_page,
-        })
+        Ok(PaginatedResponse::new(
+            recipes,
+            params.page,
+            limit,
+            total as u64,
+        ))
     }
 
     /// Get ingredients for a recipe
@@ -383,20 +388,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_page_offset_calculation() {
-        let params = PageParams {
+    fn test_pagination_offset_calculation() {
+        let params = PaginationParams {
             page: 1,
-            per_page: 10,
+            page_size: 10,
         };
-        let offset = (params.page.saturating_sub(1)) * params.per_page;
-        assert_eq!(offset, 0);
+        assert_eq!(params.offset(), 0);
 
-        let params = PageParams {
+        let params = PaginationParams {
             page: 2,
-            per_page: 10,
+            page_size: 10,
         };
-        let offset = (params.page.saturating_sub(1)) * params.per_page;
-        assert_eq!(offset, 10);
+        assert_eq!(params.offset(), 10);
     }
 
     #[test]
