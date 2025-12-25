@@ -9,7 +9,7 @@ authors = ["scttpr"]
 
 [dependencies]
 # Web framework
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
@@ -48,6 +48,9 @@ validator = { version = "0.18", features = ["derive"] }
 # Error handling
 thiserror = "2"
 anyhow = "1"
+
+# Async traits
+async-trait = "0.1"
 
 # Image processing
 image = "0.25"
