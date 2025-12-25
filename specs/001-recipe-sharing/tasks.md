@@ -107,28 +107,28 @@ Based on plan.md project structure:
 
 ### HTML Handlers for US1
 
-- [ ] T048 [P] [US1] Create recipe card component template in templates/components/recipe_card.html
-- [ ] T049 [P] [US1] Create ingredient list component template in templates/components/ingredient_list.html
-- [ ] T050 [P] [US1] Create instruction steps component template in templates/components/instruction_steps.html
-- [ ] T051 [US1] Create recipe create/edit form page in templates/recipes/form.html with HTMX
-- [ ] T052 [US1] Create recipe view page in templates/recipes/view.html
-- [ ] T053 [US1] Create recipe list page in templates/recipes/list.html
-- [ ] T054 [US1] Implement HTML handlers in src/handlers/recipes.rs (create, view, edit, list pages)
-- [ ] T055 [US1] Create user profile page showing their recipes in templates/users/profile.html
-- [ ] T056 [US1] Implement user profile handler in src/handlers/users.rs
+- [x] T048 [P] [US1] Create recipe card component template in templates/components/recipe_card.html
+- [x] T049 [P] [US1] Create ingredient list component template in templates/components/ingredient_list.html
+- [x] T050 [P] [US1] Create instruction steps component template in templates/components/instruction_steps.html
+- [x] T051 [US1] Create recipe create/edit form page in templates/recipes/form.html with HTMX
+- [x] T052 [US1] Create recipe view page in templates/recipes/view.html
+- [x] T053 [US1] Create recipe list page in templates/recipes/list.html
+- [x] T054 [US1] Implement HTML handlers in src/handlers/recipes.rs (create, view, edit, list pages)
+- [x] T055 [US1] Create user profile page showing their recipes in templates/users/profile.html
+- [x] T056 [US1] Implement user profile handler in src/handlers/users.rs
 
 ### Metric/Imperial Conversion for US1
 
-- [ ] T057 [US1] Implement unit conversion utilities in src/lib/units.rs (metric ↔ imperial)
-- [ ] T058 [US1] Apply user's measurement preference when rendering ingredients in templates
+- [x] T057 [US1] Implement unit conversion utilities in src/lib/units.rs (metric ↔ imperial)
+- [x] T058 [US1] Apply user's measurement preference when rendering ingredients in templates
 
 ### Seeds & Fixtures for MVP Testing
 
-- [ ] T059 Create src/lib/seed.rs with seed runner, environment detection (dev/test), and CLI flag `--seed`
-- [ ] T060 Create seed data: 3 test users (alice/metric, bob/imperial, chef_marie/metric) in src/lib/seeds/users.rs
-- [ ] T061 Create seed data: 5 sample recipes with varying complexity (simple 3-ingredient to complex 15-ingredient) in src/lib/seeds/recipes.rs
-- [ ] T062 Create seed data: 1 "stress test" recipe at validation limits (50 ingredients, 30 steps, 10 images) in src/lib/seeds/recipes.rs
-- [ ] T063 Add seed command to Makefile (`make seed` runs with --seed flag, `make reset-db` drops + migrates + seeds)
+- [x] T059 Create src/lib/seed.rs with seed runner, environment detection (dev/test), and CLI flag `--seed`
+- [x] T060 Create seed data: 3 test users (alice/metric, bob/imperial, chef_marie/metric) in src/lib/seeds/users.rs
+- [x] T061 Create seed data: 5 sample recipes with varying complexity (simple 3-ingredient to complex 15-ingredient) in src/lib/seeds/recipes.rs
+- [x] T062 Create seed data: 1 "stress test" recipe at validation limits (50 ingredients, 30 steps, 10 images) in src/lib/seeds/recipes.rs
+- [x] T063 Add seed command to Makefile (`make seed` runs with --seed flag, `make reset-db` drops + migrates + seeds)
 
 **Checkpoint**: User Story 1 complete - users can create, view, edit, delete recipes with all details
 
