@@ -6,9 +6,9 @@
     <a href="/books/{{ book.id }}" class="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
         {# Cover Image #}
         <div class="aspect-[4/3] bg-gray-200 dark:bg-gray-700 relative">
-            {% if book.cover_image_url %}
+            {% if let Some(cover_url) = book.cover_image_url %}
             <img
-                src="{{ book.cover_image_url }}"
+                src="{{ cover_url }}"
                 alt="{{ book.title }}"
                 class="w-full h-full object-cover"
                 loading="lazy"
@@ -33,9 +33,9 @@
                 {{ book.title }}
             </h3>
 
-            {% if book.description %}
+            {% if let Some(desc) = book.description %}
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                {{ book.description }}
+                {{ desc }}
             </p>
             {% endif %}
         </div>
