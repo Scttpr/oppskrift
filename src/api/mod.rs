@@ -3,6 +3,7 @@
 pub mod books;
 pub mod middleware;
 pub mod recipes;
+pub mod social;
 pub mod users;
 
 use axum::Router;
@@ -15,4 +16,5 @@ pub fn routes() -> Router<AppState> {
         .nest("/users", users::routes())
         .nest("/recipes", recipes::routes())
         .nest("/books", books::routes())
+        .merge(social::routes())
 }
