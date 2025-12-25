@@ -1,5 +1,6 @@
 // API module - REST endpoints, ActivityPub handlers
 
+pub mod books;
 pub mod middleware;
 pub mod recipes;
 pub mod users;
@@ -13,4 +14,5 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .nest("/users", users::routes())
         .nest("/recipes", recipes::routes())
+        .nest("/books", books::routes())
 }
