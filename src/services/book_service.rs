@@ -107,8 +107,35 @@ impl BookService {
         Ok(())
     }
 
-    /// List books by owner
+    /// List all books by owner (for dropdowns, no pagination)
     pub async fn list_by_owner(
+        pool: &PgPool,
+        owner_id: Uuid,
+    ) -> AppResult<Vec<RecipeBookSummary>> {
+        let books = sqlx::query_as!(
+            RecipeBookSummary,
+            r#"
+            SELECT
+                b.id, b.owner_id, b.title, b.description, b.cover_image_url,
+                b.visibility as "visibility: Visibility",
+                b.created_at,
+                COUNT(e.id) as "recipe_count!"
+            FROM recipe_books b
+            LEFT JOIN book_recipe_entries e ON e.book_id = b.id
+            WHERE b.owner_id = $1
+            GROUP BY b.id
+            ORDER BY b.title
+            "#,
+            owner_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(books)
+    }
+
+    /// List books by owner with pagination
+    pub async fn list_by_owner_paginated(
         pool: &PgPool,
         owner_id: Uuid,
         params: &PaginationParams,

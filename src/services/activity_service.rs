@@ -167,13 +167,13 @@ impl ActivityService {
             LIMIT $2 OFFSET $3
             "#,
             user_id,
-            limit,
-            offset
+            limit as i64,
+            offset as i64
         )
         .fetch_all(pool)
         .await?;
 
-        Ok(PaginatedResponse::new(activities, total, params))
+        Ok(PaginatedResponse::new(activities, params.page, limit, total as u64))
     }
 
     /// Get activities by a specific user
@@ -210,13 +210,13 @@ impl ActivityService {
             LIMIT $2 OFFSET $3
             "#,
             user_id,
-            limit,
-            offset
+            limit as i64,
+            offset as i64
         )
         .fetch_all(pool)
         .await?;
 
-        Ok(PaginatedResponse::new(activities, total, params))
+        Ok(PaginatedResponse::new(activities, params.page, limit, total as u64))
     }
 }
 
