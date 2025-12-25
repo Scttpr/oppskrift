@@ -8,10 +8,40 @@ use crate::models::{
     InstructionStep, Recipe, RecipeSummary, UpdateRecipe, Visibility,
 };
 
+/// Maximum number of ingredients per recipe
+pub const MAX_INGREDIENTS: usize = 50;
+
+/// Maximum number of instruction steps per recipe
+pub const MAX_INSTRUCTIONS: usize = 30;
+
 /// Service for recipe-related database operations
 pub struct RecipeService;
 
 impl RecipeService {
+    /// Validate ingredient count
+    pub fn validate_ingredients(ingredients: &[CreateIngredient]) -> AppResult<()> {
+        if ingredients.len() > MAX_INGREDIENTS {
+            return Err(AppError::Validation(format!(
+                "Recipe cannot have more than {} ingredients (got {})",
+                MAX_INGREDIENTS,
+                ingredients.len()
+            )));
+        }
+        Ok(())
+    }
+
+    /// Validate instruction step count
+    pub fn validate_instructions(steps: &[CreateInstructionStep]) -> AppResult<()> {
+        if steps.len() > MAX_INSTRUCTIONS {
+            return Err(AppError::Validation(format!(
+                "Recipe cannot have more than {} instruction steps (got {})",
+                MAX_INSTRUCTIONS,
+                steps.len()
+            )));
+        }
+        Ok(())
+    }
+
     /// Create a new recipe
     pub async fn create(
         pool: &PgPool,
@@ -253,6 +283,8 @@ impl RecipeService {
         recipe_id: Uuid,
         ingredients: Vec<CreateIngredient>,
     ) -> AppResult<Vec<Ingredient>> {
+        Self::validate_ingredients(&ingredients)?;
+
         let mut result = Vec::new();
 
         for ingredient in ingredients {
@@ -285,6 +317,8 @@ impl RecipeService {
         recipe_id: Uuid,
         steps: Vec<CreateInstructionStep>,
     ) -> AppResult<Vec<InstructionStep>> {
+        Self::validate_instructions(&steps)?;
+
         let mut result = Vec::new();
 
         for step in steps {
@@ -363,5 +397,63 @@ mod tests {
         };
         let offset = (params.page.saturating_sub(1)) * params.per_page;
         assert_eq!(offset, 10);
+    }
+
+    #[test]
+    fn test_validate_ingredients_ok() {
+        let ingredients: Vec<CreateIngredient> = (1..=50)
+            .map(|i| CreateIngredient {
+                position: i,
+                quantity: None,
+                unit: None,
+                name: format!("Ingredient {}", i),
+                notes: None,
+            })
+            .collect();
+
+        assert!(RecipeService::validate_ingredients(&ingredients).is_ok());
+    }
+
+    #[test]
+    fn test_validate_ingredients_too_many() {
+        let ingredients: Vec<CreateIngredient> = (1..=51)
+            .map(|i| CreateIngredient {
+                position: i,
+                quantity: None,
+                unit: None,
+                name: format!("Ingredient {}", i),
+                notes: None,
+            })
+            .collect();
+
+        assert!(RecipeService::validate_ingredients(&ingredients).is_err());
+    }
+
+    #[test]
+    fn test_validate_instructions_ok() {
+        let steps: Vec<CreateInstructionStep> = (1..=30)
+            .map(|i| CreateInstructionStep {
+                step_number: i,
+                description: format!("Step {}", i),
+                image_url: None,
+                duration_min: None,
+            })
+            .collect();
+
+        assert!(RecipeService::validate_instructions(&steps).is_ok());
+    }
+
+    #[test]
+    fn test_validate_instructions_too_many() {
+        let steps: Vec<CreateInstructionStep> = (1..=31)
+            .map(|i| CreateInstructionStep {
+                step_number: i,
+                description: format!("Step {}", i),
+                image_url: None,
+                duration_min: None,
+            })
+            .collect();
+
+        assert!(RecipeService::validate_instructions(&steps).is_err());
     }
 }
