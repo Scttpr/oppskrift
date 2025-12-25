@@ -116,7 +116,7 @@ impl SavedRecipeService {
         let recipes = sqlx::query_as!(
             RecipeSummary,
             r#"
-            SELECT r.id, r.title, r.description,
+            SELECT r.id, r.author_id, r.title, r.description,
                    r.difficulty as "difficulty: _",
                    r.prep_time_min, r.cook_time_min,
                    r.created_at,
@@ -128,13 +128,13 @@ impl SavedRecipeService {
             LIMIT $2 OFFSET $3
             "#,
             user_id,
-            limit,
-            offset
+            limit as i64,
+            offset as i64
         )
         .fetch_all(pool)
         .await?;
 
-        Ok(PaginatedResponse::new(recipes, total, params))
+        Ok(PaginatedResponse::new(recipes, params.page, limit, total as u64))
     }
 }
 
