@@ -276,13 +276,13 @@ Based on plan.md project structure:
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T128 [P] Add rate limiting middleware with tower-governor in src/api/middleware/rate_limit.rs
-- [ ] T129 [P] Add request logging with tracing in src/main.rs
-- [ ] T130 [P] Create health check endpoint GET /health in src/api/health.rs
+- [x] T128 [P] Add rate limiting middleware with tower-governor in src/api/middleware/rate_limit.rs
+- [x] T129 [P] Add request logging with tracing in src/main.rs
+- [x] T130 [P] Create health check endpoint GET /health in src/api/health.rs
 - [ ] T131 [P] Add OpenAPI documentation generation (utoipa or similar)
 - [ ] T132 Implement input validation with validator crate across all endpoints
 - [ ] T133 Add proper error responses matching OpenAPI spec
-- [ ] T134 Create database indexes per data-model.md specifications
+- [x] T134 Create database indexes per data-model.md specifications
 
 ### Accessibility (Constitution v1.2.0 - State of the Art)
 
@@ -310,10 +310,10 @@ Based on plan.md project structure:
 
 ### Constitution Compliance & Quality
 
-- [ ] T153 [P] Implement RSS/Atom feeds for public recipes and user profiles in src/api/feeds.rs (Constitution III: RSS/Atom)
-- [ ] T154 [P] Implement oEmbed endpoint for recipe embedding in src/api/oembed.rs (Constitution III: Embedding)
+- [x] T153 [P] Implement RSS/Atom feeds for public recipes and user profiles in src/api/feeds.rs (Constitution III: RSS/Atom)
+- [x] T154 [P] Implement oEmbed endpoint for recipe embedding in src/api/oembed.rs (Constitution III: Embedding)
 - [ ] T155 [P] Document encryption-at-rest requirements for PostgreSQL and S3 in DEPLOYMENT.md (Constitution II: Security)
-- [ ] T156 [P] Setup background job queue infrastructure with tokio tasks or sqlx-based queue in src/jobs/mod.rs (Constitution V: Background Jobs)
+- [x] T156 [P] Setup background job queue infrastructure with tokio tasks or sqlx-based queue in src/jobs/mod.rs (Constitution V: Background Jobs)
 - [ ] T157 Run load testing with k6 to verify SC-007 (1000 concurrent users) and document results
 - [ ] T158 Add UX metrics instrumentation for SC-001/002/003 (recipe creation time, book creation time, first-publish success rate)
 
