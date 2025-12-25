@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     routing::{get, post},
     Json, Router,
@@ -11,9 +11,10 @@ use crate::api::middleware::AuthUser;
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
 use crate::lib::schema_org::SchemaOrgRecipe;
+use crate::lib::storage::StorageClient;
 use crate::models::{
     CreateIngredient, CreateInstructionStep, CreateRecipe, Ingredient, InstructionStep, Recipe,
-    RecipeSummary, UpdateRecipe,
+    RecipeImage, RecipeSummary, UpdateRecipe,
 };
 use crate::services::{ImageService, RecipeService, UserService};
 use crate::AppState;
@@ -23,6 +24,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_recipes).post(create_recipe))
         .route("/{id}", get(get_recipe).put(update_recipe).delete(delete_recipe))
+        .route("/{id}/images", post(upload_image))
 }
 
 /// Request body for creating a recipe with ingredients and instructions
@@ -208,4 +210,76 @@ async fn list_recipes(
 ) -> AppResult<Json<PaginatedResponse<RecipeSummary>>> {
     let recipes = RecipeService::list_public(&state.db, &params).await?;
     Ok(Json(recipes))
+}
+
+/// POST /api/v1/recipes/{id}/images
+/// Upload an image for a recipe
+async fn upload_image(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    auth: AuthUser,
+    mut multipart: Multipart,
+) -> AppResult<(StatusCode, Json<RecipeImage>)> {
+    // Check ownership
+    let existing = RecipeService::get_by_id(&state.db, id).await?;
+    if existing.author_id != auth.id {
+        return Err(AppError::Forbidden);
+    }
+
+    // Create storage client
+    let storage = StorageClient::from_env().await?;
+
+    let mut image_data: Option<Vec<u8>> = None;
+    let mut alt_text: Option<String> = None;
+    let mut is_primary = false;
+    let mut content_type: Option<String> = None;
+
+    // Parse multipart form
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Failed to parse multipart: {}", e)))?
+    {
+        let name = field.name().unwrap_or("").to_string();
+
+        match name.as_str() {
+            "image" => {
+                content_type = field.content_type().map(|s| s.to_string());
+                image_data = Some(
+                    field
+                        .bytes()
+                        .await
+                        .map_err(|e| AppError::BadRequest(format!("Failed to read image: {}", e)))?
+                        .to_vec(),
+                );
+            }
+            "alt_text" => {
+                alt_text = Some(
+                    field
+                        .text()
+                        .await
+                        .map_err(|e| {
+                            AppError::BadRequest(format!("Failed to read alt_text: {}", e))
+                        })?,
+                );
+            }
+            "is_primary" => {
+                let value = field.text().await.unwrap_or_default();
+                is_primary = value == "true" || value == "1";
+            }
+            _ => {}
+        }
+    }
+
+    let data = image_data.ok_or_else(|| AppError::BadRequest("No image provided".to_string()))?;
+
+    // Validate MIME type if provided
+    if let Some(mime) = &content_type {
+        ImageService::validate_mime_type(mime)?;
+    }
+
+    // Upload the image
+    let image = ImageService::upload_image(&state.db, &storage, id, data, alt_text, is_primary).await?;
+
+    Ok((StatusCode::CREATED, Json(image)))
 }
