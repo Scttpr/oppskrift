@@ -1,17 +1,17 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}{% if book %}Edit Book{% else %}Create Book{% endif %} - Oppskrift{% endblock %}
+{% block title %}{% if let Some(_) = book %}Edit Book{% else %}Create Book{% endif %} - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
     <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">
-        {% if book %}Edit Recipe Book{% else %}Create a New Recipe Book{% endif %}
+        {% if let Some(_) = book %}Edit Recipe Book{% else %}Create a New Recipe Book{% endif %}
     </h1>
 
     <form
         method="post"
         enctype="multipart/form-data"
-        action="{% if book %}/books/{{ book.id }}{% else %}/books{% endif %}"
+        action="{% if let Some(b) = book %}/books/{{ b.id }}{% else %}/books{% endif %}"
         class="space-y-6"
     >
         {# Title #}
@@ -25,7 +25,7 @@
                 name="title"
                 required
                 maxlength="200"
-                value="{% if book %}{{ book.title }}{% endif %}"
+                value="{% if let Some(b) = book %}{{ b.title }}{% endif %}"
                 class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 aria-describedby="title-help"
             />
@@ -44,7 +44,7 @@
                 name="description"
                 rows="3"
                 class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            >{% if book %}{{ book.description }}{% endif %}</textarea>
+            >{% if let Some(b) = book %}{% if let Some(desc) = b.description %}{{ desc }}{% endif %}{% endif %}</textarea>
         </div>
 
         {# Cover Image #}
@@ -65,8 +65,10 @@
                     dark:file:bg-primary-900 dark:file:text-primary-300
                     hover:file:bg-primary-100 dark:hover:file:bg-primary-800"
             />
-            {% if book and book.cover_image_url %}
-            <img src="{{ book.cover_image_url }}" alt="Current cover" class="mt-2 w-32 h-24 object-cover rounded" />
+            {% if let Some(b) = book %}
+            {% if let Some(cover_url) = b.cover_image_url %}
+            <img src="{{ cover_url }}" alt="Current cover" class="mt-2 w-32 h-24 object-cover rounded" />
+            {% endif %}
             {% endif %}
         </div>
 
@@ -79,7 +81,10 @@
                         type="radio"
                         name="visibility"
                         value="public"
-                        {% if not book or book.visibility == "public" %}checked{% endif %}
+                        {% match book %}
+                        {% when Some with (b) %}{% if b.visibility.to_string() == "public" %}checked{% endif %}
+                        {% when None %}checked
+                        {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
                     <span class="text-gray-700 dark:text-gray-300">Public</span>
@@ -89,7 +94,10 @@
                         type="radio"
                         name="visibility"
                         value="private"
-                        {% if book and book.visibility == "private" %}checked{% endif %}
+                        {% match book %}
+                        {% when Some with (b) %}{% if b.visibility.to_string() == "private" %}checked{% endif %}
+                        {% when None %}
+                        {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
                     <span class="text-gray-700 dark:text-gray-300">Private</span>
@@ -103,10 +111,10 @@
                 type="submit"
                 class="px-6 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
             >
-                {% if book %}Update Book{% else %}Create Book{% endif %}
+                {% if let Some(_) = book %}Update Book{% else %}Create Book{% endif %}
             </button>
             <a
-                href="{% if book %}/books/{{ book.id }}{% else %}/books{% endif %}"
+                href="{% if let Some(b) = book %}/books/{{ b.id }}{% else %}/books{% endif %}"
                 class="px-6 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
             >
                 Cancel

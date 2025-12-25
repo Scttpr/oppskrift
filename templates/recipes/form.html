@@ -1,17 +1,17 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}{% if recipe %}Edit Recipe{% else %}Create Recipe{% endif %} - Oppskrift{% endblock %}
+{% block title %}{% if let Some(_) = recipe %}Edit Recipe{% else %}Create Recipe{% endif %} - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
     <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">
-        {% if recipe %}Edit Recipe{% else %}Create a New Recipe{% endif %}
+        {% if let Some(_) = recipe %}Edit Recipe{% else %}Create a New Recipe{% endif %}
     </h1>
 
     <form
         method="post"
-        action="{% if recipe %}/recipes/{{ recipe.id }}{% else %}/recipes{% endif %}"
-        hx-post="{% if recipe %}/api/v1/recipes/{{ recipe.id }}{% else %}/api/v1/recipes{% endif %}"
+        action="{% if let Some(r) = recipe %}/recipes/{{ r.id }}{% else %}/recipes{% endif %}"
+        hx-post="{% if let Some(r) = recipe %}/api/v1/recipes/{{ r.id }}{% else %}/api/v1/recipes{% endif %}"
         hx-target="#form-result"
         hx-swap="innerHTML"
         class="space-y-8"
@@ -30,7 +30,7 @@
                     name="title"
                     required
                     maxlength="200"
-                    value="{% if recipe %}{{ recipe.title }}{% endif %}"
+                    value="{% if let Some(r) = recipe %}{{ r.title }}{% endif %}"
                     class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     aria-describedby="title-help"
                 />
@@ -49,7 +49,7 @@
                     rows="3"
                     class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     aria-describedby="description-help"
-                >{% if recipe %}{{ recipe.description }}{% endif %}</textarea>
+                >{% if let Some(r) = recipe %}{% if let Some(desc) = r.description %}{{ desc }}{% endif %}{% endif %}</textarea>
                 <p id="description-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     A brief summary of your recipe
                 </p>
@@ -70,7 +70,7 @@
                         id="prep_time_min"
                         name="prep_time_min"
                         min="0"
-                        value="{% if recipe %}{{ recipe.prep_time_min }}{% endif %}"
+                        value="{% if let Some(r) = recipe %}{% if let Some(pt) = r.prep_time_min %}{{ pt }}{% endif %}{% endif %}"
                         class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     />
                 </div>
@@ -84,7 +84,7 @@
                         id="cook_time_min"
                         name="cook_time_min"
                         min="0"
-                        value="{% if recipe %}{{ recipe.cook_time_min }}{% endif %}"
+                        value="{% if let Some(r) = recipe %}{% if let Some(ct) = r.cook_time_min %}{{ ct }}{% endif %}{% endif %}"
                         class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     />
                 </div>
@@ -99,9 +99,16 @@
                         class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     >
                         <option value="">Select...</option>
-                        <option value="easy" {% if recipe and recipe.difficulty == "easy" %}selected{% endif %}>Easy</option>
-                        <option value="medium" {% if recipe and recipe.difficulty == "medium" %}selected{% endif %}>Medium</option>
-                        <option value="hard" {% if recipe and recipe.difficulty == "hard" %}selected{% endif %}>Hard</option>
+                        {% match recipe %}
+                        {% when Some with (r) %}
+                        <option value="easy" {% if let Some(d) = r.difficulty %}{% if d == "easy" %}selected{% endif %}{% endif %}>Easy</option>
+                        <option value="medium" {% if let Some(d) = r.difficulty %}{% if d == "medium" %}selected{% endif %}{% endif %}>Medium</option>
+                        <option value="hard" {% if let Some(d) = r.difficulty %}{% if d == "hard" %}selected{% endif %}{% endif %}>Hard</option>
+                        {% when None %}
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                        {% endmatch %}
                     </select>
                 </div>
             </div>
@@ -116,7 +123,7 @@
                     name="servings"
                     maxlength="50"
                     placeholder="e.g., 4 servings, 12 cookies"
-                    value="{% if recipe %}{{ recipe.servings }}{% endif %}"
+                    value="{% if let Some(r) = recipe %}{% if let Some(s) = r.servings %}{{ s }}{% endif %}{% endif %}"
                     class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 />
             </div>
@@ -132,7 +139,10 @@
                         type="radio"
                         name="visibility"
                         value="public"
-                        {% if not recipe or recipe.visibility == "public" %}checked{% endif %}
+                        {% match recipe %}
+                        {% when Some with (r) %}{% if r.visibility.to_string() == "public" %}checked{% endif %}
+                        {% when None %}checked
+                        {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
                     <span class="text-gray-700 dark:text-gray-300">Public</span>
@@ -142,7 +152,10 @@
                         type="radio"
                         name="visibility"
                         value="private"
-                        {% if recipe and recipe.visibility == "private" %}checked{% endif %}
+                        {% match recipe %}
+                        {% when Some with (r) %}{% if r.visibility.to_string() == "private" %}checked{% endif %}
+                        {% when None %}
+                        {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
                     <span class="text-gray-700 dark:text-gray-300">Private</span>
@@ -159,10 +172,10 @@
                 type="submit"
                 class="px-6 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
             >
-                {% if recipe %}Update Recipe{% else %}Create Recipe{% endif %}
+                {% if let Some(_) = recipe %}Update Recipe{% else %}Create Recipe{% endif %}
             </button>
             <a
-                href="{% if recipe %}/recipes/{{ recipe.id }}{% else %}/recipes{% endif %}"
+                href="{% if let Some(r) = recipe %}/recipes/{{ r.id }}{% else %}/recipes{% endif %}"
                 class="px-6 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
             >
                 Cancel
