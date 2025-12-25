@@ -1,5 +1,6 @@
 // Handlers module - HTML page handlers (serve templates)
 
+pub mod books;
 pub mod recipes;
 pub mod users;
 
@@ -11,5 +12,6 @@ use crate::AppState;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .nest("/recipes", recipes::routes())
+        .nest("/books", books::routes())
         .nest("/users", users::routes())
 }
