@@ -156,7 +156,7 @@ async fn update_recipe(
     // Check ownership
     let existing = RecipeService::get_by_id(&state.db, id).await?;
     if existing.author_id != auth.id {
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("Not authorized to modify this recipe".to_string()));
     }
 
     // Update recipe
@@ -195,7 +195,7 @@ async fn delete_recipe(
     // Check ownership
     let existing = RecipeService::get_by_id(&state.db, id).await?;
     if existing.author_id != auth.id {
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("Not authorized to modify this recipe".to_string()));
     }
 
     RecipeService::delete(&state.db, id).await?;
@@ -223,7 +223,7 @@ async fn upload_image(
     // Check ownership
     let existing = RecipeService::get_by_id(&state.db, id).await?;
     if existing.author_id != auth.id {
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("Not authorized to modify this recipe".to_string()));
     }
 
     // Create storage client
