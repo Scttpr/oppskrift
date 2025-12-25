@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use validator::Validate;
 
 use super::recipe::Visibility;
 
@@ -20,19 +21,25 @@ pub struct RecipeBook {
 }
 
 /// Create a new recipe book
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct CreateRecipeBook {
+    #[validate(length(min = 1, max = 200, message = "Title must be 1-200 characters"))]
     pub title: String,
+    #[validate(length(max = 1000, message = "Description must be at most 1000 characters"))]
     pub description: Option<String>,
+    #[validate(url(message = "Cover image must be a valid URL"))]
     pub cover_image_url: Option<String>,
     pub visibility: Option<Visibility>,
 }
 
 /// Update a recipe book
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct UpdateRecipeBook {
+    #[validate(length(min = 1, max = 200, message = "Title must be 1-200 characters"))]
     pub title: Option<String>,
+    #[validate(length(max = 1000, message = "Description must be at most 1000 characters"))]
     pub description: Option<String>,
+    #[validate(url(message = "Cover image must be a valid URL"))]
     pub cover_image_url: Option<String>,
     pub visibility: Option<Visibility>,
 }

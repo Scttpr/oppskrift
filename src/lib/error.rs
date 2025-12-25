@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::Serialize;
 use thiserror::Error;
+use utoipa::ToSchema;
 
 /// Application error types
 #[derive(Debug, Error)]
@@ -35,7 +36,7 @@ pub enum AppError {
 }
 
 /// Error response body
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ErrorResponse {
     pub error: String,
     pub message: String,

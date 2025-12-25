@@ -5,6 +5,7 @@ pub mod books;
 pub mod feeds;
 pub mod middleware;
 pub mod oembed;
+pub mod openapi;
 pub mod recipes;
 pub mod social;
 pub mod users;
@@ -35,4 +36,10 @@ pub fn syndication_routes() -> Router<AppState> {
     Router::new()
         .merge(feeds::routes())
         .merge(oembed::routes())
+}
+
+/// Create documentation routes
+pub fn docs_routes() -> Router<AppState> {
+    Router::new()
+        .merge(openapi::routes())
 }

@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use validator::Validate;
 
 /// Recipe visibility
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
@@ -65,25 +66,35 @@ pub struct Recipe {
 }
 
 /// Create a new recipe
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct CreateRecipe {
+    #[validate(length(min = 1, max = 200, message = "Title must be 1-200 characters"))]
     pub title: String,
+    #[validate(length(max = 2000, message = "Description must be at most 2000 characters"))]
     pub description: Option<String>,
     pub visibility: Option<Visibility>,
+    #[validate(range(min = 0, max = 1440, message = "Prep time must be 0-1440 minutes"))]
     pub prep_time_min: Option<i32>,
+    #[validate(range(min = 0, max = 1440, message = "Cook time must be 0-1440 minutes"))]
     pub cook_time_min: Option<i32>,
+    #[validate(length(max = 100, message = "Servings must be at most 100 characters"))]
     pub servings: Option<String>,
     pub difficulty: Option<Difficulty>,
 }
 
 /// Update an existing recipe
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct UpdateRecipe {
+    #[validate(length(min = 1, max = 200, message = "Title must be 1-200 characters"))]
     pub title: Option<String>,
+    #[validate(length(max = 2000, message = "Description must be at most 2000 characters"))]
     pub description: Option<String>,
     pub visibility: Option<Visibility>,
+    #[validate(range(min = 0, max = 1440, message = "Prep time must be 0-1440 minutes"))]
     pub prep_time_min: Option<i32>,
+    #[validate(range(min = 0, max = 1440, message = "Cook time must be 0-1440 minutes"))]
     pub cook_time_min: Option<i32>,
+    #[validate(length(max = 100, message = "Servings must be at most 100 characters"))]
     pub servings: Option<String>,
     pub difficulty: Option<Difficulty>,
 }

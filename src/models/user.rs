@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use validator::Validate;
 
 /// User measurement preference
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
@@ -44,10 +45,13 @@ pub struct CreateUser {
 }
 
 /// Update user profile
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct UpdateUser {
+    #[validate(length(min = 1, max = 100, message = "Display name must be 1-100 characters"))]
     pub display_name: Option<String>,
+    #[validate(length(max = 500, message = "Bio must be at most 500 characters"))]
     pub bio: Option<String>,
+    #[validate(url(message = "Avatar URL must be a valid URL"))]
     pub avatar_url: Option<String>,
     pub measurement_pref: Option<MeasurementPref>,
 }
