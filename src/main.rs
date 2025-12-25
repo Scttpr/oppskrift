@@ -10,6 +10,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod api;
 mod handlers;
+mod jobs;
 mod lib;
 mod models;
 mod services;
@@ -74,6 +75,8 @@ fn create_router(state: AppState) -> Router {
         .route("/health", get(health_check))
         // API routes
         .nest("/api/v1", api::routes())
+        // ActivityPub federation routes
+        .merge(api::federation_routes())
         // HTML handler routes
         .merge(handlers::routes())
         // Static file serving

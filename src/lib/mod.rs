@@ -1,5 +1,6 @@
 // Lib module - Shared utilities, Schema.org serialization
 
+pub mod activitypub;
 pub mod db;
 pub mod error;
 pub mod pagination;
