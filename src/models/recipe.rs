@@ -18,6 +18,15 @@ impl Default for Visibility {
     }
 }
 
+impl std::fmt::Display for Visibility {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Visibility::Public => write!(f, "Public"),
+            Visibility::Private => write!(f, "Private"),
+        }
+    }
+}
+
 /// Recipe difficulty level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "difficulty_type", rename_all = "lowercase")]
@@ -26,6 +35,16 @@ pub enum Difficulty {
     Easy,
     Medium,
     Hard,
+}
+
+impl std::fmt::Display for Difficulty {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Difficulty::Easy => write!(f, "Easy"),
+            Difficulty::Medium => write!(f, "Medium"),
+            Difficulty::Hard => write!(f, "Hard"),
+        }
+    }
 }
 
 /// Recipe entity - core content type
