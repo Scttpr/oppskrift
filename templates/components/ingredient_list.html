@@ -1,0 +1,40 @@
+{# Ingredient List Component
+   Usage: {% include "components/ingredient_list.html" %}
+   Variables: ingredients (Vec<Ingredient>), measurement_pref (optional)
+#}
+<section aria-labelledby="ingredients-heading">
+    <h2 id="ingredients-heading" class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+        Ingredients
+    </h2>
+
+    <ul class="space-y-2" role="list">
+        {% for ingredient in ingredients %}
+        <li class="flex items-start gap-3 text-gray-700 dark:text-gray-300">
+            <span class="flex-shrink-0 w-5 h-5 mt-0.5 text-primary-500" aria-hidden="true">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+            </span>
+            <span>
+                {% if ingredient.quantity %}
+                <span class="font-medium">{{ ingredient.quantity }}</span>
+                {% endif %}
+
+                {% if ingredient.unit %}
+                <span>{{ ingredient.unit }}</span>
+                {% endif %}
+
+                <span>{{ ingredient.name }}</span>
+
+                {% if ingredient.notes %}
+                <span class="text-gray-500 dark:text-gray-400 italic">({{ ingredient.notes }})</span>
+                {% endif %}
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+
+    {% if ingredients|length == 0 %}
+    <p class="text-gray-500 dark:text-gray-400 italic">No ingredients listed.</p>
+    {% endif %}
+</section>
