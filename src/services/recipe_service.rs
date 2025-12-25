@@ -1,0 +1,367 @@
+use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::lib::error::{AppError, AppResult};
+use crate::lib::pagination::{Page, PageParams};
+use crate::models::{
+    CreateIngredient, CreateInstructionStep, CreateRecipe, Difficulty, Ingredient,
+    InstructionStep, Recipe, RecipeSummary, UpdateRecipe, Visibility,
+};
+
+/// Service for recipe-related database operations
+pub struct RecipeService;
+
+impl RecipeService {
+    /// Create a new recipe
+    pub async fn create(
+        pool: &PgPool,
+        author_id: Uuid,
+        input: CreateRecipe,
+        base_url: &str,
+    ) -> AppResult<Recipe> {
+        let id = Uuid::new_v4();
+        let ap_id = format!("{}/recipes/{}", base_url, id);
+        let visibility = input.visibility.unwrap_or_default();
+
+        sqlx::query_as!(
+            Recipe,
+            r#"
+            INSERT INTO recipes (id, author_id, title, description, visibility, prep_time_min, cook_time_min, servings, difficulty, ap_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING
+                id, author_id, title, description,
+                visibility as "visibility: Visibility",
+                prep_time_min, cook_time_min, servings,
+                difficulty as "difficulty: Difficulty",
+                created_at, updated_at, ap_id
+            "#,
+            id,
+            author_id,
+            input.title,
+            input.description,
+            visibility as Visibility,
+            input.prep_time_min,
+            input.cook_time_min,
+            input.servings,
+            input.difficulty as Option<Difficulty>,
+            ap_id
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(AppError::from)
+    }
+
+    /// Get a recipe by ID
+    pub async fn get_by_id(pool: &PgPool, id: Uuid) -> AppResult<Recipe> {
+        sqlx::query_as!(
+            Recipe,
+            r#"
+            SELECT
+                id, author_id, title, description,
+                visibility as "visibility: Visibility",
+                prep_time_min, cook_time_min, servings,
+                difficulty as "difficulty: Difficulty",
+                created_at, updated_at, ap_id
+            FROM recipes
+            WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Recipe {} not found", id)))
+    }
+
+    /// Update a recipe
+    pub async fn update(pool: &PgPool, id: Uuid, input: UpdateRecipe) -> AppResult<Recipe> {
+        sqlx::query_as!(
+            Recipe,
+            r#"
+            UPDATE recipes
+            SET
+                title = COALESCE($2, title),
+                description = COALESCE($3, description),
+                visibility = COALESCE($4, visibility),
+                prep_time_min = COALESCE($5, prep_time_min),
+                cook_time_min = COALESCE($6, cook_time_min),
+                servings = COALESCE($7, servings),
+                difficulty = COALESCE($8, difficulty),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING
+                id, author_id, title, description,
+                visibility as "visibility: Visibility",
+                prep_time_min, cook_time_min, servings,
+                difficulty as "difficulty: Difficulty",
+                created_at, updated_at, ap_id
+            "#,
+            id,
+            input.title,
+            input.description,
+            input.visibility as Option<Visibility>,
+            input.prep_time_min,
+            input.cook_time_min,
+            input.servings,
+            input.difficulty as Option<Difficulty>
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Recipe {} not found", id)))
+    }
+
+    /// Delete a recipe
+    pub async fn delete(pool: &PgPool, id: Uuid) -> AppResult<()> {
+        let result = sqlx::query!("DELETE FROM recipes WHERE id = $1", id)
+            .execute(pool)
+            .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound(format!("Recipe {} not found", id)));
+        }
+
+        Ok(())
+    }
+
+    /// List recipes by author
+    pub async fn list_by_author(
+        pool: &PgPool,
+        author_id: Uuid,
+        params: PageParams,
+    ) -> AppResult<Page<RecipeSummary>> {
+        let offset = (params.page.saturating_sub(1)) * params.per_page;
+
+        let recipes = sqlx::query_as!(
+            RecipeSummary,
+            r#"
+            SELECT
+                r.id, r.author_id, r.title, r.description,
+                r.prep_time_min, r.cook_time_min,
+                r.difficulty as "difficulty: Difficulty",
+                r.created_at,
+                ri.url as primary_image_url
+            FROM recipes r
+            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
+            WHERE r.author_id = $1
+            ORDER BY r.created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+            author_id,
+            params.per_page as i64,
+            offset as i64
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let total: i64 = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM recipes WHERE author_id = $1",
+            author_id
+        )
+        .fetch_one(pool)
+        .await?
+        .unwrap_or(0);
+
+        Ok(Page {
+            items: recipes,
+            total: total as u64,
+            page: params.page,
+            per_page: params.per_page,
+        })
+    }
+
+    /// List public recipes
+    pub async fn list_public(pool: &PgPool, params: PageParams) -> AppResult<Page<RecipeSummary>> {
+        let offset = (params.page.saturating_sub(1)) * params.per_page;
+
+        let recipes = sqlx::query_as!(
+            RecipeSummary,
+            r#"
+            SELECT
+                r.id, r.author_id, r.title, r.description,
+                r.prep_time_min, r.cook_time_min,
+                r.difficulty as "difficulty: Difficulty",
+                r.created_at,
+                ri.url as primary_image_url
+            FROM recipes r
+            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
+            WHERE r.visibility = 'public'
+            ORDER BY r.created_at DESC
+            LIMIT $1 OFFSET $2
+            "#,
+            params.per_page as i64,
+            offset as i64
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let total: i64 = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM recipes WHERE visibility = 'public'"
+        )
+        .fetch_one(pool)
+        .await?
+        .unwrap_or(0);
+
+        Ok(Page {
+            items: recipes,
+            total: total as u64,
+            page: params.page,
+            per_page: params.per_page,
+        })
+    }
+
+    /// Get ingredients for a recipe
+    pub async fn get_ingredients(pool: &PgPool, recipe_id: Uuid) -> AppResult<Vec<Ingredient>> {
+        let ingredients = sqlx::query_as!(
+            Ingredient,
+            r#"
+            SELECT id, recipe_id, position, quantity, unit, name, notes
+            FROM ingredients
+            WHERE recipe_id = $1
+            ORDER BY position
+            "#,
+            recipe_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(ingredients)
+    }
+
+    /// Get instruction steps for a recipe
+    pub async fn get_instructions(
+        pool: &PgPool,
+        recipe_id: Uuid,
+    ) -> AppResult<Vec<InstructionStep>> {
+        let steps = sqlx::query_as!(
+            InstructionStep,
+            r#"
+            SELECT id, recipe_id, step_number, description, image_url, duration_min
+            FROM instruction_steps
+            WHERE recipe_id = $1
+            ORDER BY step_number
+            "#,
+            recipe_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(steps)
+    }
+
+    /// Add ingredients to a recipe (batch)
+    pub async fn add_ingredients(
+        pool: &PgPool,
+        recipe_id: Uuid,
+        ingredients: Vec<CreateIngredient>,
+    ) -> AppResult<Vec<Ingredient>> {
+        let mut result = Vec::new();
+
+        for ingredient in ingredients {
+            let created = sqlx::query_as!(
+                Ingredient,
+                r#"
+                INSERT INTO ingredients (recipe_id, position, quantity, unit, name, notes)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id, recipe_id, position, quantity, unit, name, notes
+                "#,
+                recipe_id,
+                ingredient.position,
+                ingredient.quantity,
+                ingredient.unit,
+                ingredient.name,
+                ingredient.notes
+            )
+            .fetch_one(pool)
+            .await?;
+
+            result.push(created);
+        }
+
+        Ok(result)
+    }
+
+    /// Add instruction steps to a recipe (batch)
+    pub async fn add_instructions(
+        pool: &PgPool,
+        recipe_id: Uuid,
+        steps: Vec<CreateInstructionStep>,
+    ) -> AppResult<Vec<InstructionStep>> {
+        let mut result = Vec::new();
+
+        for step in steps {
+            let created = sqlx::query_as!(
+                InstructionStep,
+                r#"
+                INSERT INTO instruction_steps (recipe_id, step_number, description, image_url, duration_min)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id, recipe_id, step_number, description, image_url, duration_min
+                "#,
+                recipe_id,
+                step.step_number,
+                step.description,
+                step.image_url,
+                step.duration_min
+            )
+            .fetch_one(pool)
+            .await?;
+
+            result.push(created);
+        }
+
+        Ok(result)
+    }
+
+    /// Replace all ingredients for a recipe
+    pub async fn replace_ingredients(
+        pool: &PgPool,
+        recipe_id: Uuid,
+        ingredients: Vec<CreateIngredient>,
+    ) -> AppResult<Vec<Ingredient>> {
+        // Delete existing ingredients
+        sqlx::query!("DELETE FROM ingredients WHERE recipe_id = $1", recipe_id)
+            .execute(pool)
+            .await?;
+
+        // Add new ingredients
+        Self::add_ingredients(pool, recipe_id, ingredients).await
+    }
+
+    /// Replace all instruction steps for a recipe
+    pub async fn replace_instructions(
+        pool: &PgPool,
+        recipe_id: Uuid,
+        steps: Vec<CreateInstructionStep>,
+    ) -> AppResult<Vec<InstructionStep>> {
+        // Delete existing steps
+        sqlx::query!(
+            "DELETE FROM instruction_steps WHERE recipe_id = $1",
+            recipe_id
+        )
+        .execute(pool)
+        .await?;
+
+        // Add new steps
+        Self::add_instructions(pool, recipe_id, steps).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_page_offset_calculation() {
+        let params = PageParams {
+            page: 1,
+            per_page: 10,
+        };
+        let offset = (params.page.saturating_sub(1)) * params.per_page;
+        assert_eq!(offset, 0);
+
+        let params = PageParams {
+            page: 2,
+            per_page: 10,
+        };
+        let offset = (params.page.saturating_sub(1)) * params.per_page;
+        assert_eq!(offset, 10);
+    }
+}
