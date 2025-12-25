@@ -16,25 +16,25 @@
                 </svg>
             </span>
             <span>
-                {% if ingredient.quantity %}
-                <span class="font-medium">{{ ingredient.quantity }}</span>
+                {% if let Some(qty) = ingredient.quantity %}
+                <span class="font-medium">{{ qty }}</span>
                 {% endif %}
 
-                {% if ingredient.unit %}
-                <span>{{ ingredient.unit }}</span>
+                {% if let Some(unit) = ingredient.unit %}
+                <span>{{ unit }}</span>
                 {% endif %}
 
                 <span>{{ ingredient.name }}</span>
 
-                {% if ingredient.notes %}
-                <span class="text-gray-500 dark:text-gray-400 italic">({{ ingredient.notes }})</span>
+                {% if let Some(notes) = ingredient.notes %}
+                <span class="text-gray-500 dark:text-gray-400 italic">({{ notes }})</span>
                 {% endif %}
             </span>
         </li>
         {% endfor %}
     </ul>
 
-    {% if ingredients|length == 0 %}
+    {% if ingredients.is_empty() %}
     <p class="text-gray-500 dark:text-gray-400 italic">No ingredients listed.</p>
     {% endif %}
 </section>
