@@ -2,7 +2,7 @@
 
 {% block title %}{{ recipe.title }} - Oppskrift{% endblock %}
 
-{% block meta_description %}{{ recipe.description|default("A delicious recipe on Oppskrift") }}{% endblock %}
+{% block meta_description %}{% if let Some(desc) = recipe.description %}{{ desc }}{% else %}A delicious recipe on Oppskrift{% endif %}{% endblock %}
 
 {% block head %}
 {# Schema.org JSON-LD #}
@@ -29,9 +29,62 @@
                 {% endif %}
             </div>
 
-            {# Actions (if owner) #}
-            {% if is_owner %}
+            {# Actions #}
             <div class="flex items-center gap-2">
+                {# Add to Book dropdown (for logged-in users) #}
+                {% if let Some(_) = user %}
+                <div class="relative" x-data="{ open: false }">
+                    <button
+                        @click="open = !open"
+                        @click.outside="open = false"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-2"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                        Add to Book
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div
+                        x-show="open"
+                        x-transition
+                        class="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10"
+                    >
+                        <div class="py-1" role="menu">
+                            {% if !user_books.is_empty() %}
+                            {% for book in user_books %}
+                            <button
+                                hx-post="/api/v1/books/{{ book.id }}/recipes"
+                                hx-vals='{"recipe_id": "{{ recipe.id }}"}'
+                                hx-swap="none"
+                                hx-on::after-request="if(event.detail.successful) { alert('Added to {{ book.title }}'); open = false; }"
+                                class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                role="menuitem"
+                            >
+                                {{ book.title }}
+                            </button>
+                            {% endfor %}
+                            <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                            {% else %}
+                            <p class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">No books yet</p>
+                            {% endif %}
+                            <a
+                                href="/books/new"
+                                class="block px-4 py-2 text-sm text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                role="menuitem"
+                            >
+                                + Create New Book
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Owner actions #}
+                {% if is_owner %}
                 <a
                     href="/recipes/{{ recipe.id }}/edit"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -46,8 +99,8 @@
                 >
                     Delete
                 </button>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
 
         {# Recipe Meta #}
@@ -56,13 +109,13 @@
             <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
                 {% if recipe.difficulty == "easy" %}
                 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
-                {% elif recipe.difficulty == "medium" %}
+                {% else if recipe.difficulty == "medium" %}
                 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
                 {% else %}
                 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
                 {% endif %}
             ">
-                {{ recipe.difficulty|title }}
+                {{ recipe.difficulty|capitalize }}
             </span>
             {% endif %}
 
@@ -103,11 +156,11 @@
     </header>
 
     {# Primary Image #}
-    {% if primary_image %}
+    {% if let Some(img) = primary_image %}
     <figure class="mb-8">
         <img
-            src="{{ primary_image.url }}"
-            alt="{{ primary_image.alt_text|default(recipe.title) }}"
+            src="{{ img.url }}"
+            alt="{% if let Some(alt) = img.alt_text %}{{ alt }}{% else %}{{ recipe.title }}{% endif %}"
             class="w-full rounded-lg shadow-md"
         />
     </figure>
@@ -127,17 +180,17 @@
     </div>
 
     {# Additional Images #}
-    {% if images|length > 1 %}
+    {% if images.len() > 1 %}
     <section class="mt-12" aria-labelledby="gallery-heading">
         <h2 id="gallery-heading" class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
             More Photos
         </h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             {% for image in images %}
-            {% if not image.is_primary %}
+            {% if !image.is_primary %}
             <img
                 src="{{ image.url }}"
-                alt="{{ image.alt_text|default("Recipe photo") }}"
+                alt="{% if let Some(alt) = image.alt_text %}{{ alt }}{% else %}Recipe photo{% endif %}"
                 class="rounded-lg object-cover aspect-square"
                 loading="lazy"
             />

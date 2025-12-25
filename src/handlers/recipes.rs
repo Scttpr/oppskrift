@@ -11,8 +11,8 @@ use crate::api::middleware::OptionalAuthUser;
 use crate::lib::error::AppResult;
 use crate::lib::pagination::{PaginationMeta, PaginationParams};
 use crate::lib::schema_org::SchemaOrgRecipe;
-use crate::models::{Ingredient, InstructionStep, Recipe, RecipeImage, RecipeSummary, User};
-use crate::services::{ImageService, RecipeService, UserService};
+use crate::models::{Ingredient, InstructionStep, Recipe, RecipeBookSummary, RecipeImage, RecipeSummary, User};
+use crate::services::{BookService, ImageService, RecipeService, UserService};
 use crate::AppState;
 
 /// Recipe page routes
@@ -86,6 +86,8 @@ struct RecipeViewTemplate {
     primary_image: Option<RecipeImage>,
     schema_json: String,
     is_owner: bool,
+    user: Option<User>,
+    user_books: Vec<RecipeBookSummary>,
 }
 
 /// View recipe page handler
@@ -113,6 +115,15 @@ async fn view_recipe_page(
 
     let is_owner = auth.0.as_ref().map(|u| u.id) == Some(recipe.author_id);
 
+    // Fetch current user and their books for "Add to Book" dropdown
+    let (user, user_books) = if let Some(auth_user) = auth.0.as_ref() {
+        let user = UserService::get_by_id(&state.db, auth_user.id).await.ok();
+        let books = BookService::list_by_owner(&state.db, auth_user.id).await.unwrap_or_default();
+        (user, books)
+    } else {
+        (None, vec![])
+    };
+
     let template = RecipeViewTemplate {
         recipe,
         author,
@@ -122,6 +133,8 @@ async fn view_recipe_page(
         primary_image,
         schema_json,
         is_owner,
+        user,
+        user_books,
     };
 
     Ok(Html(template.render().map_err(|e| {
