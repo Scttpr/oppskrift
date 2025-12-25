@@ -2,7 +2,9 @@
 
 pub mod activitypub;
 pub mod books;
+pub mod feeds;
 pub mod middleware;
+pub mod oembed;
 pub mod recipes;
 pub mod social;
 pub mod users;
@@ -26,4 +28,11 @@ pub fn federation_routes() -> Router<AppState> {
     Router::new()
         .merge(webfinger::routes())
         .nest("/ap", activitypub::routes())
+}
+
+/// Create content syndication routes (RSS, Atom, oEmbed)
+pub fn syndication_routes() -> Router<AppState> {
+    Router::new()
+        .merge(feeds::routes())
+        .merge(oembed::routes())
 }
