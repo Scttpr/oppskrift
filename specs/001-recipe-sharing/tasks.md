@@ -188,41 +188,41 @@ Based on plan.md project structure:
 
 ### Models for US3
 
-- [ ] T084 Create Follow table migration in migrations/009_follows.sql
-- [ ] T085 Create SavedRecipe table migration in migrations/010_saved_recipes.sql
-- [ ] T086 Create Activity table migration in migrations/011_activities.sql
-- [ ] T087 [P] [US3] Implement Follow model in src/models/follow.rs
-- [ ] T088 [P] [US3] Implement SavedRecipe model in src/models/saved_recipe.rs
-- [ ] T089 [P] [US3] Implement Activity model in src/models/activity.rs (ensure created_at uses TIMESTAMPTZ with ISO 8601 serialization per Constitution III)
+- [x] T084 Create Follow table migration in migrations/009_follows.sql
+- [x] T085 Create SavedRecipe table migration in migrations/010_saved_recipes.sql
+- [x] T086 Create Activity table migration in migrations/011_activities.sql
+- [x] T087 [P] [US3] Implement Follow model in src/models/follow.rs
+- [x] T088 [P] [US3] Implement SavedRecipe model in src/models/saved_recipe.rs
+- [x] T089 [P] [US3] Implement Activity model in src/models/activity.rs (ensure created_at uses TIMESTAMPTZ with ISO 8601 serialization per Constitution III)
 
 ### Services for US3
 
-- [ ] T090 [US3] Implement FollowService in src/services/follow_service.rs with follow, unfollow, get_followers, get_following methods
-- [ ] T091 [US3] Implement SavedRecipeService in src/services/saved_recipe_service.rs with save, unsave, get_saved methods
-- [ ] T092 [US3] Implement ActivityService in src/services/activity_service.rs with create_activity, get_feed methods
-- [ ] T093 [US3] Create activity when recipe/book is created (integrate with RecipeService, BookService)
-- [ ] T094 [US3] Implement share action creating Announce activity in ActivityService
+- [x] T090 [US3] Implement FollowService in src/services/follow_service.rs with follow, unfollow, get_followers, get_following methods
+- [x] T091 [US3] Implement SavedRecipeService in src/services/saved_recipe_service.rs with save, unsave, get_saved methods
+- [x] T092 [US3] Implement ActivityService in src/services/activity_service.rs with create_activity, get_feed methods
+- [x] T093 [US3] Create activity when recipe/book is created (integrate with RecipeService, BookService)
+- [x] T094 [US3] Implement share action creating Announce activity in ActivityService
 
 ### API Endpoints for US3
 
-- [ ] T095 [US3] Implement POST /api/v1/users/{id}/follow in src/api/social.rs
-- [ ] T096 [US3] Implement DELETE /api/v1/users/{id}/follow in src/api/social.rs
-- [ ] T097 [US3] Implement POST /api/v1/recipes/{id}/save in src/api/social.rs
-- [ ] T098 [US3] Implement DELETE /api/v1/recipes/{id}/save in src/api/social.rs
-- [ ] T099 [US3] Implement GET /api/v1/users/{id}/saved in src/api/social.rs (list saved recipes)
-- [ ] T100 [US3] Implement POST /api/v1/recipes/{id}/share in src/api/social.rs
-- [ ] T101 [US3] Implement GET /api/v1/feed in src/api/social.rs (activity feed with pagination)
+- [x] T095 [US3] Implement POST /api/v1/users/{id}/follow in src/api/social.rs
+- [x] T096 [US3] Implement DELETE /api/v1/users/{id}/follow in src/api/social.rs
+- [x] T097 [US3] Implement POST /api/v1/recipes/{id}/save in src/api/social.rs
+- [x] T098 [US3] Implement DELETE /api/v1/recipes/{id}/save in src/api/social.rs
+- [x] T099 [US3] Implement GET /api/v1/users/{id}/saved in src/api/social.rs (list saved recipes)
+- [x] T100 [US3] Implement POST /api/v1/recipes/{id}/share in src/api/social.rs
+- [x] T101 [US3] Implement GET /api/v1/feed in src/api/social.rs (activity feed with pagination)
 
 ### HTML Handlers for US3
 
-- [ ] T102 [P] [US3] Create activity card component template in templates/components/activity_card.html
-- [ ] T103 [US3] Create activity feed page in templates/feed/index.html
-- [ ] T104 [US3] Implement feed handler in src/handlers/feed.rs
-- [ ] T105 [US3] Add follow/unfollow button to user profile page with HTMX
-- [ ] T106 [US3] Add save/unsave button to recipe view page with HTMX
-- [ ] T107 [US3] Add share button to recipe view page with HTMX
-- [ ] T108 [US3] Create saved recipes page in templates/users/saved.html
-- [ ] T109 [US3] Update user profile to show follower/following counts
+- [x] T102 [P] [US3] Create activity card component template in templates/components/activity_card.html
+- [x] T103 [US3] Create activity feed page in templates/feed/index.html
+- [x] T104 [US3] Implement feed handler in src/handlers/feed.rs
+- [x] T105 [US3] Add follow/unfollow button to user profile page with HTMX
+- [x] T106 [US3] Add save/unsave button to recipe view page with HTMX
+- [x] T107 [US3] Add share button to recipe view page with HTMX
+- [x] T108 [US3] Create saved recipes page in templates/users/saved.html
+- [x] T109 [US3] Update user profile to show follower/following counts
 
 **Checkpoint**: User Story 3 complete - social features working (follow, save, share, feed)
 
