@@ -38,6 +38,10 @@ chrono = { version = "0.4", features = ["serde"] }
 # UUIDs
 uuid = { version = "1", features = ["v4", "serde"] }
 
+# Decimal numbers
+rust_decimal = { version = "1", features = ["serde", "db-postgres"] }
+rust_decimal_macros = "1"
+
 # Validation
 validator = { version = "0.18", features = ["derive"] }
 
