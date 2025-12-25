@@ -74,36 +74,36 @@ Based on plan.md project structure:
 
 ### Models for US1
 
-- [ ] T027 Create Recipe table migration in migrations/003_recipes.sql
-- [ ] T028 Create Ingredient table migration in migrations/004_ingredients.sql
-- [ ] T029 Create InstructionStep table migration in migrations/005_instruction_steps.sql
-- [ ] T030 Create RecipeImage table migration in migrations/006_recipe_images.sql
-- [ ] T031 [P] [US1] Implement Recipe model in src/models/recipe.rs
-- [ ] T032 [P] [US1] Implement Ingredient model in src/models/ingredient.rs
-- [ ] T033 [P] [US1] Implement InstructionStep model in src/models/instruction_step.rs
-- [ ] T034 [P] [US1] Implement RecipeImage model in src/models/recipe_image.rs
+- [x] T027 Create Recipe table migration in migrations/003_recipes.sql
+- [x] T028 Create Ingredient table migration in migrations/004_ingredients.sql
+- [x] T029 Create InstructionStep table migration in migrations/005_instruction_steps.sql
+- [x] T030 Create RecipeImage table migration in migrations/006_recipe_images.sql
+- [x] T031 [P] [US1] Implement Recipe model in src/models/recipe.rs
+- [x] T032 [P] [US1] Implement Ingredient model in src/models/ingredient.rs
+- [x] T033 [P] [US1] Implement InstructionStep model in src/models/instruction_step.rs
+- [x] T034 [P] [US1] Implement RecipeImage model in src/models/recipe_image.rs
 
 ### Services for US1
 
-- [ ] T035 [US1] Implement RecipeService in src/services/recipe_service.rs with create, get_by_id, update, delete, list_by_author methods
-- [ ] T036 [US1] Implement ingredient validation (max 50) in RecipeService
-- [ ] T037 [US1] Implement instruction validation (max 30 steps) in RecipeService
-- [ ] T038 [US1] Implement Schema.org JSON-LD serialization in src/lib/schema_org.rs
+- [x] T035 [US1] Implement RecipeService in src/services/recipe_service.rs with create, get_by_id, update, delete, list_by_author methods
+- [x] T036 [US1] Implement ingredient validation (max 50) in RecipeService
+- [x] T037 [US1] Implement instruction validation (max 30 steps) in RecipeService
+- [x] T038 [US1] Implement Schema.org JSON-LD serialization in src/lib/schema_org.rs
 
 ### Image Upload for US1
 
-- [ ] T039 [US1] Setup S3 client in src/lib/storage.rs with configurable backend
-- [ ] T040 [US1] Implement image upload service in src/services/image_service.rs (resize, validate, upload)
-- [ ] T041 [US1] Implement image limit validation (max 10 per recipe) in image_service.rs
+- [x] T039 [US1] Setup S3 client in src/lib/storage.rs with configurable backend
+- [x] T040 [US1] Implement image upload service in src/services/image_service.rs (resize, validate, upload)
+- [x] T041 [US1] Implement image limit validation (max 10 per recipe) in image_service.rs
 
 ### API Endpoints for US1
 
-- [ ] T042 [US1] Implement POST /api/v1/recipes in src/api/recipes.rs (create recipe)
-- [ ] T043 [US1] Implement GET /api/v1/recipes/{id} in src/api/recipes.rs (get recipe with JSON and JSON-LD; support Accept header content negotiation per Constitution III)
-- [ ] T044 [US1] Implement PUT /api/v1/recipes/{id} in src/api/recipes.rs (update recipe)
-- [ ] T045 [US1] Implement DELETE /api/v1/recipes/{id} in src/api/recipes.rs (delete recipe)
-- [ ] T046 [US1] Implement GET /api/v1/recipes in src/api/recipes.rs (list recipes with pagination)
-- [ ] T047 [US1] Implement POST /api/v1/recipes/{id}/images in src/api/recipes.rs (upload image)
+- [x] T042 [US1] Implement POST /api/v1/recipes in src/api/recipes.rs (create recipe)
+- [x] T043 [US1] Implement GET /api/v1/recipes/{id} in src/api/recipes.rs (get recipe with JSON and JSON-LD; support Accept header content negotiation per Constitution III)
+- [x] T044 [US1] Implement PUT /api/v1/recipes/{id} in src/api/recipes.rs (update recipe)
+- [x] T045 [US1] Implement DELETE /api/v1/recipes/{id} in src/api/recipes.rs (delete recipe)
+- [x] T046 [US1] Implement GET /api/v1/recipes in src/api/recipes.rs (list recipes with pagination)
+- [x] T047 [US1] Implement POST /api/v1/recipes/{id}/images in src/api/recipes.rs (upload image)
 
 ### HTML Handlers for US1
 
