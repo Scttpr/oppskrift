@@ -3,6 +3,7 @@ use sqlx::PgPool;
 use std::net::SocketAddr;
 use tower_http::{
     cors::{Any, CorsLayer},
+    services::ServeDir,
     trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -75,7 +76,8 @@ fn create_router(state: AppState) -> Router {
         // .nest("/api/v1", api::routes())
         // HTML handler routes will be mounted here
         // .nest("/", handlers::routes())
-        // Static file serving (will be added in T021)
+        // Static file serving
+        .nest_service("/static", ServeDir::new("static"))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state)
