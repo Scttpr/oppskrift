@@ -150,7 +150,7 @@ async fn update_book(
     // Check ownership
     let existing = BookService::get_by_id(&state.db, id).await?;
     if existing.owner_id != auth.id {
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("Not authorized to modify this book".to_string()));
     }
 
     let book = BookService::update(&state.db, id, input).await?;
@@ -167,7 +167,7 @@ async fn delete_book(
     // Check ownership
     let existing = BookService::get_by_id(&state.db, id).await?;
     if existing.owner_id != auth.id {
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("Not authorized to modify this book".to_string()));
     }
 
     BookService::delete(&state.db, id).await?;
@@ -206,7 +206,7 @@ async fn add_recipe_to_book(
     // Check ownership
     let book = BookService::get_by_id(&state.db, id).await?;
     if book.owner_id != auth.id {
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("Not authorized to modify this book".to_string()));
     }
 
     let entry = BookService::add_recipe(&state.db, id, input).await?;
@@ -223,7 +223,7 @@ async fn remove_recipe_from_book(
     // Check ownership
     let book = BookService::get_by_id(&state.db, id).await?;
     if book.owner_id != auth.id {
-        return Err(AppError::Forbidden);
+        return Err(AppError::Forbidden("Not authorized to modify this book".to_string()));
     }
 
     BookService::remove_recipe(&state.db, id, recipe_id).await?;
