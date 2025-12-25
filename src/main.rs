@@ -74,8 +74,8 @@ fn create_router(state: AppState) -> Router {
         .route("/health", get(health_check))
         // API routes
         .nest("/api/v1", api::routes())
-        // HTML handler routes will be mounted here
-        // .nest("/", handlers::routes())
+        // HTML handler routes
+        .merge(handlers::routes())
         // Static file serving
         .nest_service("/static", ServeDir::new("static"))
         .layer(TraceLayer::new_for_http())
