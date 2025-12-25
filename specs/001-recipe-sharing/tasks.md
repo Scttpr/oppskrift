@@ -144,35 +144,35 @@ Based on plan.md project structure:
 
 ### Models for US2
 
-- [ ] T064 Create RecipeBook table migration in migrations/007_recipe_books.sql
-- [ ] T065 Create BookRecipeEntry table migration in migrations/008_book_recipe_entries.sql
-- [ ] T066 [P] [US2] Implement RecipeBook model in src/models/recipe_book.rs
-- [ ] T067 [P] [US2] Implement BookRecipeEntry model in src/models/book_recipe_entry.rs
+- [x] T064 Create RecipeBook table migration in migrations/007_recipe_books.sql
+- [x] T065 Create BookRecipeEntry table migration in migrations/008_book_recipe_entries.sql
+- [x] T066 [P] [US2] Implement RecipeBook model in src/models/recipe_book.rs
+- [x] T067 [P] [US2] Implement BookRecipeEntry model in src/models/book_recipe_entry.rs
 
 ### Services for US2
 
-- [ ] T068 [US2] Implement BookService in src/services/book_service.rs with create, get_by_id, update, delete, list_by_owner methods
-- [ ] T069 [US2] Implement add_recipe, remove_recipe methods in BookService
-- [ ] T070 [US2] Implement get_recipes_in_book method in BookService
+- [x] T068 [US2] Implement BookService in src/services/book_service.rs with create, get_by_id, update, delete, list_by_owner methods
+- [x] T069 [US2] Implement add_recipe, remove_recipe methods in BookService
+- [x] T070 [US2] Implement get_recipes_in_book method in BookService
 
 ### API Endpoints for US2
 
-- [ ] T071 [US2] Implement POST /api/v1/books in src/api/books.rs (create book with multipart/form-data for optional cover image per FR-011)
-- [ ] T072 [US2] Implement GET /api/v1/books/{id} in src/api/books.rs (get book with recipes)
-- [ ] T073 [US2] Implement PUT /api/v1/books/{id} in src/api/books.rs (update book)
-- [ ] T074 [US2] Implement DELETE /api/v1/books/{id} in src/api/books.rs (delete book)
-- [ ] T075 [US2] Implement GET /api/v1/books in src/api/books.rs (list books with pagination)
-- [ ] T076 [US2] Implement POST /api/v1/books/{id}/recipes in src/api/books.rs (add recipe to book)
-- [ ] T077 [US2] Implement DELETE /api/v1/books/{id}/recipes/{recipeId} in src/api/books.rs (remove recipe)
+- [x] T071 [US2] Implement POST /api/v1/books in src/api/books.rs (create book with multipart/form-data for optional cover image per FR-011)
+- [x] T072 [US2] Implement GET /api/v1/books/{id} in src/api/books.rs (get book with recipes)
+- [x] T073 [US2] Implement PUT /api/v1/books/{id} in src/api/books.rs (update book)
+- [x] T074 [US2] Implement DELETE /api/v1/books/{id} in src/api/books.rs (delete book)
+- [x] T075 [US2] Implement GET /api/v1/books in src/api/books.rs (list books with pagination)
+- [x] T076 [US2] Implement POST /api/v1/books/{id}/recipes in src/api/books.rs (add recipe to book)
+- [x] T077 [US2] Implement DELETE /api/v1/books/{id}/recipes/{recipeId} in src/api/books.rs (remove recipe)
 
 ### HTML Handlers for US2
 
-- [ ] T078 [P] [US2] Create book card component template in templates/components/book_card.html
-- [ ] T079 [US2] Create book create/edit form page in templates/books/form.html with HTMX
-- [ ] T080 [US2] Create book view page in templates/books/view.html (with recipe list)
-- [ ] T081 [US2] Create book list page in templates/books/list.html
-- [ ] T082 [US2] Implement HTML handlers in src/handlers/books.rs
-- [ ] T083 [US2] Add "Add to Book" button to recipe view page with HTMX dropdown
+- [x] T078 [P] [US2] Create book card component template in templates/components/book_card.html
+- [x] T079 [US2] Create book create/edit form page in templates/books/form.html with HTMX
+- [x] T080 [US2] Create book view page in templates/books/view.html (with recipe list)
+- [x] T081 [US2] Create book list page in templates/books/list.html
+- [x] T082 [US2] Implement HTML handlers in src/handlers/books.rs
+- [x] T083 [US2] Add "Add to Book" button to recipe view page with HTMX dropdown
 
 **Checkpoint**: User Story 2 complete - users can create books and organize recipes
 
