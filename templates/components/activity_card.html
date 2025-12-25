@@ -1,0 +1,76 @@
+{# Activity Card Component
+   Usage: {% include "components/activity_card.html" %}
+   Variables: activity (ActivityWithActor)
+#}
+<article class="flex gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+    {# Actor Avatar #}
+    <div class="flex-shrink-0">
+        {% if let Some(avatar) = activity.actor_avatar_url %}
+        <img
+            src="{{ avatar }}"
+            alt="{{ activity.actor_display_name }}'s avatar"
+            class="w-10 h-10 rounded-full object-cover"
+        />
+        {% else %}
+        <div class="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+            <span class="text-sm font-bold text-primary-600 dark:text-primary-400">
+                {{ activity.actor_display_name.chars().next().unwrap_or('?') }}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+
+    {# Activity Content #}
+    <div class="flex-1 min-w-0">
+        <p class="text-gray-900 dark:text-white">
+            <a href="/users/{{ activity.actor_id }}" class="font-medium hover:underline">
+                {{ activity.actor_display_name }}
+            </a>
+            <span class="text-gray-600 dark:text-gray-400">
+                {% match activity.activity_type %}
+                {% when crate::models::ActivityType::Create %}
+                    {% match activity.target_type %}
+                    {% when crate::models::TargetType::Recipe %}created a new recipe
+                    {% when crate::models::TargetType::Book %}created a new recipe book
+                    {% when crate::models::TargetType::User %}joined
+                    {% endmatch %}
+                {% when crate::models::ActivityType::Share %}shared a recipe
+                {% when crate::models::ActivityType::Follow %}started following someone
+                {% endmatch %}
+            </span>
+        </p>
+
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <time datetime="{{ activity.created_at }}">
+                {{ activity.created_at.format("%B %d, %Y at %H:%M") }}
+            </time>
+        </p>
+
+        {# Link to target #}
+        <div class="mt-2">
+            {% match activity.target_type %}
+            {% when crate::models::TargetType::Recipe %}
+            <a
+                href="/recipes/{{ activity.target_id }}"
+                class="text-primary-600 dark:text-primary-400 hover:underline text-sm"
+            >
+                View recipe
+            </a>
+            {% when crate::models::TargetType::Book %}
+            <a
+                href="/books/{{ activity.target_id }}"
+                class="text-primary-600 dark:text-primary-400 hover:underline text-sm"
+            >
+                View book
+            </a>
+            {% when crate::models::TargetType::User %}
+            <a
+                href="/users/{{ activity.target_id }}"
+                class="text-primary-600 dark:text-primary-400 hover:underline text-sm"
+            >
+                View profile
+            </a>
+            {% endmatch %}
+        </div>
+    </div>
+</article>
