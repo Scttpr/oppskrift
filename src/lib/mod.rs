@@ -5,7 +5,9 @@ pub mod error;
 pub mod pagination;
 pub mod schema_org;
 pub mod seeds;
+pub mod storage;
 
 pub use error::{AppError, AppResult, ErrorResponse};
 pub use pagination::{PaginatedResponse, PaginationMeta, PaginationParams};
 pub use schema_org::SchemaOrgRecipe;
+pub use storage::{SharedStorage, StorageClient, StorageConfig};
