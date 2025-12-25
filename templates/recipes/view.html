@@ -22,7 +22,7 @@
                 </h1>
 
                 {# Author #}
-                {% if author %}
+                {% if let Some(author) = author %}
                 <p class="mt-2 text-gray-600 dark:text-gray-400">
                     by <a href="/users/{{ author.id }}" class="text-primary-600 dark:text-primary-400 hover:underline">{{ author.display_name }}</a>
                 </p>
@@ -31,8 +31,48 @@
 
             {# Actions #}
             <div class="flex items-center gap-2">
-                {# Add to Book dropdown (for logged-in users) #}
+                {# Save/Share buttons (for logged-in users) #}
                 {% if let Some(_) = user %}
+                {# Save Button #}
+                {% if is_saved %}
+                <button
+                    hx-delete="/api/v1/recipes/{{ recipe.id }}/save"
+                    hx-swap="outerHTML"
+                    hx-target="this"
+                    class="px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900 border border-primary-300 dark:border-primary-600 rounded-md hover:bg-primary-100 dark:hover:bg-primary-800"
+                    title="Unsave recipe"
+                >
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                </button>
+                {% else %}
+                <button
+                    hx-post="/api/v1/recipes/{{ recipe.id }}/save"
+                    hx-swap="outerHTML"
+                    hx-target="this"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                    title="Save recipe"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                </button>
+                {% endif %}
+
+                {# Share Button #}
+                <button
+                    hx-post="/api/v1/recipes/{{ recipe.id }}/share"
+                    hx-swap="none"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                    title="Share recipe"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                </button>
+
+                {# Add to Book dropdown (for logged-in users) #}
                 <details class="relative dropdown">
                     <summary class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-2 cursor-pointer list-none">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -96,52 +136,50 @@
 
         {# Recipe Meta #}
         <div class="mt-4 flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-            {% if recipe.difficulty %}
+            {% if let Some(difficulty) = recipe.difficulty %}
             <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
-                {% if recipe.difficulty == "easy" %}
-                bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
-                {% else if recipe.difficulty == "medium" %}
-                bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
-                {% else %}
-                bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
-                {% endif %}
+                {% match difficulty %}
+                {% when crate::models::Difficulty::Easy %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                {% when crate::models::Difficulty::Medium %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                {% when crate::models::Difficulty::Hard %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                {% endmatch %}
             ">
-                {{ recipe.difficulty|capitalize }}
+                {{ difficulty }}
             </span>
             {% endif %}
 
-            {% if recipe.prep_time_min %}
+            {% if let Some(prep) = recipe.prep_time_min %}
             <span class="flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {{ recipe.prep_time_min }} min prep
+                {{ prep }} min prep
             </span>
             {% endif %}
 
-            {% if recipe.cook_time_min %}
+            {% if let Some(cook) = recipe.cook_time_min %}
             <span class="flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
                 </svg>
-                {{ recipe.cook_time_min }} min cook
+                {{ cook }} min cook
             </span>
             {% endif %}
 
-            {% if recipe.servings %}
+            {% if let Some(servings) = recipe.servings %}
             <span class="flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                {{ recipe.servings }}
+                {{ servings }}
             </span>
             {% endif %}
         </div>
 
         {# Description #}
-        {% if recipe.description %}
+        {% if let Some(desc) = recipe.description %}
         <p class="mt-4 text-lg text-gray-700 dark:text-gray-300">
-            {{ recipe.description }}
+            {{ desc }}
         </p>
         {% endif %}
     </header>
