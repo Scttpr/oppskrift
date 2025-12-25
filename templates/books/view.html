@@ -9,9 +9,9 @@
         <div class="flex items-start justify-between gap-4">
             <div class="flex items-start gap-6">
                 {# Cover Image #}
-                {% if book.cover_image_url %}
+                {% if let Some(cover_url) = book.cover_image_url %}
                 <img
-                    src="{{ book.cover_image_url }}"
+                    src="{{ cover_url }}"
                     alt="{{ book.title }}"
                     class="w-32 h-24 object-cover rounded-lg shadow-sm"
                 />
@@ -29,15 +29,15 @@
                     </h1>
 
                     {# Owner #}
-                    {% if owner %}
+                    {% if let Some(owner) = owner %}
                     <p class="mt-1 text-gray-600 dark:text-gray-400">
                         by <a href="/users/{{ owner.id }}" class="text-primary-600 dark:text-primary-400 hover:underline">{{ owner.display_name }}</a>
                     </p>
                     {% endif %}
 
-                    {% if book.description %}
+                    {% if let Some(desc) = book.description %}
                     <p class="mt-2 text-gray-700 dark:text-gray-300">
-                        {{ book.description }}
+                        {{ desc }}
                     </p>
                     {% endif %}
 

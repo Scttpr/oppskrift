@@ -101,9 +101,24 @@
                         <option value="">Select...</option>
                         {% match recipe %}
                         {% when Some with (r) %}
-                        <option value="easy" {% if let Some(d) = r.difficulty %}{% if d == "easy" %}selected{% endif %}{% endif %}>Easy</option>
-                        <option value="medium" {% if let Some(d) = r.difficulty %}{% if d == "medium" %}selected{% endif %}{% endif %}>Medium</option>
-                        <option value="hard" {% if let Some(d) = r.difficulty %}{% if d == "hard" %}selected{% endif %}{% endif %}>Hard</option>
+                            {% match r.difficulty %}
+                            {% when Some with (crate::models::Difficulty::Easy) %}
+                        <option value="easy" selected>Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                            {% when Some with (crate::models::Difficulty::Medium) %}
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                            {% when Some with (crate::models::Difficulty::Hard) %}
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard" selected>Hard</option>
+                            {% when None %}
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                            {% endmatch %}
                         {% when None %}
                         <option value="easy">Easy</option>
                         <option value="medium">Medium</option>
@@ -140,7 +155,11 @@
                         name="visibility"
                         value="public"
                         {% match recipe %}
-                        {% when Some with (r) %}{% if r.visibility.to_string() == "public" %}checked{% endif %}
+                        {% when Some with (r) %}
+                            {% match r.visibility %}
+                            {% when crate::models::Visibility::Public %}checked
+                            {% when crate::models::Visibility::Private %}
+                            {% endmatch %}
                         {% when None %}checked
                         {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
@@ -153,7 +172,11 @@
                         name="visibility"
                         value="private"
                         {% match recipe %}
-                        {% when Some with (r) %}{% if r.visibility.to_string() == "private" %}checked{% endif %}
+                        {% when Some with (r) %}
+                            {% match r.visibility %}
+                            {% when crate::models::Visibility::Public %}
+                            {% when crate::models::Visibility::Private %}checked
+                            {% endmatch %}
                         {% when None %}
                         {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
