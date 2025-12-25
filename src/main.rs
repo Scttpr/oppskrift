@@ -77,6 +77,8 @@ fn create_router(state: AppState) -> Router {
         .nest("/api/v1", api::routes())
         // ActivityPub federation routes
         .merge(api::federation_routes())
+        // Content syndication routes (RSS, Atom, oEmbed)
+        .merge(api::syndication_routes())
         // HTML handler routes
         .merge(handlers::routes())
         // Static file serving
