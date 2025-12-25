@@ -279,9 +279,9 @@ Based on plan.md project structure:
 - [x] T128 [P] Add rate limiting middleware with tower-governor in src/api/middleware/rate_limit.rs
 - [x] T129 [P] Add request logging with tracing in src/main.rs
 - [x] T130 [P] Create health check endpoint GET /health in src/api/health.rs
-- [ ] T131 [P] Add OpenAPI documentation generation (utoipa or similar)
-- [ ] T132 Implement input validation with validator crate across all endpoints
-- [ ] T133 Add proper error responses matching OpenAPI spec
+- [x] T131 [P] Add OpenAPI documentation generation (utoipa or similar)
+- [x] T132 Implement input validation with validator crate across all endpoints
+- [x] T133 Add proper error responses matching OpenAPI spec
 - [x] T134 Create database indexes per data-model.md specifications
 
 ### Accessibility (Constitution v1.2.0 - State of the Art)
