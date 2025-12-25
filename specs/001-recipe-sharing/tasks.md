@@ -306,13 +306,13 @@ Based on plan.md project structure:
 
 - [ ] T150 Optimize page load performance (<3s on 3G target)
 - [ ] T151 Run quickstart.md validation scenarios
-- [ ] T152 Create CONTRIBUTING.md with development setup instructions
+- [x] T152 Create CONTRIBUTING.md with development setup instructions
 
 ### Constitution Compliance & Quality
 
 - [x] T153 [P] Implement RSS/Atom feeds for public recipes and user profiles in src/api/feeds.rs (Constitution III: RSS/Atom)
 - [x] T154 [P] Implement oEmbed endpoint for recipe embedding in src/api/oembed.rs (Constitution III: Embedding)
-- [ ] T155 [P] Document encryption-at-rest requirements for PostgreSQL and S3 in DEPLOYMENT.md (Constitution II: Security)
+- [x] T155 [P] Document encryption-at-rest requirements for PostgreSQL and S3 in DEPLOYMENT.md (Constitution II: Security)
 - [x] T156 [P] Setup background job queue infrastructure with tokio tasks or sqlx-based queue in src/jobs/mod.rs (Constitution V: Background Jobs)
 - [ ] T157 Run load testing with k6 to verify SC-007 (1000 concurrent users) and document results
 - [ ] T158 Add UX metrics instrumentation for SC-001/002/003 (recipe creation time, book creation time, first-publish success rate)
