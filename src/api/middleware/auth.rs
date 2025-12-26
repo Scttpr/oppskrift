@@ -83,8 +83,9 @@ where
                     .into_response()
             })?;
 
-        // Get JWT secret from environment
-        let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "dev-secret".to_string());
+        // Get JWT secret from environment - MUST be set, no fallback
+        let secret = std::env::var("JWT_SECRET")
+            .expect("JWT_SECRET environment variable must be set");
 
         // Decode and validate JWT
         let token_data = decode::<Claims>(
