@@ -1,0 +1,173 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Privacy Policy - Oppskrift{% endblock %}
+{% block meta_description %}Privacy Policy for Oppskrift - Learn how we handle your personal data{% endblock %}
+
+{% block content %}
+<article class="prose dark:prose-invert max-w-4xl mx-auto">
+    <h1>Privacy Policy</h1>
+    <p class="text-sm text-gray-500">Last updated: December 2024</p>
+
+    <section>
+        <h2>1. Introduction</h2>
+        <p>Oppskrift is a federated recipe sharing platform. This policy explains how we collect, use, and protect your personal data in compliance with the General Data Protection Regulation (GDPR).</p>
+    </section>
+
+    <section>
+        <h2>2. Data Controller</h2>
+        <p>The data controller responsible for your personal data is the instance administrator of this Oppskrift server.</p>
+    </section>
+
+    <section>
+        <h2>3. Data We Collect</h2>
+
+        <h3>3.1 Account Data</h3>
+        <ul>
+            <li>Username (required)</li>
+            <li>Display name (optional)</li>
+            <li>Email address (if provided)</li>
+            <li>Profile biography (optional)</li>
+            <li>Avatar image (optional)</li>
+            <li>Measurement preferences (metric/imperial)</li>
+        </ul>
+
+        <h3>3.2 Content Data</h3>
+        <ul>
+            <li>Recipes you create (title, description, ingredients, instructions, images)</li>
+            <li>Recipe books and collections</li>
+            <li>Comments and interactions</li>
+        </ul>
+
+        <h3>3.3 Technical Data</h3>
+        <ul>
+            <li>IP address (for security and rate limiting)</li>
+            <li>Browser user agent</li>
+            <li>Access timestamps</li>
+            <li>ActivityPub federation identifiers</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>4. Legal Basis for Processing</h2>
+        <p>We process your data under the following legal bases (GDPR Article 6):</p>
+        <table class="min-w-full">
+            <thead>
+                <tr>
+                    <th>Data Category</th>
+                    <th>Legal Basis</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Account data</td>
+                    <td>Contract performance</td>
+                    <td>Provide the service</td>
+                </tr>
+                <tr>
+                    <td>Content data</td>
+                    <td>Contract performance</td>
+                    <td>Enable recipe sharing</td>
+                </tr>
+                <tr>
+                    <td>Technical data</td>
+                    <td>Legitimate interest</td>
+                    <td>Security, abuse prevention</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2>5. How We Use Your Data</h2>
+        <ul>
+            <li><strong>Service delivery</strong>: Display your profile and recipes</li>
+            <li><strong>Federation</strong>: Share content with other ActivityPub servers</li>
+            <li><strong>Security</strong>: Protect against unauthorized access and abuse</li>
+            <li><strong>Communication</strong>: Send service-related notifications</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>6. Data Sharing</h2>
+
+        <h3>6.1 Federation</h3>
+        <p>When you interact with users on other ActivityPub servers, your public profile and content are shared with those servers according to the ActivityPub protocol.</p>
+
+        <h3>6.2 Third Parties</h3>
+        <p>We do not sell your data. We may share data with:</p>
+        <ul>
+            <li>Infrastructure providers (hosting, storage) under data processing agreements</li>
+            <li>Law enforcement when legally required</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>7. Data Retention</h2>
+        <table class="min-w-full">
+            <thead>
+                <tr>
+                    <th>Data Type</th>
+                    <th>Retention Period</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Account data</td>
+                    <td>Until account deletion</td>
+                </tr>
+                <tr>
+                    <td>Content data</td>
+                    <td>Until content/account deletion</td>
+                </tr>
+                <tr>
+                    <td>Security logs</td>
+                    <td>90 days</td>
+                </tr>
+                <tr>
+                    <td>Backup data</td>
+                    <td>30 days after deletion</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2>8. Your Rights (GDPR Articles 15-22)</h2>
+        <p>You have the right to:</p>
+        <ul>
+            <li><strong>Access</strong>: Request a copy of your personal data</li>
+            <li><strong>Rectification</strong>: Correct inaccurate data</li>
+            <li><strong>Erasure</strong>: Delete your account and data</li>
+            <li><strong>Portability</strong>: Export your data in a machine-readable format</li>
+            <li><strong>Restriction</strong>: Limit how we process your data</li>
+            <li><strong>Object</strong>: Object to processing based on legitimate interest</li>
+            <li><strong>Withdraw consent</strong>: Where processing is based on consent</li>
+        </ul>
+        <p>To exercise these rights, contact the instance administrator.</p>
+    </section>
+
+    <section>
+        <h2>9. Data Security</h2>
+        <p>We implement security measures including:</p>
+        <ul>
+            <li>Encrypted connections (HTTPS/TLS)</li>
+            <li>Secure password hashing</li>
+            <li>RSA cryptographic signatures for federation</li>
+            <li>Regular security audits</li>
+            <li>Access logging and monitoring</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>10. Cookies</h2>
+        <p>We use essential cookies only for session management and security tokens. No tracking or analytics cookies are used.</p>
+    </section>
+
+    <section>
+        <h2>11. Contact</h2>
+        <p>For privacy inquiries or to exercise your rights, contact the instance administrator.</p>
+        <p>For complaints, you may also contact your local data protection authority.</p>
+    </section>
+</article>
+{% endblock %}
