@@ -1,0 +1,210 @@
+# docs/security/risks/risk-register.yaml
+# Registre des risques sécurité - Oppskrift
+# Généré par /osk-baseline le 2025-12-26
+
+metadata:
+  project: "Oppskrift"
+  generated: "2025-12-26"
+  last_updated: "2025-12-26"
+  baseline_score: 36
+  current_score: 45
+  target_score: 80
+
+summary:
+  total_risks: 5
+  by_severity:
+    critique: 3
+    important: 2
+    moyen: 0
+    mineur: 0
+  by_status:
+    ouvert: 4
+    en_cours: 0
+    resolu: 1
+    verifie: 0
+    accepte: 0
+
+# Conformité des principes (0-100%)
+principles_compliance:
+  I_threat_modeling: 30
+  II_risk_analysis: 30
+  III_security_requirements: 45
+  IV_security_testing: 40
+  V_secrets_management: 50
+  VI_audit_logging: 25
+  VII_patch_management: 60
+
+risks:
+  # Vulnérabilités Baseline
+  - id: "VULN-BASELINE-001"
+    source: "/osk-baseline"
+    type: "vulnerabilite"
+    feature: "auth"
+    titre: "JWT Secret Fallback"
+    description: "Le code utilise 'dev-secret' comme fallback si JWT_SECRET n'est pas défini, permettant la forgery de tokens en production."
+    categorie_stride: "S"
+    severite: "CRITIQUE"
+    priorite: "P0"
+    impact: 5
+    probabilite: 5
+    exposition: 4
+    score_initial: 100
+    score_residuel: 0
+    fichiers:
+      - "src/api/middleware/auth.rs:87"
+    asset_menace: "Système d'authentification"
+    vecteur_attaque: "Envoi de tokens JWT signés avec 'dev-secret'"
+    controles_existants:
+      - "expect() si JWT_SECRET non défini"
+      - "Validation longueur minimale (32 chars) dans Config"
+    controles_requis:
+      - "Panic! si JWT_SECRET non défini"
+      - "Validation longueur minimale (32 chars)"
+    principe_viole: "V"
+    cwe: "CWE-798"
+    owasp: "A07:2021"
+    statut: "RESOLU"
+    dates:
+      detection: "2025-12-26"
+      echeance: "2025-12-28"
+      resolution: "2025-12-26"
+    resolution:
+      taches: ["T001", "T002", "T003", "T004"]
+      description: "JWT_SECRET requis au démarrage, validation longueur >= 32 chars"
+    assignee: null
+    equipe: null
+
+  - id: "VULN-BASELINE-002"
+    source: "/osk-baseline"
+    type: "vulnerabilite"
+    feature: "federation"
+    titre: "Clé Privée Placeholder ActivityPub"
+    description: "La clé privée pour signer les requêtes HTTP est un placeholder, rendant les signatures invalides et potentiellement forgeables."
+    categorie_stride: "S"
+    severite: "CRITIQUE"
+    priorite: "P0"
+    impact: 4
+    probabilite: 5
+    exposition: 4
+    score_initial: 80
+    score_residuel: 80
+    fichiers:
+      - "src/jobs/federation.rs:127"
+    asset_menace: "Fédération ActivityPub"
+    vecteur_attaque: "Signature prévisible des requêtes sortantes"
+    controles_existants: []
+    controles_requis:
+      - "Générer paire RSA par utilisateur"
+      - "Stocker clé privée chiffrée en DB"
+    principe_viole: "V"
+    cwe: "CWE-321"
+    owasp: "A02:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-26"
+      echeance: "2025-12-28"
+    assignee: null
+    equipe: null
+
+  - id: "VULN-BASELINE-003"
+    source: "/osk-baseline"
+    type: "vulnerabilite"
+    feature: "federation"
+    titre: "Signature HTTP Non Vérifiée"
+    description: "Les inbox ActivityPub acceptent les activités sans vérifier la signature HTTP, permettant l'injection d'activités forgées."
+    categorie_stride: "S"
+    severite: "CRITIQUE"
+    priorite: "P0"
+    impact: 4
+    probabilite: 5
+    exposition: 4
+    score_initial: 80
+    score_residuel: 80
+    fichiers:
+      - "src/api/activitypub.rs:80-81"
+      - "src/api/activitypub.rs:95-96"
+    asset_menace: "Inbox ActivityPub"
+    vecteur_attaque: "POST d'activités forgées vers /ap/inbox"
+    controles_existants: []
+    controles_requis:
+      - "Parser header Signature"
+      - "Fetch clé publique de l'acteur"
+      - "Vérifier signature avant traitement"
+    principe_viole: "III"
+    cwe: "CWE-347"
+    owasp: "A02:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-26"
+      echeance: "2025-12-28"
+    assignee: null
+    equipe: null
+
+  - id: "VULN-BASELINE-004"
+    source: "/osk-baseline"
+    type: "vulnerabilite"
+    feature: "federation"
+    titre: "Clé Publique Placeholder"
+    description: "La clé publique exposée dans le profil Actor est un placeholder invalide, empêchant la vérification des signatures sortantes."
+    categorie_stride: "I"
+    severite: "IMPORTANT"
+    priorite: "P1"
+    impact: 4
+    probabilite: 4
+    exposition: 4
+    score_initial: 64
+    score_residuel: 64
+    fichiers:
+      - "src/api/activitypub.rs:61"
+    asset_menace: "Profil Actor ActivityPub"
+    vecteur_attaque: "N/A (dysfonctionnement)"
+    controles_existants: []
+    controles_requis:
+      - "Générer vraie paire RSA"
+      - "Stocker clé publique en DB"
+      - "Retourner vraie clé dans Actor"
+    principe_viole: "V"
+    cwe: "CWE-321"
+    owasp: "A02:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-26"
+      echeance: "2026-01-02"
+    assignee: null
+    equipe: null
+
+  # Risques Système
+  - id: "RISK-SYS-001"
+    source: "/osk-baseline"
+    type: "systeme"
+    feature: null
+    titre: "Absence d'Audit Logging"
+    description: "Le système utilise tracing mais n'a pas de piste d'audit structurée pour les actions sensibles (compliance RGPD)."
+    categorie_stride: "R"
+    severite: "IMPORTANT"
+    priorite: "P1"
+    impact: 3
+    probabilite: 5
+    exposition: 3
+    score_initial: 45
+    score_residuel: 45
+    fichiers:
+      - "src/main.rs"
+      - "src/services/**/*.rs"
+    asset_menace: "Toutes les actions utilisateur"
+    vecteur_attaque: "N/A (non-conformité)"
+    controles_existants:
+      - "tracing pour logs applicatifs"
+    controles_requis:
+      - "Audit logging JSON structuré"
+      - "Logger actions sur données personnelles"
+      - "Centralisation des logs"
+    principe_viole: "VI"
+    cwe: "CWE-778"
+    owasp: "A09:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-26"
+      echeance: "2026-01-02"
+    assignee: null
+    equipe: null
