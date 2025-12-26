@@ -31,6 +31,8 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub ap_id: String,
+    /// Whether user participates in ActivityPub federation
+    pub federation_enabled: bool,
 }
 
 /// Create a new user
@@ -103,6 +105,7 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             ap_id: "https://example.com/users/chef".to_string(),
+            federation_enabled: true,
         };
 
         let profile: UserProfile = user.clone().into();

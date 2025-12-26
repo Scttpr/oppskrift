@@ -18,7 +18,7 @@ impl UserService {
             SELECT
                 id, username, display_name, bio, avatar_url,
                 measurement_pref as "measurement_pref: MeasurementPref",
-                created_at, updated_at, ap_id
+                created_at, updated_at, ap_id, federation_enabled
             FROM users
             WHERE id = $1
             "#,
@@ -37,7 +37,7 @@ impl UserService {
             SELECT
                 id, username, display_name, bio, avatar_url,
                 measurement_pref as "measurement_pref: MeasurementPref",
-                created_at, updated_at, ap_id
+                created_at, updated_at, ap_id, federation_enabled
             FROM users
             WHERE username = $1
             "#,
@@ -64,7 +64,7 @@ impl UserService {
             RETURNING
                 id, username, display_name, bio, avatar_url,
                 measurement_pref as "measurement_pref: MeasurementPref",
-                created_at, updated_at, ap_id
+                created_at, updated_at, ap_id, federation_enabled
             "#,
             input.username,
             input.display_name,
@@ -123,7 +123,7 @@ impl UserService {
             RETURNING
                 id, username, display_name, bio, avatar_url,
                 measurement_pref as "measurement_pref: MeasurementPref",
-                created_at, updated_at, ap_id
+                created_at, updated_at, ap_id, federation_enabled
             "#,
             id,
             input.display_name,
@@ -180,6 +180,39 @@ impl UserService {
         .ok_or_else(|| AppError::NotFound(format!("Keys not found for user {}", user_id)))?;
 
         Ok(key)
+    }
+
+    /// Toggle federation for a user
+    pub async fn set_federation_enabled(
+        pool: &PgPool,
+        user_id: Uuid,
+        enabled: bool,
+    ) -> AppResult<User> {
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            UPDATE users
+            SET federation_enabled = $2, updated_at = NOW()
+            WHERE id = $1
+            RETURNING
+                id, username, display_name, bio, avatar_url,
+                measurement_pref as "measurement_pref: MeasurementPref",
+                created_at, updated_at, ap_id, federation_enabled
+            "#,
+            user_id,
+            enabled
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("User {} not found", user_id)))?;
+
+        // Audit federation toggle
+        AuditEvent::new("user.federation.toggle")
+            .with_user(user_id)
+            .with_metadata("enabled", &enabled.to_string())
+            .log();
+
+        Ok(user)
     }
 }
 
