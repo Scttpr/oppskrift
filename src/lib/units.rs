@@ -93,7 +93,7 @@ pub fn convert_quantity(
 
     // Find applicable conversion
     for conv in CONVERSIONS {
-        if to_system == MeasurementSystem::Imperial && conv.from_unit == unit_lower {
+        if to_system == MeasurementSystem::Imperial && conv.from_unit.to_lowercase() == unit_lower {
             // Metric to imperial
             if conv.category == UnitCategory::Temperature {
                 // Special case: Celsius to Fahrenheit
@@ -102,7 +102,9 @@ pub fn convert_quantity(
             }
             let converted = quantity * conv.factor;
             return (converted.round_dp(2), conv.to_unit.to_string());
-        } else if to_system == MeasurementSystem::Metric && conv.to_unit == unit_lower {
+        } else if to_system == MeasurementSystem::Metric
+            && conv.to_unit.to_lowercase() == unit_lower
+        {
             // Imperial to metric
             if conv.category == UnitCategory::Temperature {
                 // Special case: Fahrenheit to Celsius
@@ -162,7 +164,7 @@ mod tests {
     fn test_kg_to_pounds() {
         let (qty, unit) = convert_quantity(dec!(1), "kg", MeasurementSystem::Imperial);
         assert_eq!(unit, "lb");
-        assert!(qty > dec!(2.2) && qty < dec!(2.21));
+        assert_eq!(qty, dec!(2.20)); // 1 kg * 2.20462, rounded to 2 decimals
     }
 
     #[test]
