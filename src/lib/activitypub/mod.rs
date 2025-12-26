@@ -92,4 +92,29 @@ impl Activity {
         self.target = Some(target);
         self
     }
+
+    /// Create a Delete activity for an actor (used when disabling federation)
+    pub fn delete_actor(base_url: &str, actor_id: uuid::Uuid) -> Self {
+        let actor_url = format!("{}/users/{}", base_url, actor_id);
+        let activity_id = format!("{}/activities/{}", base_url, uuid::Uuid::new_v4());
+
+        Self::new(activity_id, ActivityType::Delete, actor_url.clone())
+            .with_object(serde_json::json!({
+                "id": actor_url,
+                "type": "Tombstone"
+            }))
+    }
+
+    /// Create a Delete activity for a recipe
+    pub fn delete_recipe(base_url: &str, actor_id: uuid::Uuid, recipe_id: uuid::Uuid) -> Self {
+        let actor_url = format!("{}/users/{}", base_url, actor_id);
+        let recipe_url = format!("{}/recipes/{}", base_url, recipe_id);
+        let activity_id = format!("{}/activities/{}", base_url, uuid::Uuid::new_v4());
+
+        Self::new(activity_id, ActivityType::Delete, actor_url)
+            .with_object(serde_json::json!({
+                "id": recipe_url,
+                "type": "Tombstone"
+            }))
+    }
 }
