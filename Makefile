@@ -1,104 +1,76 @@
-.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop up rebuild down prod-up lint fmt audit check migrate
+.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop up rebuild down lint fmt audit check migrate
 
-# Default target
-all: css build
+# Detect compose command
+COMPOSE := $(shell command -v docker-compose 2>/dev/null || command -v podman-compose 2>/dev/null || echo "docker compose")
+export DATABASE_URL ?= postgres://oppskrift:oppskrift@localhost:5432/oppskrift
 
-# Build the Rust application
+# Default: just build
+all: build
+
 build:
 	cargo build --release
 
-# Run the application
 run: css
 	cargo run
 
-# Development mode with hot reload
-dev:
+dev: css
 	cargo watch -x run
 
-# Build Tailwind CSS
 css:
 	./tailwindcss -i static/css/input.css -o static/css/main.css --minify
 
-# Watch Tailwind CSS for changes
 css-watch:
 	./tailwindcss -i static/css/input.css -o static/css/main.css --watch
 
-# Run tests (ensures database is running)
-test: db
-	@sqlx migrate run --source migrations > /dev/null 2>&1 || true
-	cargo test --all-features
-
-# Clean build artifacts
-clean:
-	cargo clean
-	rm -f static/css/main.css
-
-# Seed the database (development)
-seed:
-	cargo run -- --seed
-
-# Reset database (drop, migrate, seed)
-reset-db:
-	sqlx database drop -y || true
-	sqlx database create
-	sqlx migrate run
-	cargo run -- --seed
-
-# Database URL for local development
-export DATABASE_URL ?= postgres://oppskrift:oppskrift@localhost:5432/oppskrift
-
-# Detect compose command (docker-compose, podman-compose, or docker compose)
-COMPOSE_CMD := $(shell command -v docker-compose 2>/dev/null || command -v podman-compose 2>/dev/null || echo "docker compose")
-COMPOSE := $(COMPOSE_CMD)
-
-# Start database container
+# Database
 db:
-	@$(COMPOSE) up -d db
-	@echo "Waiting for database to be ready..."
-	@until $(COMPOSE) exec -T db pg_isready -U oppskrift > /dev/null 2>&1; do sleep 1; done
-	@echo "Database is ready"
+	@$(COMPOSE) up -d db 2>/dev/null || true
+	@until $(COMPOSE) exec -T db pg_isready -U oppskrift >/dev/null 2>&1; do sleep 1; done
 
-# Stop database container
 db-stop:
-	$(COMPOSE) stop db
+	@$(COMPOSE) stop db
 
-# Start all services (builds app first, replaces old containers)
+migrate: db
+	@sqlx migrate run
+
+# Docker
 up:
 	$(COMPOSE) build app
 	$(COMPOSE) up -d --force-recreate
 
-# Full rebuild (no cache)
 rebuild:
 	$(COMPOSE) build --no-cache app
 	$(COMPOSE) up -d --force-recreate
 
-# Stop all services
 down:
-	$(COMPOSE) down
+	@$(COMPOSE) down
 
-# Production deployment (requires secrets)
-prod-up:
-	$(COMPOSE_CMD) -f docker-compose.yml up -d
-
-# Run migrations (starts db if needed)
-migrate: db
-	sqlx migrate run
-
-# Lint and format (ensures database is running for SQLx)
-lint: db
-	@sqlx migrate run --source migrations > /dev/null 2>&1 || true
+# Quality
+lint: db migrate
 	cargo clippy --all-features -- -D warnings
 	cargo fmt -- --check
 
-# Quick check (compile only, with database)
-check: db
-	@sqlx migrate run --source migrations > /dev/null 2>&1 || true
+check: db migrate
 	cargo check --all-features
 
-# Format code
+test: db migrate
+	cargo test --all-features
+
 fmt:
 	cargo fmt
 
-# Security audit
 audit:
 	cargo audit
+
+clean:
+	cargo clean
+	rm -f static/css/main.css
+
+seed:
+	cargo run -- --seed
+
+reset-db: db
+	sqlx database drop -y || true
+	sqlx database create
+	sqlx migrate run
+	cargo run -- --seed
