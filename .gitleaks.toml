@@ -25,3 +25,21 @@ id = "s3-secret"
 description = "S3 Secret Access Key"
 regex = '''S3_SECRET_ACCESS_KEY\s*=\s*["']?[^"'\s]+["']?'''
 keywords = ["S3_SECRET", "secret_access_key"]
+
+[[rules]]
+id = "totp-encryption-key"
+description = "TOTP Encryption Key"
+regex = '''TOTP_ENCRYPTION_KEY\s*=\s*["']?[a-fA-F0-9]{64}["']?'''
+keywords = ["TOTP_ENCRYPTION_KEY", "totp_encryption"]
+
+[[rules]]
+id = "smtp-password"
+description = "SMTP Password"
+regex = '''SMTP_PASSWORD\s*=\s*["']?[^"'\s]+["']?'''
+keywords = ["SMTP_PASSWORD", "smtp_pass"]
+
+[[rules]]
+id = "argon2-hash"
+description = "Argon2 Password Hash (should never be in code)"
+regex = '''\$argon2(id|i|d)\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+'''
+keywords = ["argon2"]
