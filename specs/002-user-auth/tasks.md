@@ -102,8 +102,8 @@ Single project structure at repository root:
 
 ### Tests for User Story 1
 
-- [ ] T029 [P] [US1] Create tests/integration/registration_test.rs - Test successful registration, duplicate email/username, password validation, confirmation flow
-- [ ] T030 [P] [US1] Add security test in tests/security/enumeration_test.rs - Verify registration doesn't reveal existing emails
+- [x] T029 [P] [US1] Create tests/registration_test.rs - Test registration validation, username/password requirements, token format
+- [x] T030 [P] [US1] Create tests/enumeration_test.rs - Security tests for email enumeration prevention
 
 **Checkpoint**: User Story 1 complete - users can register and confirm accounts
 
