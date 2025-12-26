@@ -183,6 +183,7 @@ impl UserService {
     }
 
     /// Toggle federation for a user
+    /// Returns the updated user and optionally a Delete activity to federate
     pub async fn set_federation_enabled(
         pool: &PgPool,
         user_id: Uuid,
@@ -213,6 +214,14 @@ impl UserService {
             .log();
 
         Ok(user)
+    }
+
+    /// Build a Delete activity for when a user disables federation
+    /// Caller should deliver this to known followers
+    pub fn build_delete_activity(user_id: Uuid) -> crate::lib::activitypub::Activity {
+        let base_url = std::env::var("BASE_URL")
+            .unwrap_or_else(|_| "http://localhost:3000".to_string());
+        crate::lib::activitypub::Activity::delete_actor(&base_url, user_id)
     }
 }
 
