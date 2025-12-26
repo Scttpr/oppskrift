@@ -9,10 +9,12 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  DATABASE_URL: postgres://oppskrift:oppskrift@localhost:5432/oppskrift
 
 jobs:
-  check:
-    name: Check
+  # Build first - all other jobs depend on this
+  build:
+    name: Build
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -20,7 +22,7 @@ jobs:
         env:
           POSTGRES_USER: oppskrift
           POSTGRES_PASSWORD: oppskrift
-          POSTGRES_DB: oppskrift_test
+          POSTGRES_DB: oppskrift
         ports:
           - 5432:5432
         options: >-
@@ -28,20 +30,30 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    env:
-      DATABASE_URL: postgres://oppskrift:oppskrift@localhost:5432/oppskrift_test
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           cache-all-crates: "true"
+          shared-key: "build"
       - name: Install sqlx-cli
         run: cargo install sqlx-cli --no-default-features --features postgres
       - name: Run migrations
         run: sqlx migrate run
-      - run: cargo check --all-features
+      - name: Build
+        run: cargo build --all-features
+      # Cache build artifacts for other jobs
+      - name: Save build artifacts
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            target/
+            ~/.cargo/registry/
+            ~/.cargo/git/
+          key: build-${{ github.sha }}
 
+  # Format check - no dependencies, fast
   fmt:
     name: Format
     runs-on: ubuntu-latest
@@ -52,8 +64,10 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all -- --check
 
+  # Clippy - depends on build, reuses build cache
   clippy:
     name: Clippy
+    needs: build
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -61,7 +75,7 @@ jobs:
         env:
           POSTGRES_USER: oppskrift
           POSTGRES_PASSWORD: oppskrift
-          POSTGRES_DB: oppskrift_test
+          POSTGRES_DB: oppskrift
         ports:
           - 5432:5432
         options: >-
@@ -69,24 +83,30 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    env:
-      DATABASE_URL: postgres://oppskrift:oppskrift@localhost:5432/oppskrift_test
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - uses: Swatinem/rust-cache@v2
+      # Restore build artifacts from build job
+      - name: Restore build artifacts
+        uses: actions/cache/restore@v4
         with:
-          cache-all-crates: "true"
+          path: |
+            target/
+            ~/.cargo/registry/
+            ~/.cargo/git/
+          key: build-${{ github.sha }}
       - name: Install sqlx-cli
         run: cargo install sqlx-cli --no-default-features --features postgres
       - name: Run migrations
         run: sqlx migrate run
       - run: cargo clippy --all-features -- -D warnings
 
+  # Tests - depends on build, reuses build cache
   test:
     name: Test
+    needs: build
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -94,7 +114,7 @@ jobs:
         env:
           POSTGRES_USER: oppskrift
           POSTGRES_PASSWORD: oppskrift
-          POSTGRES_DB: oppskrift_test
+          POSTGRES_DB: oppskrift
         ports:
           - 5432:5432
         options: >-
@@ -102,20 +122,25 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    env:
-      DATABASE_URL: postgres://oppskrift:oppskrift@localhost:5432/oppskrift_test
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      # Restore build artifacts from build job
+      - name: Restore build artifacts
+        uses: actions/cache/restore@v4
         with:
-          cache-all-crates: "true"
+          path: |
+            target/
+            ~/.cargo/registry/
+            ~/.cargo/git/
+          key: build-${{ github.sha }}
       - name: Install sqlx-cli
         run: cargo install sqlx-cli --no-default-features --features postgres
       - name: Run migrations
         run: sqlx migrate run
       - run: cargo test --all-features
 
+  # Security audit - no dependencies, can run in parallel
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
