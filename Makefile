@@ -47,16 +47,19 @@ reset-db:
 # Database URL for local development
 export DATABASE_URL ?= postgres://oppskrift:oppskrift@localhost:5432/oppskrift
 
+# Detect compose command (docker-compose, podman-compose, or docker compose)
+COMPOSE := $(shell command -v docker-compose 2>/dev/null || command -v podman-compose 2>/dev/null || echo "docker compose")
+
 # Start database container
 db:
-	@docker-compose up -d db
+	@$(COMPOSE) up -d db
 	@echo "Waiting for database to be ready..."
-	@until docker-compose exec -T db pg_isready -U oppskrift > /dev/null 2>&1; do sleep 1; done
+	@until $(COMPOSE) exec -T db pg_isready -U oppskrift > /dev/null 2>&1; do sleep 1; done
 	@echo "Database is ready"
 
 # Stop database container
 db-stop:
-	docker-compose stop db
+	$(COMPOSE) stop db
 
 # Run migrations (starts db if needed)
 migrate: db
