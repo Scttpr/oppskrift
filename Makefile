@@ -1,4 +1,4 @@
-.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop up down prod-up lint fmt audit check migrate
+.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop up rebuild down prod-up lint fmt audit check migrate
 
 # Default target
 all: css build
@@ -65,6 +65,11 @@ db-stop:
 # Start all services (builds app first, replaces old containers)
 up:
 	$(COMPOSE) build app
+	$(COMPOSE) up -d --force-recreate
+
+# Full rebuild (no cache)
+rebuild:
+	$(COMPOSE) build --no-cache app
 	$(COMPOSE) up -d --force-recreate
 
 # Stop all services
