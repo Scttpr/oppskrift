@@ -13,6 +13,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::lib::activitypub::{PersonActor, RecipeBookCollection, RecipeObject};
+use crate::lib::audit::AuditEvent;
 use crate::lib::pagination::PaginationParams;
 use crate::services::{ActivityService, BookService, RecipeService, UserService};
 use crate::AppState;
@@ -80,10 +81,31 @@ async fn inbox(
     // TODO: Verify HTTP signature from headers
     // let signature = headers.get("signature");
 
-    // Process the activity
-    process_incoming_activity(&state, activity).await?;
+    // Audit incoming activity
+    let activity_type = activity.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
+    let actor = activity.get("actor").and_then(|a| a.as_str()).unwrap_or("unknown");
 
-    Ok(StatusCode::ACCEPTED)
+    // Process the activity
+    match process_incoming_activity(&state, activity).await {
+        Ok(()) => {
+            AuditEvent::new("federation.inbox.received")
+                .with_user(id)
+                .with_metadata("activity_type", activity_type)
+                .with_metadata("actor", actor)
+                .log();
+            Ok(StatusCode::ACCEPTED)
+        }
+        Err(status) => {
+            AuditEvent::new("federation.inbox.rejected")
+                .with_user(id)
+                .with_metadata("activity_type", activity_type)
+                .with_metadata("actor", actor)
+                .with_metadata("status", &status.as_u16().to_string())
+                .warn()
+                .log();
+            Err(status)
+        }
+    }
 }
 
 /// Shared inbox - receive activities for any user
@@ -94,10 +116,31 @@ async fn shared_inbox(
 ) -> Result<StatusCode, StatusCode> {
     // TODO: Verify HTTP signature from headers
 
-    // Process the activity
-    process_incoming_activity(&state, activity).await?;
+    // Audit incoming activity
+    let activity_type = activity.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
+    let actor = activity.get("actor").and_then(|a| a.as_str()).unwrap_or("unknown");
 
-    Ok(StatusCode::ACCEPTED)
+    // Process the activity
+    match process_incoming_activity(&state, activity).await {
+        Ok(()) => {
+            AuditEvent::new("federation.inbox.received")
+                .with_metadata("inbox", "shared")
+                .with_metadata("activity_type", activity_type)
+                .with_metadata("actor", actor)
+                .log();
+            Ok(StatusCode::ACCEPTED)
+        }
+        Err(status) => {
+            AuditEvent::new("federation.inbox.rejected")
+                .with_metadata("inbox", "shared")
+                .with_metadata("activity_type", activity_type)
+                .with_metadata("actor", actor)
+                .with_metadata("status", &status.as_u16().to_string())
+                .warn()
+                .log();
+            Err(status)
+        }
+    }
 }
 
 /// Process an incoming activity

@@ -198,7 +198,7 @@ async fn delete_recipe(
         return Err(AppError::Forbidden("Not authorized to modify this recipe".to_string()));
     }
 
-    RecipeService::delete(&state.db, id).await?;
+    RecipeService::delete(&state.db, id, auth.id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

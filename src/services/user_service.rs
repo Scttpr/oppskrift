@@ -1,6 +1,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::lib::audit::AuditEvent;
 use crate::lib::crypto::generate_rsa_keypair;
 use crate::lib::error::{AppError, AppResult};
 use crate::models::user::{CreateUser, MeasurementPref, UpdateUser, User};
@@ -97,12 +98,18 @@ impl UserService {
         .execute(pool)
         .await?;
 
+        // Audit user creation
+        AuditEvent::new("user.create")
+            .with_user(user.id)
+            .with_target("user", user.id)
+            .log();
+
         Ok(user)
     }
 
     /// Update a user's profile
     pub async fn update(pool: &PgPool, id: Uuid, input: UpdateUser) -> AppResult<User> {
-        sqlx::query_as!(
+        let user = sqlx::query_as!(
             User,
             r#"
             UPDATE users
@@ -126,7 +133,15 @@ impl UserService {
         )
         .fetch_optional(pool)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("User {} not found", id)))
+        .ok_or_else(|| AppError::NotFound(format!("User {} not found", id)))?;
+
+        // Audit user update
+        AuditEvent::new("user.update")
+            .with_user(id)
+            .with_target("user", id)
+            .log();
+
+        Ok(user)
     }
 
     /// Check if a username is available
