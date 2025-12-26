@@ -8,6 +8,8 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::lib::audit::AuditEvent;
+
 /// JWT claims structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
@@ -95,6 +97,13 @@ where
         )
         .map_err(|e| {
             tracing::debug!("JWT validation failed: {:?}", e);
+
+            // Audit invalid token attempt
+            AuditEvent::new("auth.token.invalid")
+                .with_metadata("reason", &e.to_string())
+                .warn()
+                .log();
+
             (
                 StatusCode::UNAUTHORIZED,
                 Json(AuthError {
