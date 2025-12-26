@@ -117,26 +117,26 @@ Single project structure at repository root:
 
 ### Services for User Story 2
 
-- [ ] T031 [US2] Add login() to src/services/auth.rs - Verify credentials, check lockout, create session, log event, handle 2FA check (defer actual 2FA to US4)
-- [ ] T032 [US2] Add logout() to src/services/auth.rs - Terminate current session, log event
-- [ ] T033 [US2] Add check_lockout() and increment_failed_attempts() to src/services/auth.rs - Account lockout logic (5 attempts, 15-min lockout)
+- [x] T031 [US2] Add login() to src/services/auth.rs - Verify credentials, check lockout, create session, log event, handle 2FA check (defer actual 2FA to US4)
+- [x] T032 [US2] Add logout() to src/services/auth.rs - Terminate current session, log event
+- [x] T033 [US2] Add check_lockout() and increment_failed_attempts() to src/services/auth.rs - Account lockout logic (5 attempts, 15-min lockout)
 
 ### API Endpoints for User Story 2
 
-- [ ] T034 [US2] Add POST /api/auth/login to src/api/auth.rs - Credential verification, session creation, secure cookie
-- [ ] T035 [US2] Add POST /api/auth/logout to src/api/auth.rs - Session termination
-- [ ] T036 [US2] Create src/api/account.rs - GET /api/account/profile endpoint (protected, uses AuthUser)
+- [x] T034 [US2] Add POST /api/auth/login to src/api/auth.rs - Credential verification, session creation, secure cookie
+- [x] T035 [US2] Add POST /api/auth/logout to src/api/auth.rs - Session termination
+- [x] T036 [US2] Create src/api/account.rs - GET /api/account/profile endpoint (protected, uses AuthUser)
 
 ### Integration for User Story 2
 
-- [ ] T037 [US2] Update src/main.rs - Add account routes with session auth requirement
-- [ ] T038 [US2] Implement constant-time credential verification in src/services/auth.rs - Fake hash check for non-existent users to prevent timing attacks
+- [x] T037 [US2] Update src/main.rs - Add account routes with session auth requirement
+- [x] T038 [US2] Implement constant-time credential verification in src/services/auth.rs - Fake hash check for non-existent users to prevent timing attacks
 
 ### Tests for User Story 2
 
-- [ ] T039 [P] [US2] Create tests/integration/login_test.rs - Test successful login, invalid credentials, lockout after 5 failures, logout
-- [ ] T040 [P] [US2] Create tests/security/rate_limit_test.rs - Verify rate limiting blocks brute force
-- [ ] T041 [P] [US2] Add timing test in tests/security/timing_test.rs - Verify constant-time response for valid vs invalid users
+- [x] T039 [P] [US2] Create tests/integration/login_test.rs - Test successful login, invalid credentials, lockout after 5 failures, logout
+- [x] T040 [P] [US2] Create tests/security/rate_limit_test.rs - Verify rate limiting blocks brute force
+- [x] T041 [P] [US2] Add timing test in tests/security/timing_test.rs - Verify constant-time response for valid vs invalid users
 
 **Checkpoint**: User Stories 1 & 2 complete - functional registration and login (MVP!)
 
