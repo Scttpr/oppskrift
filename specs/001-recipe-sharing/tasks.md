@@ -286,13 +286,13 @@ Based on plan.md project structure:
 
 ### Accessibility (Constitution v1.2.0 - State of the Art)
 
-- [ ] T135 Validate skip links work correctly on all pages (keyboard focus, visibility on focus)
-- [ ] T136 Validate ARIA landmarks (main, nav, banner, contentinfo) present and correct on all page templates
-- [ ] T137 Ensure all form inputs have associated labels with `for` attribute; link error messages with `aria-describedby`
-- [ ] T138 Add visible focus indicators (3:1 contrast) to all interactive elements in Tailwind config
-- [ ] T139 Implement high-contrast mode toggle in user preferences and CSS custom properties
-- [ ] T140 Add alt text prompt/requirement to image upload forms; mark decorative images with `alt=""`
-- [ ] T141 Ensure color is not sole information carrier (add icons/text to status indicators)
+- [x] T135 Validate skip links work correctly on all pages (keyboard focus, visibility on focus)
+- [x] T136 Validate ARIA landmarks (main, nav, banner, contentinfo) present and correct on all page templates
+- [x] T137 Ensure all form inputs have associated labels with `for` attribute; link error messages with `aria-describedby`
+- [x] T138 Add visible focus indicators (3:1 contrast) to all interactive elements in Tailwind config
+- [x] T139 Implement high-contrast mode toggle in user preferences and CSS custom properties
+- [x] T140 Add alt text prompt/requirement to image upload forms; mark decorative images with `alt=""`
+- [x] T141 Ensure color is not sole information carrier (add icons/text to status indicators)
 - [ ] T142 Run axe-core automated audit on all pages; fix all critical/serious issues
 - [ ] T143 Run Lighthouse accessibility audit; achieve score ≥95
 - [ ] T144 Manual keyboard navigation test: verify all journeys completable without mouse
