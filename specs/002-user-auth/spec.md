@@ -2,7 +2,7 @@
 
 **Feature Branch**: `002-user-auth`
 **Created**: 2025-12-26
-**Status**: Draft
+**Status**: In Progress (MVP Complete - User Stories 1 & 2)
 **Input**: User description: "Lets go for authentication, it should be rock solid, easy for end user. Everything in code related to auth now is a stub, feel free to remove everything."
 
 ## User Scenarios & Testing *(mandatory)*

@@ -36,7 +36,7 @@ Technical approach: Argon2id password hashing, tower_governor rate limiting, dat
 | I. Threat Modeling | ✅ PASS | STRIDE analysis completed → `.osk/specs/002-user-auth/threats.md` |
 | II. Risk Analysis | ✅ PASS | 12 risks identified, 3 P0 critical → `.osk/specs/002-user-auth/risks.md` |
 | III. Security Requirements | ✅ PASS | 33 FRs mapped to controls in research.md |
-| IV. Security Testing | 🔄 PENDING | Tests to be created per task |
+| IV. Security Testing | ✅ PASS | registration_test.rs, login_test.rs, timing_test.rs, enumeration_test.rs |
 | V. Secrets Management | ✅ PASS | JWT_SECRET, TOTP_ENCRYPTION_KEY required (no fallbacks) |
 | VI. Audit Logging | ✅ PASS | security_events table designed |
 | VII. Patch Management | ✅ PASS | cargo-audit in CI |
