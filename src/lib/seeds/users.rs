@@ -10,26 +10,35 @@ use crate::services::UserService;
 /// Test user data
 struct TestUser {
     username: &'static str,
+    email: &'static str,
     display_name: &'static str,
     bio: &'static str,
     measurement_pref: MeasurementPref,
 }
 
+/// Placeholder password hash for seed users (not for production!)
+/// This is a valid Argon2id hash of "TestPassword123" for development only
+const SEED_PASSWORD_HASH: &str =
+    "$argon2id$v=19$m=19456,t=2,p=1$seed_salt_dev$placeholder_hash_for_development_only";
+
 const TEST_USERS: &[TestUser] = &[
     TestUser {
         username: "alice",
+        email: "alice@example.com",
         display_name: "Alice Chen",
         bio: "Home cook passionate about Asian fusion cuisine. Love experimenting with traditional recipes!",
         measurement_pref: MeasurementPref::Metric,
     },
     TestUser {
         username: "bob",
+        email: "bob@example.com",
         display_name: "Bob Wilson",
         bio: "BBQ enthusiast from Texas. Smoking meats is my meditation.",
         measurement_pref: MeasurementPref::Imperial,
     },
     TestUser {
         username: "chef_marie",
+        email: "marie@example.com",
         display_name: "Chef Marie Dubois",
         bio: "Professional pastry chef with 15 years experience. Currently teaching at culinary school.",
         measurement_pref: MeasurementPref::Metric,
@@ -52,6 +61,8 @@ pub async fn seed_users(pool: &PgPool, base_url: &str) -> AppResult<Vec<Uuid>> {
 
         let input = CreateUser {
             username: user.username.to_string(),
+            email: user.email.to_string(),
+            password_hash: SEED_PASSWORD_HASH.to_string(),
             display_name: user.display_name.to_string(),
             bio: Some(user.bio.to_string()),
             avatar_url: None,
