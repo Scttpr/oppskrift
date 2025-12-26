@@ -12,7 +12,7 @@ use axum::{
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::lib::activitypub::{PersonActor, RecipeBookCollection, RecipeObject};
+use crate::lib::activitypub::{HttpSignature, PersonActor, RecipeBookCollection, RecipeObject, verify_signature};
 use crate::lib::audit::AuditEvent;
 use crate::lib::pagination::PaginationParams;
 use crate::services::{ActivityService, BookService, RecipeService, UserService};
@@ -70,7 +70,7 @@ async fn get_actor(
 async fn inbox(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    _headers: HeaderMap,
+    headers: HeaderMap,
     Json(activity): Json<Value>,
 ) -> Result<StatusCode, StatusCode> {
     // Verify the user exists
@@ -78,8 +78,17 @@ async fn inbox(
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
-    // TODO: Verify HTTP signature from headers
-    // let signature = headers.get("signature");
+    // Verify HTTP signature
+    if let Err(status) = verify_inbox_signature(&headers, "POST", &format!("/ap/users/{}/inbox", id)).await {
+        let actor = activity.get("actor").and_then(|a| a.as_str()).unwrap_or("unknown");
+        AuditEvent::new("federation.inbox.rejected")
+            .with_user(id)
+            .with_metadata("reason", "signature_invalid")
+            .with_metadata("actor", actor)
+            .warn()
+            .log();
+        return Err(status);
+    }
 
     // Audit incoming activity
     let activity_type = activity.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
@@ -111,10 +120,20 @@ async fn inbox(
 /// Shared inbox - receive activities for any user
 async fn shared_inbox(
     State(state): State<AppState>,
-    _headers: HeaderMap,
+    headers: HeaderMap,
     Json(activity): Json<Value>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Verify HTTP signature from headers
+    // Verify HTTP signature
+    if let Err(status) = verify_inbox_signature(&headers, "POST", "/ap/inbox").await {
+        let actor = activity.get("actor").and_then(|a| a.as_str()).unwrap_or("unknown");
+        AuditEvent::new("federation.inbox.rejected")
+            .with_metadata("inbox", "shared")
+            .with_metadata("reason", "signature_invalid")
+            .with_metadata("actor", actor)
+            .warn()
+            .log();
+        return Err(status);
+    }
 
     // Audit incoming activity
     let activity_type = activity.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
@@ -139,6 +158,44 @@ async fn shared_inbox(
                 .warn()
                 .log();
             Err(status)
+        }
+    }
+}
+
+/// Verify HTTP signature on incoming inbox request
+async fn verify_inbox_signature(
+    headers: &HeaderMap,
+    method: &str,
+    path: &str,
+) -> Result<(), StatusCode> {
+    // Get the Signature header
+    let signature_header = headers
+        .get("signature")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Parse the signature
+    let signature = HttpSignature::parse(signature_header)
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    // Collect headers for verification
+    let header_values: Vec<(String, String)> = headers
+        .iter()
+        .filter_map(|(k, v)| {
+            v.to_str().ok().map(|v| (k.as_str().to_lowercase(), v.to_string()))
+        })
+        .collect();
+
+    // Verify the signature
+    match verify_signature(&signature, method, path, &header_values).await {
+        Ok(result) if result.valid => Ok(()),
+        Ok(result) => {
+            tracing::warn!("Signature verification failed: {:?}", result.error);
+            Err(StatusCode::UNAUTHORIZED)
+        }
+        Err(e) => {
+            tracing::error!("Signature verification error: {:?}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
