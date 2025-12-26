@@ -176,4 +176,24 @@ mod tests {
         assert_eq!(config.session_days, 30);
         assert_eq!(config.deleted_content_days, 30);
     }
+
+    #[test]
+    fn test_custom_retention_config() {
+        let config = RetentionConfig {
+            audit_log_days: 180,
+            session_days: 7,
+            deleted_content_days: 14,
+        };
+        assert_eq!(config.audit_log_days, 180);
+        assert_eq!(config.session_days, 7);
+        assert_eq!(config.deleted_content_days, 14);
+    }
+
+    #[test]
+    fn test_retention_config_clone() {
+        let config = RetentionConfig::default();
+        let cloned = config.clone();
+        assert_eq!(config.audit_log_days, cloned.audit_log_days);
+        assert_eq!(config.session_days, cloned.session_days);
+    }
 }
