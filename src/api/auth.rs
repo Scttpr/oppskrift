@@ -5,48 +5,36 @@
 
 use axum::{
     extract::{ConnectInfo, Path, State},
-    http::StatusCode,
-    response::IntoResponse,
+    http::{header::SET_COOKIE, StatusCode},
+    response::{AppendHeaders, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
-use chrono::{Duration, Utc};
-use jsonwebtoken::{encode, EncodingKey, Header};
-use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use uuid::Uuid;
 use validator::Validate;
 
-use crate::api::middleware::SESSION_EXPIRY_DAYS;
-use crate::lib::audit::AuditEvent;
+use crate::api::middleware::{
+    clear_session_cookie, create_session_cookie, AuthUser, SESSION_EXPIRY_DAYS,
+};
 use crate::lib::config::SmtpConfig;
-use crate::lib::error::{AppError, AppResult};
-use crate::models::{EmailConfirmationResponse, RegisterRequest, ResendConfirmationRequest};
-use crate::services::{AuthService, EmailService, PasswordService, UserService};
+use crate::lib::error::AppError;
+use crate::models::{
+    EmailConfirmationResponse, LoginRequest, LoginResponse, LogoutResponse, RegisterRequest,
+    ResendConfirmationRequest, UserProfile,
+};
+use crate::services::{AuthError, AuthService, EmailService, LoginResult, PasswordService};
 use crate::AppState;
-
-/// JWT claims structure (legacy - to be replaced by session auth)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Claims {
-    /// Subject (user ID)
-    pub sub: Uuid,
-    /// Username
-    pub username: String,
-    /// Expiration time (Unix timestamp)
-    pub exp: i64,
-    /// Issued at (Unix timestamp)
-    pub iat: i64,
-}
 
 /// Auth routes
 pub fn routes() -> Router<AppState> {
     Router::new()
-        // Registration endpoints (new session-based)
+        // Registration endpoints
         .route("/register", post(register))
         .route("/confirm-email/{token}", get(confirm_email))
         .route("/resend-confirmation", post(resend_confirmation))
-        // Legacy JWT login (will be replaced)
+        // Session-based auth
         .route("/login", post(login))
+        .route("/logout", post(logout))
 }
 
 // =============================================================================
@@ -216,88 +204,140 @@ async fn resend_confirmation(
 }
 
 // =============================================================================
-// Legacy JWT Login (to be replaced with session-based login in T034)
+// Login/Logout Endpoints (T034-T035)
 // =============================================================================
 
-/// Legacy login request payload (JWT-based)
-#[derive(Debug, Deserialize, Validate)]
-pub struct LegacyLoginRequest {
-    #[validate(length(min = 1, max = 50))]
-    pub username: String,
-}
+/// User agent header name
+const USER_AGENT_HEADER: &str = "User-Agent";
 
-/// Legacy login response with JWT token
-#[derive(Debug, Serialize)]
-pub struct LegacyLoginResponse {
-    pub token: String,
-    pub expires_at: i64,
-}
-
-/// POST /api/auth/login (legacy JWT)
+/// POST /api/auth/login
 ///
-/// Authenticate user and return JWT token.
-/// This will be replaced with session-based authentication in T034.
+/// Authenticate user with email and password. Sets session cookie on success.
+///
+/// ## Request Body
+/// - `email`: User's email address
+/// - `password`: User's password
+/// - `totp_code`: Optional TOTP code (required if 2FA is enabled)
+///
+/// ## Response
+/// - `200 OK`: Login successful, session cookie set
+/// - `401 Unauthorized`: Invalid credentials
+/// - `403 Forbidden`: Account locked or email not verified
+/// - `422 Unprocessable Entity`: 2FA required
 async fn login(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Json(input): Json<LegacyLoginRequest>,
-) -> AppResult<Json<LegacyLoginResponse>> {
-    let ip = addr.ip().to_string();
+    headers: axum::http::HeaderMap,
+    Json(input): Json<LoginRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let ip = Some(addr.ip());
+    let user_agent = headers
+        .get(USER_AGENT_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(String::from);
 
     // Validate input
     input.validate().map_err(|e| {
-        AuditEvent::new("auth.login.failure")
-            .with_ip(&ip)
-            .with_metadata("reason", "validation_failed")
-            .warn()
-            .log();
+        tracing::debug!(errors = %e, "Login validation failed");
         AppError::Validation(e.to_string())
     })?;
 
-    // Find user by username
-    let user = match UserService::get_by_username(&state.db, &input.username).await {
-        Ok(user) => user,
-        Err(_) => {
-            AuditEvent::new("auth.login.failure")
-                .with_ip(&ip)
-                .with_metadata("username", &input.username)
-                .with_metadata("reason", "user_not_found")
-                .warn()
-                .log();
-            return Err(AppError::Unauthorized("Invalid credentials".to_string()));
+    // Create auth service
+    let auth_service = create_auth_service(&state);
+
+    // Attempt login
+    let result = auth_service
+        .login(&input.email, &input.password, ip, user_agent.clone(), None)
+        .await
+        .map_err(|e| match e {
+            AuthError::InvalidCredentials => {
+                AppError::Unauthorized("Invalid email or password".to_string())
+            }
+            AuthError::AccountLocked(until) => {
+                AppError::Forbidden(format!("Account locked until {}", until))
+            }
+            AuthError::EmailNotVerified => {
+                AppError::Forbidden("Please verify your email before logging in".to_string())
+            }
+            AuthError::TwoFactorRequired => {
+                // This is a special case - 2FA is required
+                AppError::Validation("Two-factor authentication required".to_string())
+            }
+            e => {
+                tracing::error!(error = %e, "Login failed");
+                AppError::Internal("Login failed".to_string())
+            }
+        })?;
+
+    match result {
+        LoginResult::Success {
+            user_id,
+            token,
+            expires_at,
+            ..
+        } => {
+            // Get user profile for response
+            let user = crate::services::UserService::get_by_id(&state.db, user_id)
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "Failed to get user after login");
+                    AppError::Internal("Login failed".to_string())
+                })?;
+
+            let profile = UserProfile::from(user);
+
+            // Set session cookie
+            let cookie = create_session_cookie(&token, SESSION_EXPIRY_DAYS);
+
+            Ok((
+                AppendHeaders([(SET_COOKIE, cookie)]),
+                Json(LoginResponse {
+                    user: profile,
+                    expires_at,
+                }),
+            ))
         }
-    };
+        LoginResult::TwoFactorRequired { .. } => {
+            // Return a special response indicating 2FA is needed
+            Err(AppError::Validation(
+                "Two-factor authentication required".to_string(),
+            ))
+        }
+    }
+}
 
-    // Generate JWT token
-    let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET environment variable must be set");
+/// POST /api/auth/logout
+///
+/// Terminate the current session and clear the session cookie.
+///
+/// ## Response
+/// - `200 OK`: Logout successful
+/// - `401 Unauthorized`: Not authenticated
+async fn logout(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+) -> Result<impl IntoResponse, AppError> {
+    // Create auth service
+    let auth_service = create_auth_service(&state);
 
-    let now = Utc::now();
-    let expires_at = now + Duration::hours(24);
+    // Logout the user
+    auth_service
+        .logout(auth_user.id, auth_user.session_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Logout failed");
+            AppError::Internal("Logout failed".to_string())
+        })?;
 
-    let claims = Claims {
-        sub: user.id,
-        username: user.username.clone(),
-        exp: expires_at.timestamp(),
-        iat: now.timestamp(),
-    };
+    // Clear session cookie
+    let cookie = clear_session_cookie();
 
-    let token = encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_bytes()),
-    )
-    .map_err(|e| AppError::Internal(format!("Failed to create token: {}", e)))?;
-
-    // Audit successful login
-    AuditEvent::new("auth.login.success")
-        .with_user(user.id)
-        .with_ip(&ip)
-        .log();
-
-    Ok(Json(LegacyLoginResponse {
-        token,
-        expires_at: expires_at.timestamp(),
-    }))
+    Ok((
+        AppendHeaders([(SET_COOKIE, cookie)]),
+        Json(LogoutResponse {
+            message: "Logged out successfully".to_string(),
+        }),
+    ))
 }
 
 // =============================================================================
