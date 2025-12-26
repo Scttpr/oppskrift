@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2025-12-25
 
 ## Active Technologies
+- Rust 1.75+ + Axum 0.8, SQLx 0.8, argon2, totp-rs, lettre, tower_governor (002-user-auth)
+- PostgreSQL 15+ (sessions, tokens, security_events tables) (002-user-auth)
 
 - **Language**: Rust 1.75+
 - **Framework**: Axum 0.8
@@ -49,6 +51,7 @@ cargo run                # Run dev server
 - Use `thiserror` for library errors, `anyhow` for application errors
 
 ## Recent Changes
+- 002-user-auth: Added Rust 1.75+ + Axum 0.8, SQLx 0.8, argon2, totp-rs, lettre, tower_governor
 
 - 001-recipe-sharing: Initial feature - recipes, books, sharing, ActivityPub federation
 
