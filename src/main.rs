@@ -29,14 +29,27 @@ async fn main() -> anyhow::Result<()> {
     // Load and validate configuration (panics if required vars missing)
     let config = lib::Config::from_env();
 
-    // Initialize tracing
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,oppskrift=debug,tower_http=debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // Initialize tracing with JSON format in production
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| "info,oppskrift=debug,tower_http=debug".into());
+
+    let is_production = std::env::var("RUST_ENV")
+        .map(|v| v == "production")
+        .unwrap_or(false);
+
+    if is_production {
+        // JSON structured logging for production
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(tracing_subscriber::fmt::layer().json())
+            .init();
+    } else {
+        // Human-readable logging for development
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
 
     // Create database connection pool
     let db = lib::db::create_default_pool().await?;
