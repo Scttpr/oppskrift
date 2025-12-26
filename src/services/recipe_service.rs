@@ -1,6 +1,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::lib::audit::AuditEvent;
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{
@@ -53,7 +54,7 @@ impl RecipeService {
         let ap_id = format!("{}/recipes/{}", base_url, id);
         let visibility = input.visibility.unwrap_or_default();
 
-        sqlx::query_as!(
+        let recipe = sqlx::query_as!(
             Recipe,
             r#"
             INSERT INTO recipes (id, author_id, title, description, visibility, prep_time_min, cook_time_min, servings, difficulty, ap_id)
@@ -78,7 +79,15 @@ impl RecipeService {
         )
         .fetch_one(pool)
         .await
-        .map_err(AppError::from)
+        .map_err(AppError::from)?;
+
+        // Audit recipe creation
+        AuditEvent::new("recipe.create")
+            .with_user(author_id)
+            .with_target("recipe", recipe.id)
+            .log();
+
+        Ok(recipe)
     }
 
     /// Get a recipe by ID (internal, no visibility check)
@@ -123,7 +132,7 @@ impl RecipeService {
 
     /// Update a recipe
     pub async fn update(pool: &PgPool, id: Uuid, input: UpdateRecipe) -> AppResult<Recipe> {
-        sqlx::query_as!(
+        let recipe = sqlx::query_as!(
             Recipe,
             r#"
             UPDATE recipes
@@ -155,11 +164,19 @@ impl RecipeService {
         )
         .fetch_optional(pool)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("Recipe {} not found", id)))
+        .ok_or_else(|| AppError::NotFound(format!("Recipe {} not found", id)))?;
+
+        // Audit recipe update
+        AuditEvent::new("recipe.update")
+            .with_user(recipe.author_id)
+            .with_target("recipe", id)
+            .log();
+
+        Ok(recipe)
     }
 
     /// Delete a recipe
-    pub async fn delete(pool: &PgPool, id: Uuid) -> AppResult<()> {
+    pub async fn delete(pool: &PgPool, id: Uuid, actor_id: Uuid) -> AppResult<()> {
         let result = sqlx::query!("DELETE FROM recipes WHERE id = $1", id)
             .execute(pool)
             .await?;
@@ -167,6 +184,12 @@ impl RecipeService {
         if result.rows_affected() == 0 {
             return Err(AppError::NotFound(format!("Recipe {} not found", id)));
         }
+
+        // Audit recipe deletion
+        AuditEvent::new("recipe.delete")
+            .with_user(actor_id)
+            .with_target("recipe", id)
+            .log();
 
         Ok(())
     }
