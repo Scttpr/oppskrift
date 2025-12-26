@@ -7,6 +7,7 @@
 pub mod activity;
 pub mod auth;
 pub mod book_recipe_entry;
+pub mod email_confirmation;
 pub mod follow;
 pub mod ingredient;
 pub mod instruction_step;
@@ -24,6 +25,10 @@ pub use auth::{
     TwoFactorRequired,
 };
 pub use book_recipe_entry::{AddRecipeToBook, BookRecipeEntry};
+pub use email_confirmation::{
+    ConfirmEmailRequest, CreateEmailConfirmationToken, EmailConfirmationInfo,
+    EmailConfirmationResponse, EmailConfirmationToken, ResendConfirmationRequest,
+};
 pub use follow::{Follow, FollowCounts};
 pub use ingredient::{CreateIngredient, Ingredient};
 pub use instruction_step::{CreateInstructionStep, InstructionStep};

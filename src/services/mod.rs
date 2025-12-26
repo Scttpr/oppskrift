@@ -5,6 +5,7 @@
 #![allow(unused_imports)]
 
 pub mod activity_service;
+pub mod auth_service;
 pub mod book_service;
 pub mod email_service;
 pub mod follow_service;
@@ -17,6 +18,7 @@ pub mod session_service;
 pub mod user_service;
 
 pub use activity_service::ActivityService;
+pub use auth_service::{AuthError, AuthService};
 pub use book_service::BookService;
 pub use email_service::EmailService;
 pub use follow_service::FollowService;

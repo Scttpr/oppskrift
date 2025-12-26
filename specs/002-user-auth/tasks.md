@@ -28,7 +28,7 @@ Single project structure at repository root:
 
 - [x] T001 Add authentication dependencies to Cargo.toml (argon2, totp-rs, lettre, aes-gcm, sha1, hex, lazy_static, regex)
 - [x] T002 [P] Create src/config.rs with validated configuration (JWT_SECRET, TOTP_ENCRYPTION_KEY required, no fallbacks)
-- [ ] T003 [P] Update src/lib.rs to export new auth modules (config, models, services, api)
+- [x] T003 [P] Update src/lib.rs to export new auth modules (config, models, services, api)
 - [x] T004 [P] Create .env.example with all required auth environment variables
 
 ---
@@ -49,25 +49,25 @@ Single project structure at repository root:
 
 ### Core Services (Foundation)
 
-- [ ] T010 Create src/services/password.rs - Argon2id hashing with OWASP params, password strength validation, HIBP breach check
-- [ ] T011 [P] Create src/services/security_log.rs - Security event logging service with CreateSecurityEvent and all SecurityEventType variants
-- [ ] T012 [P] Create src/services/email.rs - Email service with lettre for sending confirmation, reset, and notification emails
-- [ ] T013 Create src/services/session.rs - Session CRUD: create, validate, revoke, cleanup, with secure cookie handling
+- [x] T010 Create src/services/password.rs - Argon2id hashing with OWASP params, password strength validation, HIBP breach check
+- [x] T011 [P] Create src/services/security_log.rs - Security event logging service with CreateSecurityEvent and all SecurityEventType variants
+- [x] T012 [P] Create src/services/email.rs - Email service with lettre for sending confirmation, reset, and notification emails
+- [x] T013 Create src/services/session.rs - Session CRUD: create, validate, revoke, cleanup, with secure cookie handling
 
 ### Auth Models (Shared)
 
-- [ ] T014 Update src/models/user.rs - Extend User struct with auth fields per data-model.md, add RESERVED_USERNAMES const
-- [ ] T015 [P] Create src/models/auth.rs - RegisterRequest, RegisterResponse, LoginRequest, LoginResponse, TwoFactorRequired DTOs with validation
-- [ ] T016 [P] Create src/models/session.rs - Session, SessionInfo, CreateSession structs per data-model.md
-- [ ] T017 [P] Create src/models/security_event.rs - SecurityEventType enum, SecurityEvent, CreateSecurityEvent structs
+- [x] T014 Update src/models/user.rs - Extend User struct with auth fields per data-model.md, add RESERVED_USERNAMES const
+- [x] T015 [P] Create src/models/auth.rs - RegisterRequest, RegisterResponse, LoginRequest, LoginResponse, TwoFactorRequired DTOs with validation
+- [x] T016 [P] Create src/models/session.rs - Session, SessionInfo, CreateSession structs per data-model.md
+- [x] T017 [P] Create src/models/security_event.rs - SecurityEventType enum, SecurityEvent, CreateSecurityEvent structs
 
 ### Middleware
 
-- [ ] T018 Update src/api/middleware/auth.rs - Replace stub with real session validation, extract AuthUser from session cookie
+- [x] T018 Update src/api/middleware/auth.rs - Replace stub with real session validation, extract AuthUser from session cookie
 
 ### Rate Limiting
 
-- [ ] T019 Configure tower_governor for auth endpoints in src/main.rs - Per-IP (10/min) and per-account (5 attempts) rate limiting
+- [x] T019 Configure tower_governor for auth endpoints in src/main.rs - Per-IP (10/min) and per-account (5 attempts) rate limiting
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -81,24 +81,24 @@ Single project structure at repository root:
 
 ### Models for User Story 1
 
-- [ ] T020 [P] [US1] Create src/models/email_confirmation.rs - EmailConfirmationToken struct per data-model.md
+- [x] T020 [P] [US1] Create src/models/email_confirmation.rs - EmailConfirmationToken struct per data-model.md
 
 ### Services for User Story 1
 
-- [ ] T021 [US1] Create src/services/auth.rs - register() function: validate input, check username/email uniqueness, hash password, create unverified user, generate confirmation token, send email
-- [ ] T022 [US1] Add confirm_email() to src/services/auth.rs - Validate token, mark user email_verified, log security event
-- [ ] T023 [US1] Add resend_confirmation() to src/services/auth.rs - Generate new token, invalidate old, send email
+- [x] T021 [US1] Create src/services/auth.rs - register() function: validate input, check username/email uniqueness, hash password, create unverified user, generate confirmation token, send email
+- [x] T022 [US1] Add confirm_email() to src/services/auth.rs - Validate token, mark user email_verified, log security event
+- [x] T023 [US1] Add resend_confirmation() to src/services/auth.rs - Generate new token, invalidate old, send email
 
 ### API Endpoints for User Story 1
 
-- [ ] T024 [US1] Create src/api/auth.rs - POST /api/auth/register endpoint with validation, rate limiting
-- [ ] T025 [US1] Add GET /api/auth/confirm-email/:token to src/api/auth.rs - Token validation, account activation
-- [ ] T026 [US1] Add POST /api/auth/resend-confirmation to src/api/auth.rs - Resend confirmation email
+- [x] T024 [US1] Create src/api/auth.rs - POST /api/auth/register endpoint with validation, rate limiting
+- [x] T025 [US1] Add GET /api/auth/confirm-email/:token to src/api/auth.rs - Token validation, account activation
+- [x] T026 [US1] Add POST /api/auth/resend-confirmation to src/api/auth.rs - Resend confirmation email
 
 ### Integration for User Story 1
 
-- [ ] T027 [US1] Register auth routes in src/main.rs Router - Mount /api/auth/* endpoints with rate limiting layer
-- [ ] T028 [US1] Add email templates in src/services/email.rs - confirmation_email_template() function
+- [x] T027 [US1] Register auth routes in src/main.rs Router - Mount /api/auth/* endpoints with rate limiting layer
+- [x] T028 [US1] Add email templates in src/services/email.rs - confirmation_email_template() function
 
 ### Tests for User Story 1
 
