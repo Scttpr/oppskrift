@@ -3,9 +3,10 @@
 //! Ingredients are stored in metric units and converted for display
 //! based on user preference.
 
+#![allow(dead_code)]
+
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use std::fmt;
 
 /// Measurement system preference
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -95,7 +95,7 @@ impl FollowService {
             r#"
             SELECT u.id, u.username, u.display_name, u.bio, u.avatar_url,
                    u.measurement_pref as "measurement_pref: _",
-                   u.created_at, u.updated_at, u.ap_id
+                   u.created_at, u.updated_at, u.ap_id, u.federation_enabled
             FROM users u
             INNER JOIN follows f ON f.follower_id = u.id
             WHERE f.following_id = $1
@@ -116,7 +116,7 @@ impl FollowService {
             r#"
             SELECT u.id, u.username, u.display_name, u.bio, u.avatar_url,
                    u.measurement_pref as "measurement_pref: _",
-                   u.created_at, u.updated_at, u.ap_id
+                   u.created_at, u.updated_at, u.ap_id, u.federation_enabled
             FROM users u
             INNER JOIN follows f ON f.following_id = u.id
             WHERE f.follower_id = $1

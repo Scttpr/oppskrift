@@ -3,18 +3,17 @@
 //! Implements RFC 7033 WebFinger for looking up actors by acct: URI.
 
 use axum::{
-    Router,
     extract::{Query, State},
     http::StatusCode,
     response::Json,
     routing::get,
+    Router,
 };
 use serde::Deserialize;
 
-use crate::AppState;
 use crate::lib::activitypub::WebFingerResource;
-use crate::lib::error::AppResult;
 use crate::services::UserService;
+use crate::AppState;
 
 /// WebFinger routes
 pub fn routes() -> Router<AppState> {

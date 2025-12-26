@@ -1,4 +1,4 @@
-.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop lint fmt audit check
+.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop up down prod-up lint fmt audit check migrate
 
 # Default target
 all: css build
@@ -48,7 +48,8 @@ reset-db:
 export DATABASE_URL ?= postgres://oppskrift:oppskrift@localhost:5432/oppskrift
 
 # Detect compose command (docker-compose, podman-compose, or docker compose)
-COMPOSE := $(shell command -v docker-compose 2>/dev/null || command -v podman-compose 2>/dev/null || echo "docker compose")
+COMPOSE_CMD := $(shell command -v docker-compose 2>/dev/null || command -v podman-compose 2>/dev/null || echo "docker compose")
+COMPOSE := $(COMPOSE_CMD)
 
 # Start database container
 db:
@@ -60,6 +61,18 @@ db:
 # Stop database container
 db-stop:
 	$(COMPOSE) stop db
+
+# Start all services (development)
+up:
+	$(COMPOSE) up -d
+
+# Stop all services
+down:
+	$(COMPOSE) down
+
+# Production deployment (requires secrets)
+prod-up:
+	$(COMPOSE_CMD) -f docker-compose.yml up -d
 
 # Run migrations (starts db if needed)
 migrate: db

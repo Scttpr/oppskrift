@@ -5,7 +5,7 @@
 
 use base64::Engine;
 use chrono::Utc;
-use rsa::{RsaPublicKey, pkcs8::DecodePublicKey, sha2::Sha256, signature::Verifier};
+use rsa::{pkcs8::DecodePublicKey, sha2::Sha256, signature::Verifier, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 
 use crate::lib::error::{AppError, AppResult};

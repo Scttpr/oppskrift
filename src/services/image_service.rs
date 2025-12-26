@@ -1,11 +1,11 @@
-use image::{DynamicImage, ImageFormat, imageops::FilterType};
+use image::{imageops::FilterType, ImageFormat};
 use sqlx::PgPool;
 use std::io::Cursor;
 use uuid::Uuid;
 
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::storage::StorageClient;
-use crate::models::{CreateRecipeImage, RecipeImage};
+use crate::models::RecipeImage;
 
 /// Maximum number of images per recipe
 pub const MAX_IMAGES_PER_RECIPE: usize = 10;

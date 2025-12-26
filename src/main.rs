@@ -1,4 +1,6 @@
-use axum::{Router, routing::get};
+#![allow(special_module_name)]
+
+use axum::{routing::get, Router};
 use sqlx::PgPool;
 use std::net::SocketAddr;
 use tower_http::{

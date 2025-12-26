@@ -4,7 +4,7 @@
 
 use sqlx::PgPool;
 use std::sync::Arc;
-use tokio::time::{Duration, interval};
+use tokio::time::{interval, Duration};
 
 use crate::lib::audit::AuditEvent;
 

@@ -1,6 +1,8 @@
 //! Configuration validation module
 //! Ensures all required secrets are present at startup
 
+#![allow(dead_code)]
+
 use std::env;
 
 /// Configuration loaded from environment

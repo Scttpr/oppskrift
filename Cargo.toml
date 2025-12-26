@@ -1,7 +1,7 @@
 [package]
 name = "oppskrift"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 description = "A federated social platform for sharing recipes via ActivityPub"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/scttpr/oppskrift"
@@ -15,7 +15,7 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid", "rust_decimal"] }
 
 # ActivityPub federation
 activitypub_federation = "0.6"
@@ -30,7 +30,7 @@ askama_axum = "0.4"
 
 # Logging/Tracing
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # Date/Time
 chrono = { version = "0.4", features = ["serde"] }
@@ -56,7 +56,7 @@ anyhow = "1"
 # Async traits
 async-trait = "0.1"
 
-# Image processing (only common formats, excludes unmaintained avif/ravif)
+# Image processing (excludes unmaintained avif/ravif)
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 
 # S3-compatible storage
@@ -79,7 +79,7 @@ tower_governor = "0.4"
 jsonwebtoken = "9"
 
 # RSA key generation for ActivityPub signatures
-rsa = "0.9"
+rsa = { version = "0.9", features = ["sha2"] }
 rand = "0.8"
 
 [dev-dependencies]

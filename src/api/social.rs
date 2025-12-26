@@ -1,18 +1,18 @@
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post},
+    Json, Router,
 };
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::api::middleware::AuthUser;
 use crate::lib::error::AppResult;
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{Activity, ActivityWithActor, Follow, RecipeSummary, SavedRecipe};
 use crate::services::{ActivityService, FollowService, SavedRecipeService};
+use crate::AppState;
 
 /// Social feature routes
 pub fn routes() -> Router<AppState> {

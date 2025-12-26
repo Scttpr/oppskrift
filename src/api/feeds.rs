@@ -3,18 +3,18 @@
 //! Provides syndication feeds for recipes and user profiles.
 
 use axum::{
-    Router,
     extract::{Path, Query, State},
-    http::{StatusCode, header},
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
+    Router,
 };
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::lib::pagination::PaginationParams;
 use crate::services::{RecipeService, UserService};
+use crate::AppState;
 
 /// Feed routes
 pub fn routes() -> Router<AppState> {

@@ -2,12 +2,12 @@
 //!
 //! Generates OpenAPI 3.0 specification for the API.
 
-use axum::{Json, Router, routing::get};
+use axum::{routing::get, Json, Router};
 use utoipa::OpenApi;
 
-use crate::AppState;
 use crate::lib::error::ErrorResponse;
 use crate::lib::pagination::PaginationMeta;
+use crate::AppState;
 
 /// OpenAPI documentation
 #[derive(OpenApi)]

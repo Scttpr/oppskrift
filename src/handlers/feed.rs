@@ -1,17 +1,17 @@
 use askama::Template;
 use axum::{
-    Router,
     extract::{Query, State},
     response::Html,
     routing::get,
+    Router,
 };
 
-use crate::AppState;
 use crate::api::middleware::AuthUser;
 use crate::lib::error::AppResult;
 use crate::lib::pagination::{PaginationMeta, PaginationParams};
 use crate::models::ActivityWithActor;
 use crate::services::ActivityService;
+use crate::AppState;
 
 /// Feed routes
 pub fn routes() -> Router<AppState> {

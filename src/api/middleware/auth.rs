@@ -1,10 +1,10 @@
 use axum::{
-    Json,
     extract::FromRequestParts,
-    http::{StatusCode, header::AUTHORIZATION, request::Parts},
+    http::{header::AUTHORIZATION, request::Parts, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
-use jsonwebtoken::{DecodingKey, Validation, decode};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -27,6 +27,7 @@ pub struct Claims {
 #[derive(Debug, Clone)]
 pub struct AuthUser {
     pub id: Uuid,
+    #[allow(dead_code)]
     pub username: String,
 }
 

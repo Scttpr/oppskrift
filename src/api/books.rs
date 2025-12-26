@@ -1,13 +1,11 @@
 use axum::{
-    Json, Router,
     extract::{Multipart, Path, Query, State},
     http::StatusCode,
-    routing::{delete, get, post},
+    routing::{delete, get},
+    Json, Router,
 };
-use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::api::middleware::AuthUser;
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
@@ -17,6 +15,7 @@ use crate::models::{
     RecipeSummary, UpdateRecipeBook,
 };
 use crate::services::BookService;
+use crate::AppState;
 
 /// Book API routes
 pub fn routes() -> Router<AppState> {

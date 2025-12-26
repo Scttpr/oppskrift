@@ -61,8 +61,18 @@ impl AuditEvent {
     }
 
     /// Add metadata to the event
-    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
-        self.metadata = Some(metadata);
+    pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
+        let metadata = self
+            .metadata
+            .take()
+            .unwrap_or_else(|| serde_json::json!({}));
+        if let serde_json::Value::Object(mut map) = metadata {
+            map.insert(
+                key.to_string(),
+                serde_json::Value::String(value.to_string()),
+            );
+            self.metadata = Some(serde_json::Value::Object(map));
+        }
         self
     }
 
@@ -73,6 +83,7 @@ impl AuditEvent {
     }
 
     /// Set level to error
+    #[allow(dead_code)]
     pub fn error(mut self) -> Self {
         self.level = "error".to_string();
         self

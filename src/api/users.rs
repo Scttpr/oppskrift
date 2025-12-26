@@ -1,18 +1,18 @@
 use axum::{
-    Json, Router,
     extract::{Path, State},
     routing::{get, patch},
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::api::middleware::AuthUser;
 use crate::lib::error::AppResult;
 use crate::lib::pagination::PaginationParams;
 use crate::models::user::{UpdateUser, User, UserProfile};
-use crate::models::{Book, RecipeSummary};
+use crate::models::{RecipeBookSummary, RecipeSummary};
 use crate::services::{BookService, FollowService, RecipeService, SavedRecipeService, UserService};
+use crate::AppState;
 
 /// User API routes
 pub fn routes() -> Router<AppState> {
@@ -57,7 +57,7 @@ pub struct UserDataExport {
     pub exported_at: chrono::DateTime<chrono::Utc>,
     pub profile: User,
     pub recipes: Vec<RecipeSummary>,
-    pub books: Vec<Book>,
+    pub books: Vec<RecipeBookSummary>,
     pub followers_count: i64,
     pub following_count: i64,
     pub saved_recipes_count: i64,
@@ -80,7 +80,7 @@ async fn export_user_data(
     let recipes_result = RecipeService::list_by_author(&state.db, auth.id, &params).await?;
 
     // Get user's books
-    let books = BookService::list_by_owner(&state.db, auth.id, &params).await?;
+    let books = BookService::list_by_owner(&state.db, auth.id).await?;
 
     // Get follow counts
     let follow_counts = FollowService::get_counts(&state.db, auth.id).await?;
@@ -92,7 +92,7 @@ async fn export_user_data(
         exported_at: chrono::Utc::now(),
         profile: user,
         recipes: recipes_result.data,
-        books: books.data,
+        books,
         followers_count: follow_counts.followers_count,
         following_count: follow_counts.following_count,
         saved_recipes_count: saved_recipes.pagination.total_items as i64,

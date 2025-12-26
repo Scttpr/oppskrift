@@ -1,20 +1,19 @@
 use axum::{
-    Json, Router,
     extract::{ConnectInfo, State},
-    http::StatusCode,
     routing::post,
+    Json, Router,
 };
 use chrono::{Duration, Utc};
-use jsonwebtoken::{EncodingKey, Header, encode};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use validator::Validate;
 
-use crate::AppState;
 use crate::api::middleware::Claims;
 use crate::lib::audit::AuditEvent;
 use crate::lib::error::{AppError, AppResult};
 use crate::services::UserService;
+use crate::AppState;
 
 /// Auth routes
 pub fn routes() -> Router<AppState> {

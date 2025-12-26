@@ -3,6 +3,8 @@
 //! Implements ActivityPub protocol for federated recipe sharing.
 //! See: https://www.w3.org/TR/activitypub/
 
+#![allow(dead_code)]
+
 pub mod actor;
 pub mod objects;
 pub mod signature;

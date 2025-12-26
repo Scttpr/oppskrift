@@ -3,17 +3,17 @@
 //! Implements oEmbed 1.0 specification for embedding recipes.
 
 use axum::{
-    Router,
     extract::{Query, State},
     http::StatusCode,
     response::Json,
     routing::get,
+    Router,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::services::{ImageService, RecipeService, UserService};
+use crate::AppState;
 
 /// oEmbed routes
 pub fn routes() -> Router<AppState> {

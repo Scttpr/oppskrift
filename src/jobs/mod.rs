@@ -2,6 +2,8 @@
 //!
 //! Provides async job queue for federation delivery and other background tasks.
 
+#![allow(dead_code)]
+
 pub mod cleanup;
 pub mod federation;
 
@@ -9,8 +11,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-pub use cleanup::{CleanupWorker, RetentionConfig};
-pub use federation::{FederationJob, FederationWorker};
+use federation::{FederationJob, FederationWorker};
 
 /// Job queue for background processing
 #[derive(Clone)]

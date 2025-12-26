@@ -2,12 +2,14 @@
 //!
 //! Provides configurable rate limiting for API endpoints.
 
+#![allow(dead_code)]
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use tower_governor::GovernorLayer;
 use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::GovernorLayer;
 
 /// Rate limiter configuration
 #[derive(Clone)]

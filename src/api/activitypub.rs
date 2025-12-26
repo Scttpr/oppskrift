@@ -3,22 +3,22 @@
 //! Implements inbox and outbox handlers for receiving and serving activities.
 
 use axum::{
-    Router,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::Json,
     routing::{get, post},
+    Router,
 };
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::lib::activitypub::{
-    HttpSignature, PersonActor, RecipeBookCollection, RecipeObject, verify_signature,
+    verify_signature, HttpSignature, PersonActor, RecipeBookCollection, RecipeObject,
 };
 use crate::lib::audit::AuditEvent;
 use crate::lib::pagination::PaginationParams;
 use crate::services::{ActivityService, BookService, RecipeService, UserService};
+use crate::AppState;
 
 /// ActivityPub routes
 pub fn routes() -> Router<AppState> {
@@ -105,31 +105,33 @@ async fn inbox(
         return Err(status);
     }
 
-    // Audit incoming activity
+    // Audit incoming activity - extract values before moving activity
     let activity_type = activity
         .get("type")
         .and_then(|t| t.as_str())
-        .unwrap_or("unknown");
+        .unwrap_or("unknown")
+        .to_string();
     let actor = activity
         .get("actor")
         .and_then(|a| a.as_str())
-        .unwrap_or("unknown");
+        .unwrap_or("unknown")
+        .to_string();
 
     // Process the activity
     match process_incoming_activity(&state, activity).await {
         Ok(()) => {
             AuditEvent::new("federation.inbox.received")
                 .with_user(id)
-                .with_metadata("activity_type", activity_type)
-                .with_metadata("actor", actor)
+                .with_metadata("activity_type", &activity_type)
+                .with_metadata("actor", &actor)
                 .log();
             Ok(StatusCode::ACCEPTED)
         }
         Err(status) => {
             AuditEvent::new("federation.inbox.rejected")
                 .with_user(id)
-                .with_metadata("activity_type", activity_type)
-                .with_metadata("actor", actor)
+                .with_metadata("activity_type", &activity_type)
+                .with_metadata("actor", &actor)
                 .with_metadata("status", &status.as_u16().to_string())
                 .warn()
                 .log();
@@ -159,31 +161,33 @@ async fn shared_inbox(
         return Err(status);
     }
 
-    // Audit incoming activity
+    // Audit incoming activity - extract values before moving activity
     let activity_type = activity
         .get("type")
         .and_then(|t| t.as_str())
-        .unwrap_or("unknown");
+        .unwrap_or("unknown")
+        .to_string();
     let actor = activity
         .get("actor")
         .and_then(|a| a.as_str())
-        .unwrap_or("unknown");
+        .unwrap_or("unknown")
+        .to_string();
 
     // Process the activity
     match process_incoming_activity(&state, activity).await {
         Ok(()) => {
             AuditEvent::new("federation.inbox.received")
                 .with_metadata("inbox", "shared")
-                .with_metadata("activity_type", activity_type)
-                .with_metadata("actor", actor)
+                .with_metadata("activity_type", &activity_type)
+                .with_metadata("actor", &actor)
                 .log();
             Ok(StatusCode::ACCEPTED)
         }
         Err(status) => {
             AuditEvent::new("federation.inbox.rejected")
                 .with_metadata("inbox", "shared")
-                .with_metadata("activity_type", activity_type)
-                .with_metadata("actor", actor)
+                .with_metadata("activity_type", &activity_type)
+                .with_metadata("actor", &actor)
                 .with_metadata("status", &status.as_u16().to_string())
                 .warn()
                 .log();
@@ -278,7 +282,8 @@ async fn outbox(
     Path(id): Path<Uuid>,
     Query(params): Query<PaginationParams>,
 ) -> Result<Json<Value>, StatusCode> {
-    let user = UserService::get_by_id(&state.db, id)
+    // Verify user exists
+    let _user = UserService::get_by_id(&state.db, id)
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 

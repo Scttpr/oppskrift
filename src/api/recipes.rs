@@ -1,13 +1,12 @@
 use axum::{
-    Json, Router,
     extract::{Multipart, Path, Query, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{header, HeaderMap, StatusCode},
     routing::{get, post},
+    Json, Router,
 };
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::AppState;
 use crate::api::middleware::AuthUser;
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
@@ -18,6 +17,7 @@ use crate::models::{
     RecipeImage, RecipeSummary, UpdateRecipe,
 };
 use crate::services::{ImageService, RecipeService, UserService};
+use crate::AppState;
 
 /// Recipe API routes
 pub fn routes() -> Router<AppState> {

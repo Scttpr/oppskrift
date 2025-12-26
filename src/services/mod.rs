@@ -1,5 +1,7 @@
 // Services module - RecipeService, BookService, ActivityService, SocialService
 
+#![allow(dead_code)]
+
 pub mod activity_service;
 pub mod book_service;
 pub mod follow_service;

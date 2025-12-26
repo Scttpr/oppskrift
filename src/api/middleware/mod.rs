@@ -4,4 +4,3 @@ pub mod auth;
 pub mod rate_limit;
 
 pub use auth::{AuthUser, Claims, OptionalAuthUser};
-pub use rate_limit::{RateLimitConfig, create_rate_limit_layer};

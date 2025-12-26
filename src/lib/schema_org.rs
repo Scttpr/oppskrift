@@ -5,7 +5,6 @@
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use uuid::Uuid;
 
 use crate::models::{Difficulty, Ingredient, InstructionStep, Recipe, RecipeImage, User};
 

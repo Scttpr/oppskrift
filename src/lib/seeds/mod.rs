@@ -2,6 +2,8 @@
 //!
 //! Use `cargo run -- --seed` to run seeds in development.
 
+#![allow(dead_code)]
+
 pub mod recipes;
 pub mod users;
 

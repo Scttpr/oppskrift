@@ -2,8 +2,10 @@
 //!
 //! Supports both AWS S3 and S3-compatible services (MinIO, DigitalOcean Spaces, etc.)
 
+#![allow(dead_code)]
+
 use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_s3::{Client, config::Region, primitives::ByteStream};
+use aws_sdk_s3::{config::Region, primitives::ByteStream, Client};
 use std::sync::Arc;
 use uuid::Uuid;
 
