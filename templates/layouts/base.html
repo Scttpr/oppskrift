@@ -46,6 +46,18 @@
 
                 <!-- User Menu -->
                 <div class="flex items-center space-x-4">
+                    <!-- High Contrast Toggle (T139) -->
+                    <button
+                        type="button"
+                        id="contrast-toggle"
+                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        aria-label="Toggle high contrast mode"
+                        title="Toggle high contrast mode"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                    </button>
                     {% block user_menu %}
                     <a href="/login" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                         Sign In
@@ -94,6 +106,31 @@
                 // Content will be announced automatically
             }
         });
+
+        // High Contrast Toggle (T139)
+        const contrastToggle = document.getElementById('contrast-toggle');
+        if (contrastToggle) {
+            // Check saved preference
+            if (localStorage.getItem('high-contrast') === 'true') {
+                document.documentElement.classList.add('high-contrast');
+            }
+
+            contrastToggle.addEventListener('click', function() {
+                document.documentElement.classList.toggle('high-contrast');
+                const isHighContrast = document.documentElement.classList.contains('high-contrast');
+                localStorage.setItem('high-contrast', isHighContrast);
+
+                // Announce change to screen readers
+                const announcement = isHighContrast ? 'High contrast mode enabled' : 'High contrast mode disabled';
+                const liveRegion = document.createElement('div');
+                liveRegion.setAttribute('role', 'status');
+                liveRegion.setAttribute('aria-live', 'polite');
+                liveRegion.className = 'sr-only';
+                liveRegion.textContent = announcement;
+                document.body.appendChild(liveRegion);
+                setTimeout(() => liveRegion.remove(), 1000);
+            });
+        }
     </script>
 
     {% block scripts %}{% endblock %}
