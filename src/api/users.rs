@@ -3,7 +3,7 @@ use axum::{
     routing::{get, patch},
     Json, Router,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::middleware::AuthUser;
@@ -19,6 +19,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/me", get(get_current_user).patch(update_current_user))
         .route("/me/export", get(export_user_data))
+        .route("/me/federation", patch(toggle_federation))
         .route("/{id}", get(get_user_by_id))
 }
 
@@ -98,4 +99,30 @@ async fn export_user_data(
     };
 
     Ok(Json(export))
+}
+
+/// Federation toggle request
+#[derive(Debug, Deserialize)]
+pub struct FederationToggle {
+    pub enabled: bool,
+}
+
+/// Federation status response
+#[derive(Debug, Serialize)]
+pub struct FederationStatus {
+    pub federation_enabled: bool,
+}
+
+/// PATCH /api/v1/users/me/federation
+/// Toggle ActivityPub federation for the current user
+async fn toggle_federation(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(input): Json<FederationToggle>,
+) -> AppResult<Json<FederationStatus>> {
+    let user = UserService::set_federation_enabled(&state.db, auth.id, input.enabled).await?;
+
+    Ok(Json(FederationStatus {
+        federation_enabled: user.federation_enabled,
+    }))
 }
