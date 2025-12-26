@@ -41,11 +41,11 @@ Single project structure at repository root:
 
 ### Database Migrations
 
-- [ ] T005 Create migrations/20251226_001_auth_users.sql - Add auth fields to users table (email, email_verified, password_hash, totp fields, lockout fields, deletion_requested_at)
-- [ ] T006 [P] Create migrations/20251226_002_sessions.sql - Sessions table with token_hash, device_info, ip_address, user_agent, timestamps
-- [ ] T007 [P] Create migrations/20251226_003_tokens.sql - password_reset_tokens and email_confirmation_tokens tables
-- [ ] T008 [P] Create migrations/20251226_004_recovery_codes.sql - recovery_codes table for 2FA
-- [ ] T009 [P] Create migrations/20251226_005_security_events.sql - Audit log table with indexes
+- [x] T005 Create migrations/20251226_001_auth_users.sql - Add auth fields to users table (email, email_verified, password_hash, totp fields, lockout fields, deletion_requested_at)
+- [x] T006 [P] Create migrations/20251226_002_sessions.sql - Sessions table with token_hash, device_info, ip_address, user_agent, timestamps
+- [x] T007 [P] Create migrations/20251226_003_tokens.sql - password_reset_tokens and email_confirmation_tokens tables
+- [x] T008 [P] Create migrations/20251226_004_recovery_codes.sql - recovery_codes table for 2FA
+- [x] T009 [P] Create migrations/20251226_005_security_events.sql - Audit log table with indexes
 
 ### Core Services (Foundation)
 
