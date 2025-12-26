@@ -62,10 +62,10 @@ db:
 db-stop:
 	$(COMPOSE) stop db
 
-# Start all services (builds app first)
+# Start all services (builds app first, replaces old containers)
 up:
 	$(COMPOSE) build app
-	$(COMPOSE) up -d
+	$(COMPOSE) up -d --force-recreate
 
 # Stop all services
 down:
