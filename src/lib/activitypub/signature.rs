@@ -343,4 +343,76 @@ mod tests {
         assert!(header.contains("keyId="));
         assert!(header.contains("algorithm="));
     }
+
+    #[test]
+    fn test_parse_minimal_signature() {
+        let header = r#"keyId="https://example.com/key",signature="sig123""#;
+        let sig = HttpSignature::parse(header).unwrap();
+
+        assert_eq!(sig.key_id, "https://example.com/key");
+        assert_eq!(sig.algorithm, "rsa-sha256"); // default
+        assert_eq!(sig.signature, "sig123");
+    }
+
+    #[test]
+    fn test_parse_invalid_signature() {
+        // Missing required fields
+        let header = r#"algorithm="rsa-sha256""#;
+        assert!(HttpSignature::parse(header).is_none());
+    }
+
+    #[test]
+    fn test_build_signing_string() {
+        let sig = HttpSignature {
+            key_id: "https://example.com/key".to_string(),
+            algorithm: "rsa-sha256".to_string(),
+            headers: vec![
+                "(request-target)".to_string(),
+                "host".to_string(),
+                "date".to_string(),
+            ],
+            signature: "test".to_string(),
+        };
+
+        let headers = vec![
+            ("host".to_string(), "example.com".to_string()),
+            ("date".to_string(), "Sun, 01 Jan 2023 00:00:00 GMT".to_string()),
+        ];
+
+        let signing_string = sig.build_signing_string("POST", "/inbox", &headers);
+
+        assert!(signing_string.contains("(request-target): post /inbox"));
+        assert!(signing_string.contains("host: example.com"));
+        assert!(signing_string.contains("date: Sun, 01 Jan 2023 00:00:00 GMT"));
+    }
+
+    #[test]
+    fn test_verification_result() {
+        let success = VerificationResult::success("key123".to_string());
+        assert!(success.valid);
+        assert!(success.error.is_none());
+
+        let failure = VerificationResult::failure("key123".to_string(), "invalid".to_string());
+        assert!(!failure.valid);
+        assert_eq!(failure.error, Some("invalid".to_string()));
+    }
+
+    #[test]
+    fn test_remote_actor_deserialize() {
+        let json = r#"{
+            "id": "https://example.com/users/1",
+            "publicKey": {
+                "id": "https://example.com/users/1#main-key",
+                "owner": "https://example.com/users/1",
+                "publicKeyPem": "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
+            }
+        }"#;
+
+        let actor: RemoteActor = serde_json::from_str(json).unwrap();
+        assert_eq!(actor.id, "https://example.com/users/1");
+        assert!(actor.public_key.is_some());
+        let pk = actor.public_key.unwrap();
+        assert_eq!(pk.id, "https://example.com/users/1#main-key");
+        assert_eq!(pk.owner, "https://example.com/users/1");
+    }
 }
