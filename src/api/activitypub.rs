@@ -56,12 +56,19 @@ async fn get_actor(
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
+    // Return 404 if user has disabled federation
+    if !user.federation_enabled {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
-    // TODO: Get actual public key from user or generate
-    let public_key_pem = "-----BEGIN PUBLIC KEY-----\nPLACEHOLDER\n-----END PUBLIC KEY-----";
+    // Get actual public key for HTTP Signatures
+    let public_key_pem = UserService::get_public_key(&state.db, id)
+        .await
+        .unwrap_or_else(|_| "-----BEGIN PUBLIC KEY-----\nPLACEHOLDER\n-----END PUBLIC KEY-----".to_string());
 
-    let actor = PersonActor::from_user(&user, &base_url, public_key_pem);
+    let actor = PersonActor::from_user(&user, &base_url, &public_key_pem);
 
     Ok(Json(actor))
 }
