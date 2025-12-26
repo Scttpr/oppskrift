@@ -3,8 +3,17 @@
 //! Implements HTTP Signatures for authenticating ActivityPub requests.
 //! See: https://docs.joinmastodon.org/spec/security/
 
+use base64::Engine;
 use chrono::Utc;
+use rsa::{
+    pkcs8::DecodePublicKey,
+    sha2::Sha256,
+    signature::Verifier,
+    RsaPublicKey,
+};
 use serde::{Deserialize, Serialize};
+
+use crate::lib::error::{AppError, AppResult};
 
 /// HTTP Signature header components
 #[derive(Debug, Clone)]
@@ -203,6 +212,105 @@ impl VerificationResult {
             key_id,
             error: Some(error),
         }
+    }
+}
+
+/// Remote actor with public key
+#[derive(Debug, Clone, Deserialize)]
+pub struct RemoteActor {
+    pub id: String,
+    #[serde(rename = "publicKey")]
+    pub public_key: Option<PublicKeyInfo>,
+}
+
+/// Public key information from ActivityPub actor
+#[derive(Debug, Clone, Deserialize)]
+pub struct PublicKeyInfo {
+    pub id: String,
+    pub owner: String,
+    #[serde(rename = "publicKeyPem")]
+    pub public_key_pem: String,
+}
+
+/// Fetch an actor from a remote ActivityPub server
+///
+/// Fetches the actor document from the key_id URL (stripping the #fragment)
+/// and extracts the public key for signature verification.
+pub async fn fetch_actor(key_id: &str) -> AppResult<RemoteActor> {
+    // Extract the actor URL from the key_id (remove #fragment)
+    let actor_url = key_id.split('#').next().unwrap_or(key_id);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(actor_url)
+        .header("Accept", "application/activity+json, application/ld+json")
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to fetch actor: {}", e)))?;
+
+    if !response.status().is_success() {
+        return Err(AppError::Internal(format!(
+            "Failed to fetch actor: HTTP {}",
+            response.status()
+        )));
+    }
+
+    let actor: RemoteActor = response
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to parse actor: {}", e)))?;
+
+    Ok(actor)
+}
+
+/// Verify an HTTP signature using the actor's public key
+///
+/// Returns Ok(VerificationResult) indicating whether the signature is valid.
+pub async fn verify_signature(
+    signature: &HttpSignature,
+    method: &str,
+    path: &str,
+    headers: &[(String, String)],
+) -> AppResult<VerificationResult> {
+    // Fetch the actor to get the public key
+    let actor = fetch_actor(&signature.key_id).await?;
+
+    let public_key_info = actor.public_key.ok_or_else(|| {
+        AppError::Unauthorized("Actor has no public key".to_string())
+    })?;
+
+    // Verify key_id matches
+    if public_key_info.id != signature.key_id {
+        return Ok(VerificationResult::failure(
+            signature.key_id.clone(),
+            "Key ID mismatch".to_string(),
+        ));
+    }
+
+    // Parse the public key
+    let public_key = RsaPublicKey::from_public_key_pem(&public_key_info.public_key_pem)
+        .map_err(|e| AppError::Internal(format!("Failed to parse public key: {}", e)))?;
+
+    // Build the signing string
+    let signing_string = signature.build_signing_string(method, path, headers);
+
+    // Decode the signature
+    let signature_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&signature.signature)
+        .map_err(|e| AppError::Internal(format!("Failed to decode signature: {}", e)))?;
+
+    // Verify the signature using PKCS1v15 with SHA-256
+    let verifying_key = rsa::pkcs1v15::VerifyingKey::<Sha256>::new(public_key);
+    let rsa_signature = rsa::pkcs1v15::Signature::try_from(signature_bytes.as_slice())
+        .map_err(|e| AppError::Internal(format!("Invalid signature format: {}", e)))?;
+
+    match verifying_key.verify(signing_string.as_bytes(), &rsa_signature) {
+        Ok(()) => Ok(VerificationResult::success(signature.key_id.clone())),
+        Err(e) => Ok(VerificationResult::failure(
+            signature.key_id.clone(),
+            format!("Signature verification failed: {}", e),
+        )),
     }
 }
 
