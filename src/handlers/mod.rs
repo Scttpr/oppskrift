@@ -2,6 +2,7 @@
 
 pub mod books;
 pub mod feed;
+pub mod legal;
 pub mod recipes;
 pub mod users;
 
@@ -16,4 +17,5 @@ pub fn routes() -> Router<AppState> {
         .nest("/books", books::routes())
         .nest("/users", users::routes())
         .nest("/feed", feed::routes())
+        .merge(legal::routes())
 }
