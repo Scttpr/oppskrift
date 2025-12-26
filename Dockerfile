@@ -41,19 +41,25 @@ COPY static ./static
 
 RUN ./tailwindcss-linux-x64 -i static/css/input.css -o static/css/main.css --minify
 
-# Runtime stage - using distroless for minimal attack surface
-FROM gcr.io/distroless/cc-debian12:nonroot@sha256:8bd01e54ae6c812f85280cd4c6b5f6561fac96be56ea3bcf85da343a30eb9b23
+# Runtime stage
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Copy binary and static files with proper ownership
-COPY --from=builder --chown=nonroot:nonroot /app/target/release/oppskrift /app/oppskrift
-COPY --from=builder --chown=nonroot:nonroot /app/static /app/static
-COPY --from=builder --chown=nonroot:nonroot /app/templates /app/templates
-COPY --from=builder --chown=nonroot:nonroot /app/migrations /app/migrations
+# Install ca-certificates for HTTPS and create non-root user
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -u 1000 -s /sbin/nologin appuser
 
-# Use nonroot user (uid 65532)
-USER nonroot:nonroot
+# Copy binary and static files
+COPY --from=builder /app/target/release/oppskrift /app/oppskrift
+COPY --from=builder /app/static /app/static
+COPY --from=builder /app/templates /app/templates
+COPY --from=builder /app/migrations /app/migrations
+
+# Set ownership and switch to non-root user
+RUN chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 3000
 
@@ -63,7 +69,7 @@ ENV PORT=3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD ["/app/oppskrift", "--health-check"] || exit 1
+    CMD /app/oppskrift --health-check || exit 1
 
 # Security labels
 LABEL org.opencontainers.image.source="https://github.com/scttpr/oppskrift"
