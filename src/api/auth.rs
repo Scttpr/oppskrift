@@ -7,13 +7,26 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use uuid::Uuid;
 use validator::Validate;
 
-use crate::api::middleware::Claims;
 use crate::lib::audit::AuditEvent;
 use crate::lib::error::{AppError, AppResult};
 use crate::services::UserService;
 use crate::AppState;
+
+/// JWT claims structure (legacy - to be replaced by session auth)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claims {
+    /// Subject (user ID)
+    pub sub: Uuid,
+    /// Username
+    pub username: String,
+    /// Expiration time (Unix timestamp)
+    pub exp: i64,
+    /// Issued at (Unix timestamp)
+    pub iat: i64,
+}
 
 /// Auth routes
 pub fn routes() -> Router<AppState> {
