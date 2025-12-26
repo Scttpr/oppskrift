@@ -2,8 +2,8 @@
 //! RSA key generation and management
 
 use rsa::{
-    pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding},
     RsaPrivateKey, RsaPublicKey,
+    pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding},
 };
 
 use crate::lib::error::{AppError, AppResult};
@@ -54,11 +54,29 @@ mod tests {
         let keypair = generate_rsa_keypair().expect("Failed to generate keypair");
 
         // Check PEM format
-        assert!(keypair.public_key_pem.starts_with("-----BEGIN PUBLIC KEY-----"));
-        assert!(keypair.private_key_pem.starts_with("-----BEGIN PRIVATE KEY-----"));
+        assert!(
+            keypair
+                .public_key_pem
+                .starts_with("-----BEGIN PUBLIC KEY-----")
+        );
+        assert!(
+            keypair
+                .private_key_pem
+                .starts_with("-----BEGIN PRIVATE KEY-----")
+        );
 
         // Check they end properly
-        assert!(keypair.public_key_pem.trim().ends_with("-----END PUBLIC KEY-----"));
-        assert!(keypair.private_key_pem.trim().ends_with("-----END PRIVATE KEY-----"));
+        assert!(
+            keypair
+                .public_key_pem
+                .trim()
+                .ends_with("-----END PUBLIC KEY-----")
+        );
+        assert!(
+            keypair
+                .private_key_pem
+                .trim()
+                .ends_with("-----END PRIVATE KEY-----")
+        );
     }
 }

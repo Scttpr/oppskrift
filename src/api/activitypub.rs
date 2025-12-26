@@ -3,20 +3,22 @@
 //! Implements inbox and outbox handlers for receiving and serving activities.
 
 use axum::{
+    Router,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::Json,
     routing::{get, post},
-    Router,
 };
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::lib::activitypub::{HttpSignature, PersonActor, RecipeBookCollection, RecipeObject, verify_signature};
+use crate::AppState;
+use crate::lib::activitypub::{
+    HttpSignature, PersonActor, RecipeBookCollection, RecipeObject, verify_signature,
+};
 use crate::lib::audit::AuditEvent;
 use crate::lib::pagination::PaginationParams;
 use crate::services::{ActivityService, BookService, RecipeService, UserService};
-use crate::AppState;
 
 /// ActivityPub routes
 pub fn routes() -> Router<AppState> {
@@ -46,9 +48,7 @@ async fn get_actor(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
-    if !accept.contains("application/activity+json")
-        && !accept.contains("application/ld+json")
-    {
+    if !accept.contains("application/activity+json") && !accept.contains("application/ld+json") {
         return Err(StatusCode::NOT_ACCEPTABLE);
     }
 
@@ -61,12 +61,15 @@ async fn get_actor(
         return Err(StatusCode::NOT_FOUND);
     }
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     // Get actual public key for HTTP Signatures
     let public_key_pem = UserService::get_public_key(&state.db, id)
         .await
-        .unwrap_or_else(|_| "-----BEGIN PUBLIC KEY-----\nPLACEHOLDER\n-----END PUBLIC KEY-----".to_string());
+        .unwrap_or_else(|_| {
+            "-----BEGIN PUBLIC KEY-----\nPLACEHOLDER\n-----END PUBLIC KEY-----".to_string()
+        });
 
     let actor = PersonActor::from_user(&user, &base_url, &public_key_pem);
 
@@ -86,8 +89,13 @@ async fn inbox(
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
     // Verify HTTP signature
-    if let Err(status) = verify_inbox_signature(&headers, "POST", &format!("/ap/users/{}/inbox", id)).await {
-        let actor = activity.get("actor").and_then(|a| a.as_str()).unwrap_or("unknown");
+    if let Err(status) =
+        verify_inbox_signature(&headers, "POST", &format!("/ap/users/{}/inbox", id)).await
+    {
+        let actor = activity
+            .get("actor")
+            .and_then(|a| a.as_str())
+            .unwrap_or("unknown");
         AuditEvent::new("federation.inbox.rejected")
             .with_user(id)
             .with_metadata("reason", "signature_invalid")
@@ -98,8 +106,14 @@ async fn inbox(
     }
 
     // Audit incoming activity
-    let activity_type = activity.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
-    let actor = activity.get("actor").and_then(|a| a.as_str()).unwrap_or("unknown");
+    let activity_type = activity
+        .get("type")
+        .and_then(|t| t.as_str())
+        .unwrap_or("unknown");
+    let actor = activity
+        .get("actor")
+        .and_then(|a| a.as_str())
+        .unwrap_or("unknown");
 
     // Process the activity
     match process_incoming_activity(&state, activity).await {
@@ -132,7 +146,10 @@ async fn shared_inbox(
 ) -> Result<StatusCode, StatusCode> {
     // Verify HTTP signature
     if let Err(status) = verify_inbox_signature(&headers, "POST", "/ap/inbox").await {
-        let actor = activity.get("actor").and_then(|a| a.as_str()).unwrap_or("unknown");
+        let actor = activity
+            .get("actor")
+            .and_then(|a| a.as_str())
+            .unwrap_or("unknown");
         AuditEvent::new("federation.inbox.rejected")
             .with_metadata("inbox", "shared")
             .with_metadata("reason", "signature_invalid")
@@ -143,8 +160,14 @@ async fn shared_inbox(
     }
 
     // Audit incoming activity
-    let activity_type = activity.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
-    let actor = activity.get("actor").and_then(|a| a.as_str()).unwrap_or("unknown");
+    let activity_type = activity
+        .get("type")
+        .and_then(|t| t.as_str())
+        .unwrap_or("unknown");
+    let actor = activity
+        .get("actor")
+        .and_then(|a| a.as_str())
+        .unwrap_or("unknown");
 
     // Process the activity
     match process_incoming_activity(&state, activity).await {
@@ -182,14 +205,15 @@ async fn verify_inbox_signature(
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     // Parse the signature
-    let signature = HttpSignature::parse(signature_header)
-        .ok_or(StatusCode::BAD_REQUEST)?;
+    let signature = HttpSignature::parse(signature_header).ok_or(StatusCode::BAD_REQUEST)?;
 
     // Collect headers for verification
     let header_values: Vec<(String, String)> = headers
         .iter()
         .filter_map(|(k, v)| {
-            v.to_str().ok().map(|v| (k.as_str().to_lowercase(), v.to_string()))
+            v.to_str()
+                .ok()
+                .map(|v| (k.as_str().to_lowercase(), v.to_string()))
         })
         .collect();
 
@@ -258,7 +282,8 @@ async fn outbox(
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     // Get user's activities
     let activities = ActivityService::get_user_activities(&state.db, id, &params)
@@ -286,7 +311,8 @@ async fn followers(
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     // TODO: Get actual follower count
     let collection = serde_json::json!({
@@ -309,7 +335,8 @@ async fn following(
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     // TODO: Get actual following count
     let collection = serde_json::json!({
@@ -334,9 +361,7 @@ async fn get_recipe_object(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
-    if !accept.contains("application/activity+json")
-        && !accept.contains("application/ld+json")
-    {
+    if !accept.contains("application/activity+json") && !accept.contains("application/ld+json") {
         return Err(StatusCode::NOT_ACCEPTABLE);
     }
 
@@ -349,7 +374,8 @@ async fn get_recipe_object(
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let author_ap_id = format!("{}/users/{}", base_url, author.id);
 
     // Get related data
@@ -387,9 +413,7 @@ async fn get_book_object(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
-    if !accept.contains("application/activity+json")
-        && !accept.contains("application/ld+json")
-    {
+    if !accept.contains("application/activity+json") && !accept.contains("application/ld+json") {
         return Err(StatusCode::NOT_ACCEPTABLE);
     }
 
@@ -402,11 +426,15 @@ async fn get_book_object(
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let owner_ap_id = format!("{}/users/{}", base_url, owner.id);
 
     // Get recipe IDs in book
-    let params = PaginationParams { page: 1, page_size: 100 };
+    let params = PaginationParams {
+        page: 1,
+        page_size: 100,
+    };
     let recipes = BookService::get_recipes_in_book(&state.db, id, &params)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

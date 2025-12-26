@@ -5,12 +5,7 @@
 
 use base64::Engine;
 use chrono::Utc;
-use rsa::{
-    pkcs8::DecodePublicKey,
-    sha2::Sha256,
-    signature::Verifier,
-    RsaPublicKey,
-};
+use rsa::{RsaPublicKey, pkcs8::DecodePublicKey, sha2::Sha256, signature::Verifier};
 use serde::{Deserialize, Serialize};
 
 use crate::lib::error::{AppError, AppResult};
@@ -51,7 +46,8 @@ impl HttpSignature {
         Some(Self {
             key_id: key_id?,
             algorithm: algorithm.unwrap_or_else(|| "rsa-sha256".to_string()),
-            headers: headers.unwrap_or_else(|| vec!["(request-target)".to_string(), "date".to_string()]),
+            headers: headers
+                .unwrap_or_else(|| vec!["(request-target)".to_string(), "date".to_string()]),
             signature: signature?,
         })
     }
@@ -67,9 +63,16 @@ impl HttpSignature {
 
         for header_name in &self.headers {
             if header_name == "(request-target)" {
-                parts.push(format!("(request-target): {} {}", method.to_lowercase(), path));
+                parts.push(format!(
+                    "(request-target): {} {}",
+                    method.to_lowercase(),
+                    path
+                ));
             } else {
-                if let Some((_, value)) = headers.iter().find(|(k, _)| k.to_lowercase() == *header_name) {
+                if let Some((_, value)) = headers
+                    .iter()
+                    .find(|(k, _)| k.to_lowercase() == *header_name)
+                {
                     parts.push(format!("{}: {}", header_name, value));
                 }
             }
@@ -134,7 +137,8 @@ impl SigningContext {
         }
 
         // Build signing string
-        let signing_string = self.build_signing_string(method, path, &headers_to_sign, &header_values);
+        let signing_string =
+            self.build_signing_string(method, path, &headers_to_sign, &header_values);
 
         // TODO: Actual RSA-SHA256 signing with private key
         // For now, create a placeholder signature
@@ -168,7 +172,11 @@ impl SigningContext {
 
         for name in header_names {
             if name == "(request-target)" {
-                parts.push(format!("(request-target): {} {}", method.to_lowercase(), path));
+                parts.push(format!(
+                    "(request-target): {} {}",
+                    method.to_lowercase(),
+                    path
+                ));
             } else {
                 if let Some((_, value)) = header_values.iter().find(|(k, _)| k == name) {
                     parts.push(format!("{}: {}", name, value));
@@ -276,9 +284,9 @@ pub async fn verify_signature(
     // Fetch the actor to get the public key
     let actor = fetch_actor(&signature.key_id).await?;
 
-    let public_key_info = actor.public_key.ok_or_else(|| {
-        AppError::Unauthorized("Actor has no public key".to_string())
-    })?;
+    let public_key_info = actor
+        .public_key
+        .ok_or_else(|| AppError::Unauthorized("Actor has no public key".to_string()))?;
 
     // Verify key_id matches
     if public_key_info.id != signature.key_id {
@@ -376,7 +384,10 @@ mod tests {
 
         let headers = vec![
             ("host".to_string(), "example.com".to_string()),
-            ("date".to_string(), "Sun, 01 Jan 2023 00:00:00 GMT".to_string()),
+            (
+                "date".to_string(),
+                "Sun, 01 Jan 2023 00:00:00 GMT".to_string(),
+            ),
         ];
 
         let signing_string = sig.build_signing_string("POST", "/inbox", &headers);

@@ -115,10 +115,7 @@ impl SchemaOrgRecipe {
             cook_time: recipe.cook_time_min.map(format_duration),
             total_time: calculate_total_time(recipe.prep_time_min, recipe.cook_time_min),
             recipe_yield: recipe.servings.clone(),
-            recipe_ingredient: ingredients
-                .iter()
-                .map(format_ingredient)
-                .collect(),
+            recipe_ingredient: ingredients.iter().map(format_ingredient).collect(),
             recipe_instructions: instructions
                 .iter()
                 .map(|step| SchemaOrgHowToStep {
@@ -129,11 +126,14 @@ impl SchemaOrgRecipe {
                 })
                 .collect(),
             image: images.iter().map(|i| i.url.clone()).collect(),
-            difficulty: recipe.difficulty.map(|d| match d {
-                Difficulty::Easy => "Easy",
-                Difficulty::Medium => "Medium",
-                Difficulty::Hard => "Hard",
-            }.to_string()),
+            difficulty: recipe.difficulty.map(|d| {
+                match d {
+                    Difficulty::Easy => "Easy",
+                    Difficulty::Medium => "Medium",
+                    Difficulty::Hard => "Hard",
+                }
+                .to_string()
+            }),
         }
     }
 }
@@ -208,9 +208,18 @@ mod tests {
 
     #[test]
     fn test_calculate_total_time() {
-        assert_eq!(calculate_total_time(Some(15), Some(30)), Some("PT45M".to_string()));
-        assert_eq!(calculate_total_time(Some(60), Some(60)), Some("PT2H".to_string()));
-        assert_eq!(calculate_total_time(Some(30), None), Some("PT30M".to_string()));
+        assert_eq!(
+            calculate_total_time(Some(15), Some(30)),
+            Some("PT45M".to_string())
+        );
+        assert_eq!(
+            calculate_total_time(Some(60), Some(60)),
+            Some("PT2H".to_string())
+        );
+        assert_eq!(
+            calculate_total_time(Some(30), None),
+            Some("PT30M".to_string())
+        );
         assert_eq!(calculate_total_time(None, None), None);
     }
 

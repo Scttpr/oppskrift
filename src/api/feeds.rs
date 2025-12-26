@@ -3,18 +3,18 @@
 //! Provides syndication feeds for recipes and user profiles.
 
 use axum::{
+    Router,
     extract::{Path, Query, State},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
     routing::get,
-    Router,
 };
 use chrono::Utc;
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::lib::pagination::PaginationParams;
 use crate::services::{RecipeService, UserService};
-use crate::AppState;
 
 /// Feed routes
 pub fn routes() -> Router<AppState> {
@@ -34,7 +34,8 @@ async fn recipes_rss(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     let items: Vec<String> = recipes
         .data
@@ -92,7 +93,8 @@ async fn recipes_atom(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     let entries: Vec<String> = recipes
         .data
@@ -155,7 +157,8 @@ async fn user_recipes_rss(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let display_name = &user.display_name;
 
     let items: Vec<String> = recipes
@@ -222,7 +225,8 @@ async fn user_recipes_atom(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let display_name = &user.display_name;
 
     let entries: Vec<String> = recipes

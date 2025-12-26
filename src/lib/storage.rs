@@ -3,7 +3,7 @@
 //! Supports both AWS S3 and S3-compatible services (MinIO, DigitalOcean Spaces, etc.)
 
 use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_s3::{config::Region, primitives::ByteStream, Client};
+use aws_sdk_s3::{Client, config::Region, primitives::ByteStream};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -56,8 +56,8 @@ impl StorageClient {
     pub async fn new(config: StorageConfig) -> AppResult<Self> {
         let region_provider = RegionProviderChain::first_try(Region::new(config.region.clone()));
 
-        let mut aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
-            .region(region_provider);
+        let mut aws_config =
+            aws_config::defaults(aws_config::BehaviorVersion::latest()).region(region_provider);
 
         // Use custom endpoint for S3-compatible services
         if let Some(endpoint) = &config.endpoint {
@@ -77,12 +77,7 @@ impl StorageClient {
     }
 
     /// Upload a file to storage
-    pub async fn upload(
-        &self,
-        key: &str,
-        data: Vec<u8>,
-        content_type: &str,
-    ) -> AppResult<String> {
+    pub async fn upload(&self, key: &str, data: Vec<u8>, content_type: &str) -> AppResult<String> {
         let body = ByteStream::from(data);
 
         self.client

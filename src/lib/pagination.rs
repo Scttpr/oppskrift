@@ -95,19 +95,31 @@ mod tests {
 
     #[test]
     fn test_pagination_offset() {
-        let params = PaginationParams { page: 1, page_size: 20 };
+        let params = PaginationParams {
+            page: 1,
+            page_size: 20,
+        };
         assert_eq!(params.offset(), 0);
 
-        let params = PaginationParams { page: 2, page_size: 20 };
+        let params = PaginationParams {
+            page: 2,
+            page_size: 20,
+        };
         assert_eq!(params.offset(), 20);
 
-        let params = PaginationParams { page: 3, page_size: 10 };
+        let params = PaginationParams {
+            page: 3,
+            page_size: 10,
+        };
         assert_eq!(params.offset(), 20);
     }
 
     #[test]
     fn test_pagination_limit_capped() {
-        let params = PaginationParams { page: 1, page_size: 200 };
+        let params = PaginationParams {
+            page: 1,
+            page_size: 200,
+        };
         assert_eq!(params.limit(), MAX_PAGE_SIZE);
     }
 

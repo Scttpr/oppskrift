@@ -1,19 +1,21 @@
 use askama::Template;
 use axum::{
+    Router,
     extract::{Path, Query, State},
     response::Html,
     routing::get,
-    Router,
 };
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::api::middleware::OptionalAuthUser;
 use crate::lib::error::AppResult;
 use crate::lib::pagination::{PaginationMeta, PaginationParams};
 use crate::lib::schema_org::SchemaOrgRecipe;
-use crate::models::{Ingredient, InstructionStep, Recipe, RecipeBookSummary, RecipeImage, RecipeSummary, User};
+use crate::models::{
+    Ingredient, InstructionStep, Recipe, RecipeBookSummary, RecipeImage, RecipeSummary, User,
+};
 use crate::services::{BookService, ImageService, RecipeService, SavedRecipeService, UserService};
-use crate::AppState;
 
 /// Recipe page routes
 pub fn routes() -> Router<AppState> {
@@ -98,7 +100,9 @@ async fn view_recipe_page(
     auth: OptionalAuthUser,
 ) -> AppResult<Html<String>> {
     let recipe = RecipeService::get_by_id(&state.db, id).await?;
-    let author = UserService::get_by_id(&state.db, recipe.author_id).await.ok();
+    let author = UserService::get_by_id(&state.db, recipe.author_id)
+        .await
+        .ok();
     let ingredients = RecipeService::get_ingredients(&state.db, id).await?;
     let instructions = RecipeService::get_instructions(&state.db, id).await?;
     let images = ImageService::get_images(&state.db, id).await?;
@@ -119,7 +123,9 @@ async fn view_recipe_page(
     // Fetch current user, their books, and saved status
     let (user, user_books, is_saved) = if let Some(auth_user) = auth.0.as_ref() {
         let user = UserService::get_by_id(&state.db, auth_user.id).await.ok();
-        let books = BookService::list_by_owner(&state.db, auth_user.id).await.unwrap_or_default();
+        let books = BookService::list_by_owner(&state.db, auth_user.id)
+            .await
+            .unwrap_or_default();
         let is_saved = SavedRecipeService::is_saved(&state.db, auth_user.id, id).await?;
         (user, books, is_saved)
     } else {

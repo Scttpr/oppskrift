@@ -63,10 +63,7 @@ impl PersonActor {
         let actor_url = format!("{}/users/{}", base_url, user.id);
 
         Self {
-            context: serde_json::json!([
-                ACTIVITYSTREAMS_CONTEXT,
-                SECURITY_CONTEXT
-            ]),
+            context: serde_json::json!([ACTIVITYSTREAMS_CONTEXT, SECURITY_CONTEXT]),
             id: actor_url.clone(),
             actor_type: "Person".to_string(),
             preferred_username: user.username.clone(),
@@ -147,12 +144,8 @@ mod tests {
 
     #[test]
     fn test_webfinger_resource() {
-        let resource = WebFingerResource::for_user(
-            "alice",
-            "example.com",
-            "https://example.com",
-            Uuid::nil(),
-        );
+        let resource =
+            WebFingerResource::for_user("alice", "example.com", "https://example.com", Uuid::nil());
 
         assert_eq!(resource.subject, "acct:alice@example.com");
         assert!(!resource.links.is_empty());

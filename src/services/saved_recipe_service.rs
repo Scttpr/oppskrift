@@ -9,11 +9,7 @@ pub struct SavedRecipeService;
 
 impl SavedRecipeService {
     /// Save a recipe to user's saved list
-    pub async fn save(
-        pool: &PgPool,
-        user_id: Uuid,
-        recipe_id: Uuid,
-    ) -> AppResult<SavedRecipe> {
+    pub async fn save(pool: &PgPool, user_id: Uuid, recipe_id: Uuid) -> AppResult<SavedRecipe> {
         let id = Uuid::new_v4();
 
         sqlx::query_as!(
@@ -45,11 +41,7 @@ impl SavedRecipeService {
     }
 
     /// Remove a recipe from user's saved list
-    pub async fn unsave(
-        pool: &PgPool,
-        user_id: Uuid,
-        recipe_id: Uuid,
-    ) -> AppResult<()> {
+    pub async fn unsave(pool: &PgPool, user_id: Uuid, recipe_id: Uuid) -> AppResult<()> {
         let result = sqlx::query!(
             r#"
             DELETE FROM saved_recipes
@@ -69,11 +61,7 @@ impl SavedRecipeService {
     }
 
     /// Check if a user has saved a recipe
-    pub async fn is_saved(
-        pool: &PgPool,
-        user_id: Uuid,
-        recipe_id: Uuid,
-    ) -> AppResult<bool> {
+    pub async fn is_saved(pool: &PgPool, user_id: Uuid, recipe_id: Uuid) -> AppResult<bool> {
         let result = sqlx::query_scalar!(
             r#"
             SELECT EXISTS(
@@ -134,7 +122,12 @@ impl SavedRecipeService {
         .fetch_all(pool)
         .await?;
 
-        Ok(PaginatedResponse::new(recipes, params.page, limit, total as u64))
+        Ok(PaginatedResponse::new(
+            recipes,
+            params.page,
+            limit,
+            total as u64,
+        ))
     }
 }
 

@@ -5,7 +5,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::lib::error::AppResult;
-use crate::models::{CreateIngredient, CreateInstructionStep, CreateRecipe, Difficulty, Visibility};
+use crate::models::{
+    CreateIngredient, CreateInstructionStep, CreateRecipe, Difficulty, Visibility,
+};
 use crate::services::RecipeService;
 
 /// Seed sample recipes
@@ -37,7 +39,9 @@ pub async fn seed_recipes(pool: &PgPool, user_ids: &[Uuid], base_url: &str) -> A
 async fn seed_simple_pasta(pool: &PgPool, author_id: Uuid, base_url: &str) -> AppResult<usize> {
     let recipe = CreateRecipe {
         title: "Simple Garlic Pasta".to_string(),
-        description: Some("A quick and delicious pasta dish that comes together in minutes.".to_string()),
+        description: Some(
+            "A quick and delicious pasta dish that comes together in minutes.".to_string(),
+        ),
         visibility: Some(Visibility::Public),
         prep_time_min: Some(5),
         cook_time_min: Some(15),
@@ -113,14 +117,62 @@ async fn seed_bbq_ribs(pool: &PgPool, author_id: Uuid, base_url: &str) -> AppRes
     let created = RecipeService::create(pool, author_id, recipe, base_url).await?;
 
     let ingredients = vec![
-        CreateIngredient { position: 1, quantity: Some(dec!(2)), unit: Some("racks".to_string()), name: "pork spare ribs".to_string(), notes: Some("about 3 lbs each".to_string()) },
-        CreateIngredient { position: 2, quantity: Some(dec!(2)), unit: Some("tbsp".to_string()), name: "brown sugar".to_string(), notes: None },
-        CreateIngredient { position: 3, quantity: Some(dec!(2)), unit: Some("tbsp".to_string()), name: "paprika".to_string(), notes: None },
-        CreateIngredient { position: 4, quantity: Some(dec!(1)), unit: Some("tbsp".to_string()), name: "black pepper".to_string(), notes: None },
-        CreateIngredient { position: 5, quantity: Some(dec!(1)), unit: Some("tbsp".to_string()), name: "salt".to_string(), notes: None },
-        CreateIngredient { position: 6, quantity: Some(dec!(1)), unit: Some("tbsp".to_string()), name: "garlic powder".to_string(), notes: None },
-        CreateIngredient { position: 7, quantity: Some(dec!(1)), unit: Some("tbsp".to_string()), name: "onion powder".to_string(), notes: None },
-        CreateIngredient { position: 8, quantity: Some(dec!(1)), unit: Some("tsp".to_string()), name: "cayenne pepper".to_string(), notes: None },
+        CreateIngredient {
+            position: 1,
+            quantity: Some(dec!(2)),
+            unit: Some("racks".to_string()),
+            name: "pork spare ribs".to_string(),
+            notes: Some("about 3 lbs each".to_string()),
+        },
+        CreateIngredient {
+            position: 2,
+            quantity: Some(dec!(2)),
+            unit: Some("tbsp".to_string()),
+            name: "brown sugar".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 3,
+            quantity: Some(dec!(2)),
+            unit: Some("tbsp".to_string()),
+            name: "paprika".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 4,
+            quantity: Some(dec!(1)),
+            unit: Some("tbsp".to_string()),
+            name: "black pepper".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 5,
+            quantity: Some(dec!(1)),
+            unit: Some("tbsp".to_string()),
+            name: "salt".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 6,
+            quantity: Some(dec!(1)),
+            unit: Some("tbsp".to_string()),
+            name: "garlic powder".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 7,
+            quantity: Some(dec!(1)),
+            unit: Some("tbsp".to_string()),
+            name: "onion powder".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 8,
+            quantity: Some(dec!(1)),
+            unit: Some("tsp".to_string()),
+            name: "cayenne pepper".to_string(),
+            notes: None,
+        },
     ];
 
     RecipeService::add_ingredients(pool, created.id, ingredients).await?;
@@ -155,15 +207,69 @@ async fn seed_croissants(pool: &PgPool, author_id: Uuid, base_url: &str) -> AppR
     let created = RecipeService::create(pool, author_id, recipe, base_url).await?;
 
     let ingredients = vec![
-        CreateIngredient { position: 1, quantity: Some(dec!(500)), unit: Some("g".to_string()), name: "bread flour".to_string(), notes: None },
-        CreateIngredient { position: 2, quantity: Some(dec!(10)), unit: Some("g".to_string()), name: "instant yeast".to_string(), notes: None },
-        CreateIngredient { position: 3, quantity: Some(dec!(80)), unit: Some("g".to_string()), name: "sugar".to_string(), notes: None },
-        CreateIngredient { position: 4, quantity: Some(dec!(10)), unit: Some("g".to_string()), name: "salt".to_string(), notes: None },
-        CreateIngredient { position: 5, quantity: Some(dec!(300)), unit: Some("ml".to_string()), name: "whole milk".to_string(), notes: Some("cold".to_string()) },
-        CreateIngredient { position: 6, quantity: Some(dec!(55)), unit: Some("g".to_string()), name: "unsalted butter".to_string(), notes: Some("melted, for dough".to_string()) },
-        CreateIngredient { position: 7, quantity: Some(dec!(280)), unit: Some("g".to_string()), name: "unsalted butter".to_string(), notes: Some("cold, for lamination".to_string()) },
-        CreateIngredient { position: 8, quantity: Some(dec!(1)), unit: None, name: "egg".to_string(), notes: Some("for egg wash".to_string()) },
-        CreateIngredient { position: 9, quantity: Some(dec!(1)), unit: Some("tbsp".to_string()), name: "milk".to_string(), notes: Some("for egg wash".to_string()) },
+        CreateIngredient {
+            position: 1,
+            quantity: Some(dec!(500)),
+            unit: Some("g".to_string()),
+            name: "bread flour".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 2,
+            quantity: Some(dec!(10)),
+            unit: Some("g".to_string()),
+            name: "instant yeast".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 3,
+            quantity: Some(dec!(80)),
+            unit: Some("g".to_string()),
+            name: "sugar".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 4,
+            quantity: Some(dec!(10)),
+            unit: Some("g".to_string()),
+            name: "salt".to_string(),
+            notes: None,
+        },
+        CreateIngredient {
+            position: 5,
+            quantity: Some(dec!(300)),
+            unit: Some("ml".to_string()),
+            name: "whole milk".to_string(),
+            notes: Some("cold".to_string()),
+        },
+        CreateIngredient {
+            position: 6,
+            quantity: Some(dec!(55)),
+            unit: Some("g".to_string()),
+            name: "unsalted butter".to_string(),
+            notes: Some("melted, for dough".to_string()),
+        },
+        CreateIngredient {
+            position: 7,
+            quantity: Some(dec!(280)),
+            unit: Some("g".to_string()),
+            name: "unsalted butter".to_string(),
+            notes: Some("cold, for lamination".to_string()),
+        },
+        CreateIngredient {
+            position: 8,
+            quantity: Some(dec!(1)),
+            unit: None,
+            name: "egg".to_string(),
+            notes: Some("for egg wash".to_string()),
+        },
+        CreateIngredient {
+            position: 9,
+            quantity: Some(dec!(1)),
+            unit: Some("tbsp".to_string()),
+            name: "milk".to_string(),
+            notes: Some("for egg wash".to_string()),
+        },
     ];
 
     RecipeService::add_ingredients(pool, created.id, ingredients).await?;
@@ -188,10 +294,17 @@ async fn seed_croissants(pool: &PgPool, author_id: Uuid, base_url: &str) -> AppR
 }
 
 /// Create a recipe at validation limits for stress testing
-async fn seed_stress_test_recipe(pool: &PgPool, author_id: Uuid, base_url: &str) -> AppResult<usize> {
+async fn seed_stress_test_recipe(
+    pool: &PgPool,
+    author_id: Uuid,
+    base_url: &str,
+) -> AppResult<usize> {
     let recipe = CreateRecipe {
         title: "Stress Test Recipe (50 ingredients, 30 steps)".to_string(),
-        description: Some("This recipe tests the maximum limits: 50 ingredients and 30 instruction steps.".to_string()),
+        description: Some(
+            "This recipe tests the maximum limits: 50 ingredients and 30 instruction steps."
+                .to_string(),
+        ),
         visibility: Some(Visibility::Private), // Keep private so it doesn't clutter public listings
         prep_time_min: Some(120),
         cook_time_min: Some(180),
@@ -208,7 +321,11 @@ async fn seed_stress_test_recipe(pool: &PgPool, author_id: Uuid, base_url: &str)
             quantity: Some(rust_decimal::Decimal::from(i)),
             unit: Some("g".to_string()),
             name: format!("Ingredient {}", i),
-            notes: if i % 5 == 0 { Some("with notes".to_string()) } else { None },
+            notes: if i % 5 == 0 {
+                Some("with notes".to_string())
+            } else {
+                None
+            },
         })
         .collect();
 

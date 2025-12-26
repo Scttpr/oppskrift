@@ -1,18 +1,18 @@
 use askama::Template;
 use axum::{
+    Router,
     extract::{Path, Query, State},
     response::Html,
     routing::get,
-    Router,
 };
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::api::middleware::{AuthUser, OptionalAuthUser};
 use crate::lib::error::AppResult;
 use crate::lib::pagination::{PaginationMeta, PaginationParams};
 use crate::models::{FollowCounts, RecipeSummary, UserProfile};
 use crate::services::{FollowService, RecipeService, SavedRecipeService, UserService};
-use crate::AppState;
 
 /// User page routes
 pub fn routes() -> Router<AppState> {

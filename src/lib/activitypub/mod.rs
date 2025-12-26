@@ -68,10 +68,7 @@ impl Activity {
     /// Create a new activity with default context
     pub fn new(id: String, activity_type: ActivityType, actor: String) -> Self {
         Self {
-            context: serde_json::json!([
-                ACTIVITYSTREAMS_CONTEXT,
-                SECURITY_CONTEXT
-            ]),
+            context: serde_json::json!([ACTIVITYSTREAMS_CONTEXT, SECURITY_CONTEXT]),
             id,
             activity_type: activity_type.to_string(),
             actor,
@@ -98,11 +95,12 @@ impl Activity {
         let actor_url = format!("{}/users/{}", base_url, actor_id);
         let activity_id = format!("{}/activities/{}", base_url, uuid::Uuid::new_v4());
 
-        Self::new(activity_id, ActivityType::Delete, actor_url.clone())
-            .with_object(serde_json::json!({
+        Self::new(activity_id, ActivityType::Delete, actor_url.clone()).with_object(
+            serde_json::json!({
                 "id": actor_url,
                 "type": "Tombstone"
-            }))
+            }),
+        )
     }
 
     /// Create a Delete activity for a recipe
@@ -111,10 +109,9 @@ impl Activity {
         let recipe_url = format!("{}/recipes/{}", base_url, recipe_id);
         let activity_id = format!("{}/activities/{}", base_url, uuid::Uuid::new_v4());
 
-        Self::new(activity_id, ActivityType::Delete, actor_url)
-            .with_object(serde_json::json!({
-                "id": recipe_url,
-                "type": "Tombstone"
-            }))
+        Self::new(activity_id, ActivityType::Delete, actor_url).with_object(serde_json::json!({
+            "id": recipe_url,
+            "type": "Tombstone"
+        }))
     }
 }

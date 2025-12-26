@@ -1,8 +1,8 @@
 use askama::Template;
-use axum::{response::Html, routing::get, Router};
+use axum::{Router, response::Html, routing::get};
 
-use crate::lib::error::{AppError, AppResult};
 use crate::AppState;
+use crate::lib::error::{AppError, AppResult};
 
 /// Legal page routes
 pub fn routes() -> Router<AppState> {

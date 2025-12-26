@@ -1,4 +1,4 @@
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::time::Duration;
 
 /// Database connection pool configuration
@@ -13,8 +13,7 @@ pub struct DbConfig {
 impl Default for DbConfig {
     fn default() -> Self {
         Self {
-            url: std::env::var("DATABASE_URL")
-                .expect("DATABASE_URL must be set"),
+            url: std::env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
             max_connections: 10,
             min_connections: 2,
             acquire_timeout: Duration::from_secs(30),

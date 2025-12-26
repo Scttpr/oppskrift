@@ -35,13 +35,10 @@ pub fn federation_routes() -> Router<AppState> {
 
 /// Create content syndication routes (RSS, Atom, oEmbed)
 pub fn syndication_routes() -> Router<AppState> {
-    Router::new()
-        .merge(feeds::routes())
-        .merge(oembed::routes())
+    Router::new().merge(feeds::routes()).merge(oembed::routes())
 }
 
 /// Create documentation routes
 pub fn docs_routes() -> Router<AppState> {
-    Router::new()
-        .merge(openapi::routes())
+    Router::new().merge(openapi::routes())
 }

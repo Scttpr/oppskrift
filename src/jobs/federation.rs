@@ -99,12 +99,17 @@ impl FederationWorker {
     }
 
     /// Deliver an activity to a specific inbox
-    async fn deliver_to_inbox(&self, inbox_url: &str, job: &FederationJob) -> Result<(), DeliveryError> {
+    async fn deliver_to_inbox(
+        &self,
+        inbox_url: &str,
+        job: &FederationJob,
+    ) -> Result<(), DeliveryError> {
         // Parse inbox URL
-        let url = reqwest::Url::parse(inbox_url)
-            .map_err(|e| DeliveryError::InvalidUrl(e.to_string()))?;
+        let url =
+            reqwest::Url::parse(inbox_url).map_err(|e| DeliveryError::InvalidUrl(e.to_string()))?;
 
-        let host = url.host_str()
+        let host = url
+            .host_str()
             .ok_or_else(|| DeliveryError::InvalidUrl("No host in URL".to_string()))?;
         let path = url.path();
 
@@ -120,7 +125,8 @@ impl FederationWorker {
 
         // Get signing context for the actor
         // TODO: Retrieve actual private key from database
-        let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        let base_url =
+            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
         let key_id = format!("{}/users/{}#main-key", base_url, job.actor_id);
         let signing_context = SigningContext::new(
             key_id,
@@ -131,7 +137,8 @@ impl FederationWorker {
         let signed = signing_context.sign_request("POST", path, host, Some(&digest));
 
         // Send the request
-        let response = self.client
+        let response = self
+            .client
             .post(inbox_url)
             .header("Content-Type", "application/activity+json")
             .header("Accept", "application/activity+json")

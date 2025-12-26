@@ -127,10 +127,7 @@ impl BookService {
     }
 
     /// List all books by owner (for dropdowns, no pagination)
-    pub async fn list_by_owner(
-        pool: &PgPool,
-        owner_id: Uuid,
-    ) -> AppResult<Vec<RecipeBookSummary>> {
+    pub async fn list_by_owner(pool: &PgPool, owner_id: Uuid) -> AppResult<Vec<RecipeBookSummary>> {
         let books = sqlx::query_as!(
             RecipeBookSummary,
             r#"
@@ -192,7 +189,12 @@ impl BookService {
         .await?
         .unwrap_or(0);
 
-        Ok(PaginatedResponse::new(books, params.page, limit, total as u64))
+        Ok(PaginatedResponse::new(
+            books,
+            params.page,
+            limit,
+            total as u64,
+        ))
     }
 
     /// List public books
@@ -224,14 +226,18 @@ impl BookService {
         .fetch_all(pool)
         .await?;
 
-        let total: i64 = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM recipe_books WHERE visibility = 'public'"
-        )
-        .fetch_one(pool)
-        .await?
-        .unwrap_or(0);
+        let total: i64 =
+            sqlx::query_scalar!("SELECT COUNT(*) FROM recipe_books WHERE visibility = 'public'")
+                .fetch_one(pool)
+                .await?
+                .unwrap_or(0);
 
-        Ok(PaginatedResponse::new(books, params.page, limit, total as u64))
+        Ok(PaginatedResponse::new(
+            books,
+            params.page,
+            limit,
+            total as u64,
+        ))
     }
 
     /// Add a recipe to a book
@@ -336,7 +342,12 @@ impl BookService {
         .await?
         .unwrap_or(0);
 
-        Ok(PaginatedResponse::new(recipes, params.page, limit, total as u64))
+        Ok(PaginatedResponse::new(
+            recipes,
+            params.page,
+            limit,
+            total as u64,
+        ))
     }
 
     /// Get public recipes in a book (for non-owners, filters out private recipes)
@@ -383,7 +394,12 @@ impl BookService {
         .await?
         .unwrap_or(0);
 
-        Ok(PaginatedResponse::new(recipes, params.page, limit, total as u64))
+        Ok(PaginatedResponse::new(
+            recipes,
+            params.page,
+            limit,
+            total as u64,
+        ))
     }
 }
 

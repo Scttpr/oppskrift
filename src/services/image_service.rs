@@ -1,4 +1,4 @@
-use image::{imageops::FilterType, DynamicImage, ImageFormat};
+use image::{DynamicImage, ImageFormat, imageops::FilterType};
 use sqlx::PgPool;
 use std::io::Cursor;
 use uuid::Uuid;
@@ -17,12 +17,7 @@ pub const MAX_IMAGE_DIMENSION: u32 = 2048;
 pub const THUMBNAIL_SIZE: u32 = 300;
 
 /// Allowed image MIME types
-pub const ALLOWED_MIME_TYPES: [&str; 4] = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-];
+pub const ALLOWED_MIME_TYPES: [&str; 4] = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /// Service for image upload and management
 pub struct ImageService;
@@ -223,7 +218,15 @@ impl ImageService {
         .ok_or_else(|| AppError::NotFound(format!("Image {} not found", image_id)))?;
 
         // Extract key from URL (assuming URL ends with the key)
-        let key = image.url.rsplit('/').take(3).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("/");
+        let key = image
+            .url
+            .rsplit('/')
+            .take(3)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("/");
 
         // Delete from storage
         storage.delete(&key).await?;

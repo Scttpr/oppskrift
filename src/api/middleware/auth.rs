@@ -1,10 +1,10 @@
 use axum::{
-    extract::FromRequestParts,
-    http::{header::AUTHORIZATION, request::Parts, StatusCode},
-    response::{IntoResponse, Response},
     Json,
+    extract::FromRequestParts,
+    http::{StatusCode, header::AUTHORIZATION, request::Parts},
+    response::{IntoResponse, Response},
 };
-use jsonwebtoken::{decode, DecodingKey, Validation};
+use jsonwebtoken::{DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -72,22 +72,20 @@ where
             })?;
 
         // Extract Bearer token
-        let token = auth_header
-            .strip_prefix("Bearer ")
-            .ok_or_else(|| {
-                (
-                    StatusCode::UNAUTHORIZED,
-                    Json(AuthError {
-                        error: "unauthorized".to_string(),
-                        message: "Invalid authorization header format".to_string(),
-                    }),
-                )
-                    .into_response()
-            })?;
+        let token = auth_header.strip_prefix("Bearer ").ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(AuthError {
+                    error: "unauthorized".to_string(),
+                    message: "Invalid authorization header format".to_string(),
+                }),
+            )
+                .into_response()
+        })?;
 
         // Get JWT secret from environment - MUST be set, no fallback
-        let secret = std::env::var("JWT_SECRET")
-            .expect("JWT_SECRET environment variable must be set");
+        let secret =
+            std::env::var("JWT_SECRET").expect("JWT_SECRET environment variable must be set");
 
         // Decode and validate JWT
         let token_data = decode::<Claims>(

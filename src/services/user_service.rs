@@ -76,7 +76,9 @@ impl UserService {
         .fetch_one(pool)
         .await
         .map_err(|e| match e {
-            sqlx::Error::Database(ref db_err) if db_err.constraint() == Some("users_username_key") => {
+            sqlx::Error::Database(ref db_err)
+                if db_err.constraint() == Some("users_username_key") =>
+            {
                 AppError::Conflict(format!("Username '{}' is already taken", input.username))
             }
             sqlx::Error::Database(ref db_err) if db_err.constraint() == Some("users_ap_id_key") => {
@@ -219,8 +221,8 @@ impl UserService {
     /// Build a Delete activity for when a user disables federation
     /// Caller should deliver this to known followers
     pub fn build_delete_activity(user_id: Uuid) -> crate::lib::activitypub::Activity {
-        let base_url = std::env::var("BASE_URL")
-            .unwrap_or_else(|_| "http://localhost:3000".to_string());
+        let base_url =
+            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
         crate::lib::activitypub::Activity::delete_actor(&base_url, user_id)
     }
 }

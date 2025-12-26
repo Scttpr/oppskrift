@@ -5,8 +5,8 @@ use crate::lib::audit::AuditEvent;
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{
-    CreateIngredient, CreateInstructionStep, CreateRecipe, Difficulty, Ingredient,
-    InstructionStep, Recipe, RecipeSummary, UpdateRecipe, Visibility,
+    CreateIngredient, CreateInstructionStep, CreateRecipe, Difficulty, Ingredient, InstructionStep,
+    Recipe, RecipeSummary, UpdateRecipe, Visibility,
 };
 
 /// Maximum number of ingredients per recipe
@@ -270,12 +270,11 @@ impl RecipeService {
         .fetch_all(pool)
         .await?;
 
-        let total: i64 = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM recipes WHERE visibility = 'public'"
-        )
-        .fetch_one(pool)
-        .await?
-        .unwrap_or(0);
+        let total: i64 =
+            sqlx::query_scalar!("SELECT COUNT(*) FROM recipes WHERE visibility = 'public'")
+                .fetch_one(pool)
+                .await?
+                .unwrap_or(0);
 
         Ok(PaginatedResponse::new(
             recipes,

@@ -3,17 +3,17 @@
 //! Implements oEmbed 1.0 specification for embedding recipes.
 
 use axum::{
+    Router,
     extract::{Query, State},
     http::StatusCode,
     response::Json,
     routing::get,
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::services::{ImageService, RecipeService, UserService};
 use crate::AppState;
+use crate::services::{ImageService, RecipeService, UserService};
 
 /// oEmbed routes
 pub fn routes() -> Router<AppState> {
@@ -85,11 +85,11 @@ async fn oembed(
         }
     }
 
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     // Parse the URL to extract recipe ID
-    let recipe_id = parse_recipe_url(&query.url, &base_url)
-        .ok_or(StatusCode::NOT_FOUND)?;
+    let recipe_id = parse_recipe_url(&query.url, &base_url).ok_or(StatusCode::NOT_FOUND)?;
 
     // Get recipe
     let recipe = RecipeService::get_by_id(&state.db, recipe_id)

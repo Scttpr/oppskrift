@@ -21,28 +21,22 @@ impl Config {
     /// Panics if required variables are missing or invalid
     pub fn from_env() -> Self {
         // Required secrets - panic if missing
-        let database_url = env::var("DATABASE_URL")
-            .expect("DATABASE_URL must be set");
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-        let jwt_secret = env::var("JWT_SECRET")
-            .expect("JWT_SECRET must be set");
+        let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
         // Validate JWT_SECRET length
         if jwt_secret.len() < 32 {
             panic!("JWT_SECRET must be at least 32 characters");
         }
 
-        let s3_bucket = env::var("S3_BUCKET")
-            .expect("S3_BUCKET must be set");
+        let s3_bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
 
         // Optional with defaults
-        let base_url = env::var("BASE_URL")
-            .unwrap_or_else(|_| "http://localhost:3000".to_string());
-        let s3_region = env::var("S3_REGION")
-            .unwrap_or_else(|_| "us-east-1".to_string());
+        let base_url = env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        let s3_region = env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
         let s3_endpoint = env::var("S3_ENDPOINT").ok();
-        let host = env::var("HOST")
-            .unwrap_or_else(|_| "0.0.0.0".to_string());
+        let host = env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
         let port = env::var("PORT")
             .unwrap_or_else(|_| "3000".to_string())
             .parse()

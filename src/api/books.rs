@@ -1,12 +1,13 @@
 use axum::{
+    Json, Router,
     extract::{Multipart, Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post},
-    Json, Router,
 };
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::api::middleware::AuthUser;
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
@@ -16,14 +17,16 @@ use crate::models::{
     RecipeSummary, UpdateRecipeBook,
 };
 use crate::services::BookService;
-use crate::AppState;
 
 /// Book API routes
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_books).post(create_book))
         .route("/{id}", get(get_book).put(update_book).delete(delete_book))
-        .route("/{id}/recipes", get(get_book_recipes).post(add_recipe_to_book))
+        .route(
+            "/{id}/recipes",
+            get(get_book_recipes).post(add_recipe_to_book),
+        )
         .route("/{id}/recipes/{recipe_id}", delete(remove_recipe_from_book))
 }
 
@@ -42,7 +45,8 @@ async fn create_book(
     auth: AuthUser,
     mut multipart: Multipart,
 ) -> AppResult<(StatusCode, Json<RecipeBook>)> {
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     let mut title: Option<String> = None;
     let mut description: Option<String> = None;
@@ -59,9 +63,10 @@ async fn create_book(
 
         match name.as_str() {
             "title" => {
-                title = Some(field.text().await.map_err(|e| {
-                    AppError::BadRequest(format!("Failed to read title: {}", e))
-                })?);
+                title =
+                    Some(field.text().await.map_err(|e| {
+                        AppError::BadRequest(format!("Failed to read title: {}", e))
+                    })?);
             }
             "description" => {
                 description = Some(field.text().await.map_err(|e| {
@@ -150,7 +155,9 @@ async fn update_book(
     // Check ownership
     let existing = BookService::get_by_id(&state.db, id).await?;
     if existing.owner_id != auth.id {
-        return Err(AppError::Forbidden("Not authorized to modify this book".to_string()));
+        return Err(AppError::Forbidden(
+            "Not authorized to modify this book".to_string(),
+        ));
     }
 
     let book = BookService::update(&state.db, id, input).await?;
@@ -167,7 +174,9 @@ async fn delete_book(
     // Check ownership
     let existing = BookService::get_by_id(&state.db, id).await?;
     if existing.owner_id != auth.id {
-        return Err(AppError::Forbidden("Not authorized to modify this book".to_string()));
+        return Err(AppError::Forbidden(
+            "Not authorized to modify this book".to_string(),
+        ));
     }
 
     BookService::delete(&state.db, id).await?;
@@ -206,7 +215,9 @@ async fn add_recipe_to_book(
     // Check ownership
     let book = BookService::get_by_id(&state.db, id).await?;
     if book.owner_id != auth.id {
-        return Err(AppError::Forbidden("Not authorized to modify this book".to_string()));
+        return Err(AppError::Forbidden(
+            "Not authorized to modify this book".to_string(),
+        ));
     }
 
     let entry = BookService::add_recipe(&state.db, id, input).await?;
@@ -223,7 +234,9 @@ async fn remove_recipe_from_book(
     // Check ownership
     let book = BookService::get_by_id(&state.db, id).await?;
     if book.owner_id != auth.id {
-        return Err(AppError::Forbidden("Not authorized to modify this book".to_string()));
+        return Err(AppError::Forbidden(
+            "Not authorized to modify this book".to_string(),
+        ));
     }
 
     BookService::remove_recipe(&state.db, id, recipe_id).await?;

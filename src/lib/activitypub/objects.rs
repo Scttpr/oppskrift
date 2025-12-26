@@ -97,12 +97,8 @@ impl RecipeObject {
         let image_urls: Vec<String> = images.iter().map(|img| img.url.clone()).collect();
 
         // Format duration as ISO 8601
-        let prep_time = recipe
-            .prep_time_min
-            .map(|m| format!("PT{}M", m));
-        let cook_time = recipe
-            .cook_time_min
-            .map(|m| format!("PT{}M", m));
+        let prep_time = recipe.prep_time_min.map(|m| format!("PT{}M", m));
+        let cook_time = recipe.cook_time_min.map(|m| format!("PT{}M", m));
 
         // Build content from description
         let content = recipe

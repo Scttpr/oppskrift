@@ -1,20 +1,20 @@
 use axum::{
+    Json, Router,
     extract::{ConnectInfo, State},
     http::StatusCode,
     routing::post,
-    Json, Router,
 };
 use chrono::{Duration, Utc};
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use validator::Validate;
 
+use crate::AppState;
 use crate::api::middleware::Claims;
 use crate::lib::audit::AuditEvent;
 use crate::lib::error::{AppError, AppResult};
 use crate::services::UserService;
-use crate::AppState;
 
 /// Auth routes
 pub fn routes() -> Router<AppState> {
@@ -74,8 +74,7 @@ async fn login(
     // For now, this is a stub for ActivityPub federation testing
 
     // Generate JWT token
-    let secret =
-        std::env::var("JWT_SECRET").expect("JWT_SECRET environment variable must be set");
+    let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET environment variable must be set");
 
     let now = Utc::now();
     let expires_at = now + Duration::hours(24);

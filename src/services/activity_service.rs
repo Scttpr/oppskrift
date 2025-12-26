@@ -173,7 +173,12 @@ impl ActivityService {
         .fetch_all(pool)
         .await?;
 
-        Ok(PaginatedResponse::new(activities, params.page, limit, total as u64))
+        Ok(PaginatedResponse::new(
+            activities,
+            params.page,
+            limit,
+            total as u64,
+        ))
     }
 
     /// Get activities by a specific user
@@ -216,7 +221,12 @@ impl ActivityService {
         .fetch_all(pool)
         .await?;
 
-        Ok(PaginatedResponse::new(activities, params.page, limit, total as u64))
+        Ok(PaginatedResponse::new(
+            activities,
+            params.page,
+            limit,
+            total as u64,
+        ))
     }
 }
 

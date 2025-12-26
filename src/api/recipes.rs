@@ -1,12 +1,13 @@
 use axum::{
-    extract::{Multipart, Path, Query, State},
-    http::{header, HeaderMap, StatusCode},
-    routing::{get, post},
     Json, Router,
+    extract::{Multipart, Path, Query, State},
+    http::{HeaderMap, StatusCode, header},
+    routing::{get, post},
 };
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::api::middleware::AuthUser;
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
@@ -17,13 +18,15 @@ use crate::models::{
     RecipeImage, RecipeSummary, UpdateRecipe,
 };
 use crate::services::{ImageService, RecipeService, UserService};
-use crate::AppState;
 
 /// Recipe API routes
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_recipes).post(create_recipe))
-        .route("/{id}", get(get_recipe).put(update_recipe).delete(delete_recipe))
+        .route(
+            "/{id}",
+            get(get_recipe).put(update_recipe).delete(delete_recipe),
+        )
         .route("/{id}/images", post(upload_image))
 }
 
@@ -68,7 +71,8 @@ async fn create_recipe(
     RecipeService::validate_instructions(&input.instructions)?;
 
     // Get base URL from environment
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     // Create the recipe
     let recipe = RecipeService::create(&state.db, auth.id, input.recipe, &base_url).await?;
@@ -119,7 +123,9 @@ async fn get_recipe(
 
     if accept.contains("application/ld+json") {
         // Get author for Schema.org
-        let author = UserService::get_by_id(&state.db, recipe.author_id).await.ok();
+        let author = UserService::get_by_id(&state.db, recipe.author_id)
+            .await
+            .ok();
         let schema = SchemaOrgRecipe::from_recipe(
             &recipe,
             author.as_ref(),
@@ -130,11 +136,7 @@ async fn get_recipe(
         let json = serde_json::to_string(&schema)
             .map_err(|e| AppError::Internal(format!("Failed to serialize JSON-LD: {}", e)))?;
 
-        Ok((
-            [(header::CONTENT_TYPE, "application/ld+json")],
-            json,
-        )
-            .into_response())
+        Ok(([(header::CONTENT_TYPE, "application/ld+json")], json).into_response())
     } else {
         Ok(Json(RecipeResponse {
             recipe,
@@ -156,7 +158,9 @@ async fn update_recipe(
     // Check ownership
     let existing = RecipeService::get_by_id(&state.db, id).await?;
     if existing.author_id != auth.id {
-        return Err(AppError::Forbidden("Not authorized to modify this recipe".to_string()));
+        return Err(AppError::Forbidden(
+            "Not authorized to modify this recipe".to_string(),
+        ));
     }
 
     // Update recipe
@@ -195,7 +199,9 @@ async fn delete_recipe(
     // Check ownership
     let existing = RecipeService::get_by_id(&state.db, id).await?;
     if existing.author_id != auth.id {
-        return Err(AppError::Forbidden("Not authorized to modify this recipe".to_string()));
+        return Err(AppError::Forbidden(
+            "Not authorized to modify this recipe".to_string(),
+        ));
     }
 
     RecipeService::delete(&state.db, id, auth.id).await?;
@@ -223,7 +229,9 @@ async fn upload_image(
     // Check ownership
     let existing = RecipeService::get_by_id(&state.db, id).await?;
     if existing.author_id != auth.id {
-        return Err(AppError::Forbidden("Not authorized to modify this recipe".to_string()));
+        return Err(AppError::Forbidden(
+            "Not authorized to modify this recipe".to_string(),
+        ));
     }
 
     // Create storage client
@@ -254,14 +262,9 @@ async fn upload_image(
                 );
             }
             "alt_text" => {
-                alt_text = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|e| {
-                            AppError::BadRequest(format!("Failed to read alt_text: {}", e))
-                        })?,
-                );
+                alt_text = Some(field.text().await.map_err(|e| {
+                    AppError::BadRequest(format!("Failed to read alt_text: {}", e))
+                })?);
             }
             "is_primary" => {
                 let value = field.text().await.unwrap_or_default();
@@ -279,7 +282,8 @@ async fn upload_image(
     }
 
     // Upload the image
-    let image = ImageService::upload_image(&state.db, &storage, id, data, alt_text, is_primary).await?;
+    let image =
+        ImageService::upload_image(&state.db, &storage, id, data, alt_text, is_primary).await?;
 
     Ok((StatusCode::CREATED, Json(image)))
 }

@@ -4,7 +4,7 @@
 
 use sqlx::PgPool;
 use std::sync::Arc;
-use tokio::time::{interval, Duration};
+use tokio::time::{Duration, interval};
 
 use crate::lib::audit::AuditEvent;
 
@@ -141,9 +141,7 @@ impl CleanupWorker {
 
         match sqlx::query(&query).execute(self.pool.as_ref()).await {
             Ok(r) => Ok(r.rows_affected()),
-            Err(sqlx::Error::Database(ref e)) if e.message().contains("does not exist") => {
-                Ok(0)
-            }
+            Err(sqlx::Error::Database(ref e)) if e.message().contains("does not exist") => Ok(0),
             Err(e) => Err(e),
         }
     }
@@ -157,9 +155,7 @@ impl CleanupWorker {
 
         match sqlx::query(&query).execute(self.pool.as_ref()).await {
             Ok(r) => Ok(r.rows_affected()),
-            Err(sqlx::Error::Database(ref e)) if e.message().contains("does not exist") => {
-                Ok(0)
-            }
+            Err(sqlx::Error::Database(ref e)) if e.message().contains("does not exist") => Ok(0),
             Err(e) => Err(e),
         }
     }

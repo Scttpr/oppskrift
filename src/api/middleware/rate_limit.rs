@@ -6,8 +6,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::GovernorLayer;
+use tower_governor::governor::GovernorConfigBuilder;
 
 /// Rate limiter configuration
 #[derive(Clone)]
@@ -28,7 +28,9 @@ impl Default for RateLimitConfig {
 }
 
 /// Create a rate limiting layer for API routes
-pub fn create_rate_limit_layer(config: &RateLimitConfig) -> impl tower::Layer<axum::routing::Router> + Clone {
+pub fn create_rate_limit_layer(
+    config: &RateLimitConfig,
+) -> impl tower::Layer<axum::routing::Router> + Clone {
     let governor_config = std::sync::Arc::new(
         GovernorConfigBuilder::default()
             .per_second(config.requests_per_second)
@@ -37,7 +39,9 @@ pub fn create_rate_limit_layer(config: &RateLimitConfig) -> impl tower::Layer<ax
             .expect("Failed to create governor config"),
     );
 
-    GovernorLayer { config: governor_config }
+    GovernorLayer {
+        config: governor_config,
+    }
 }
 
 /// Rate limit exceeded response

@@ -195,11 +195,8 @@ mod tests {
 
     #[test]
     fn test_format_for_imperial_user() {
-        let result = format_quantity_for_user(
-            Some(dec!(100)),
-            Some("g"),
-            MeasurementSystem::Imperial,
-        );
+        let result =
+            format_quantity_for_user(Some(dec!(100)), Some("g"), MeasurementSystem::Imperial);
         assert!(result.contains("oz"));
     }
 }

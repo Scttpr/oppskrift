@@ -31,7 +31,10 @@ impl JobQueue {
     }
 
     /// Queue a federation delivery job
-    pub async fn queue_federation(&self, job: FederationJob) -> Result<(), mpsc::error::SendError<FederationJob>> {
+    pub async fn queue_federation(
+        &self,
+        job: FederationJob,
+    ) -> Result<(), mpsc::error::SendError<FederationJob>> {
         self.federation_tx.send(job).await
     }
 }

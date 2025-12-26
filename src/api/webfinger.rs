@@ -3,18 +3,18 @@
 //! Implements RFC 7033 WebFinger for looking up actors by acct: URI.
 
 use axum::{
+    Router,
     extract::{Query, State},
     http::StatusCode,
     response::Json,
     routing::get,
-    Router,
 };
 use serde::Deserialize;
 
+use crate::AppState;
 use crate::lib::activitypub::WebFingerResource;
 use crate::lib::error::AppResult;
 use crate::services::UserService;
-use crate::AppState;
 
 /// WebFinger routes
 pub fn routes() -> Router<AppState> {
@@ -50,7 +50,8 @@ async fn webfinger(
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
     // Get domain from environment or request
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let domain = base_url
         .strip_prefix("https://")
         .or_else(|| base_url.strip_prefix("http://"))

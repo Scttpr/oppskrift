@@ -1,18 +1,18 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::{get, patch},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::api::middleware::AuthUser;
 use crate::lib::error::AppResult;
 use crate::lib::pagination::PaginationParams;
 use crate::models::user::{UpdateUser, User, UserProfile};
-use crate::models::{RecipeSummary, Book};
+use crate::models::{Book, RecipeSummary};
 use crate::services::{BookService, FollowService, RecipeService, SavedRecipeService, UserService};
-use crate::AppState;
 
 /// User API routes
 pub fn routes() -> Router<AppState> {
@@ -35,10 +35,7 @@ async fn get_user_by_id(
 
 /// GET /api/v1/users/me
 /// Returns full user data for authenticated user
-async fn get_current_user(
-    State(state): State<AppState>,
-    auth: AuthUser,
-) -> AppResult<Json<User>> {
+async fn get_current_user(State(state): State<AppState>, auth: AuthUser) -> AppResult<Json<User>> {
     let user = UserService::get_by_id(&state.db, auth.id).await?;
     Ok(Json(user))
 }
@@ -76,7 +73,10 @@ async fn export_user_data(
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
     // Get user's recipes (all pages)
-    let params = PaginationParams { page: 1, page_size: 1000 };
+    let params = PaginationParams {
+        page: 1,
+        page_size: 1000,
+    };
     let recipes_result = RecipeService::list_by_author(&state.db, auth.id, &params).await?;
 
     // Get user's books

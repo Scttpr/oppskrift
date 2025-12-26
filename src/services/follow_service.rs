@@ -37,9 +37,7 @@ impl FollowService {
         .fetch_one(pool)
         .await
         .map_err(|e| match e {
-            sqlx::Error::Database(ref db_err)
-                if db_err.constraint() == Some("follows_unique") =>
-            {
+            sqlx::Error::Database(ref db_err) if db_err.constraint() == Some("follows_unique") => {
                 AppError::Validation("Already following this user".to_string())
             }
             _ => AppError::from(e),
@@ -47,11 +45,7 @@ impl FollowService {
     }
 
     /// Unfollow a user
-    pub async fn unfollow(
-        pool: &PgPool,
-        follower_id: Uuid,
-        following_id: Uuid,
-    ) -> AppResult<()> {
+    pub async fn unfollow(pool: &PgPool, follower_id: Uuid, following_id: Uuid) -> AppResult<()> {
         let result = sqlx::query!(
             r#"
             DELETE FROM follows
@@ -64,7 +58,9 @@ impl FollowService {
         .await?;
 
         if result.rows_affected() == 0 {
-            return Err(AppError::NotFound("Follow relationship not found".to_string()));
+            return Err(AppError::NotFound(
+                "Follow relationship not found".to_string(),
+            ));
         }
 
         Ok(())

@@ -42,7 +42,10 @@ pub async fn seed_users(pool: &PgPool, base_url: &str) -> AppResult<Vec<Uuid>> {
 
     for user in TEST_USERS {
         // Check if user already exists
-        if UserService::get_by_username(pool, user.username).await.is_ok() {
+        if UserService::get_by_username(pool, user.username)
+            .await
+            .is_ok()
+        {
             tracing::debug!("User {} already exists, skipping", user.username);
             continue;
         }
