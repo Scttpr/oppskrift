@@ -7,6 +7,21 @@
 
 **Organization**: Tasks grouped by user story to enable independent implementation and testing.
 
+## Progress
+
+| Phase | Description | Status | Tasks |
+|-------|-------------|--------|-------|
+| 1 | Setup (Shared Infrastructure) | ✅ Complete | T001-T004 |
+| 2 | Foundation (Database & Core Services) | ✅ Complete | T005-T019 |
+| 3 | User Story 1 - Registration | ✅ Complete | T020-T030 |
+| 4 | User Story 2 - Login | ✅ Complete | T031-T041 |
+| 5 | User Story 3 - Password Recovery | ⏳ Pending | T042-T049 |
+| 6 | User Story 4 - Account Security | ⏳ Pending | T050-T070 |
+| 7 | User Story 5 - Account Deletion | ⏳ Pending | T071-T080 |
+| 8 | Hardening & Documentation | ⏳ Pending | T081-T087 |
+
+**MVP Checkpoint**: Phases 1-4 complete (41/87 tasks) - Registration and Login functional.
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
