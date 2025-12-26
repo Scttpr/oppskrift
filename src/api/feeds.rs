@@ -21,8 +21,8 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/feeds/recipes.rss", get(recipes_rss))
         .route("/feeds/recipes.atom", get(recipes_atom))
-        .route("/feeds/users/:id/recipes.rss", get(user_recipes_rss))
-        .route("/feeds/users/:id/recipes.atom", get(user_recipes_atom))
+        .route("/feeds/users/{id}/recipes.rss", get(user_recipes_rss))
+        .route("/feeds/users/{id}/recipes.atom", get(user_recipes_atom))
 }
 
 /// RSS feed for public recipes

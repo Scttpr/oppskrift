@@ -24,14 +24,14 @@ use crate::AppState;
 pub fn routes() -> Router<AppState> {
     Router::new()
         // Actor endpoints
-        .route("/users/:id", get(get_actor))
-        .route("/users/:id/inbox", post(inbox))
-        .route("/users/:id/outbox", get(outbox))
-        .route("/users/:id/followers", get(followers))
-        .route("/users/:id/following", get(following))
+        .route("/users/{id}", get(get_actor))
+        .route("/users/{id}/inbox", post(inbox))
+        .route("/users/{id}/outbox", get(outbox))
+        .route("/users/{id}/followers", get(followers))
+        .route("/users/{id}/following", get(following))
         // Object endpoints
-        .route("/recipes/:id", get(get_recipe_object))
-        .route("/books/:id", get(get_book_object))
+        .route("/recipes/{id}", get(get_recipe_object))
+        .route("/books/{id}", get(get_book_object))
         // Shared inbox
         .route("/inbox", post(shared_inbox))
 }

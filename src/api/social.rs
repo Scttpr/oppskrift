@@ -18,15 +18,15 @@ use crate::AppState;
 pub fn routes() -> Router<AppState> {
     Router::new()
         // Follow endpoints
-        .route("/users/:id/follow", post(follow_user))
-        .route("/users/:id/follow", delete(unfollow_user))
+        .route("/users/{id}/follow", post(follow_user))
+        .route("/users/{id}/follow", delete(unfollow_user))
         // Save endpoints
-        .route("/recipes/:id/save", post(save_recipe))
-        .route("/recipes/:id/save", delete(unsave_recipe))
+        .route("/recipes/{id}/save", post(save_recipe))
+        .route("/recipes/{id}/save", delete(unsave_recipe))
         // Saved recipes list
-        .route("/users/:id/saved", get(get_saved_recipes))
+        .route("/users/{id}/saved", get(get_saved_recipes))
         // Share endpoint
-        .route("/recipes/:id/share", post(share_recipe))
+        .route("/recipes/{id}/share", post(share_recipe))
         // Feed endpoint
         .route("/feed", get(get_feed))
 }
