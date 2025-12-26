@@ -1,0 +1,55 @@
+# Rust
+target/
+debug/
+release/
+*.rs.bk
+*.rlib
+*.prof*
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.claude
+.osk/domaines
+.osk/prompts
+.osk/templates
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# Tailwind CSS standalone binary
+tailwindcss
+tailwindcss-*
+static/css/main.css
+
+# Test coverage
+coverage/
+*.profraw
+*.profdata
+
+# SQLx offline mode - DO NOT ignore, needed for Docker builds
+# .sqlx/
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+
+# Added by cargo
+
+/target

@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                r.id, r.author_id, r.title, r.description,\n                r.prep_time_min, r.cook_time_min,\n                r.difficulty as \"difficulty: Difficulty\",\n                r.created_at,\n                ri.url as primary_image_url\n            FROM recipes r\n            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true\n            WHERE r.visibility = 'public'\n            ORDER BY r.created_at DESC\n            LIMIT $1 OFFSET $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "author_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "prep_time_min",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "cook_time_min",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "difficulty: Difficulty",
+        "type_info": {
+          "Custom": {
+            "name": "difficulty_type",
+            "kind": {
+              "Enum": [
+                "easy",
+                "medium",
+                "hard"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "primary_image_url",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "d4f8ea348ff33ad35ba92f52380b6b07e8a09ef6ea75014c582e1f250d49edbe"
+}

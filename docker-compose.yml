@@ -1,0 +1,136 @@
+# Hardened docker-compose for development
+# Security measures that don't impede local workflow
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: oppskrift:dev
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-oppskrift}:${POSTGRES_PASSWORD:-oppskrift}@db:5432/${POSTGRES_DB:-oppskrift}
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: oppskrift
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      RUST_LOG: info,oppskrift=debug
+      HOST: 0.0.0.0
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production-min32}
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      INSTANCE_DOMAIN: ${INSTANCE_DOMAIN:-localhost:3000}
+      INSTANCE_NAME: ${INSTANCE_NAME:-Oppskrift Dev}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - frontend
+      - backend
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    healthcheck:
+      test: ["CMD", "/app/oppskrift", "--health-check"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-oppskrift}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oppskrift}
+      POSTGRES_DB: ${POSTGRES_DB:-oppskrift}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+      - FOWNER
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+      - /run/postgresql:size=16m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oppskrift}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - backend
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin};
+      mc mb myminio/oppskrift --ignore-existing;
+      exit 0;
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    networks:
+      - backend
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true  # No external access - services communicate internally
+
+volumes:
+  postgres_data:
+  minio_data:

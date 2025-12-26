@@ -1,0 +1,27 @@
+# Gitleaks configuration for Oppskrift
+title = "Oppskrift Gitleaks Configuration"
+
+[allowlist]
+description = "Allowed patterns"
+paths = [
+    ".env.example",
+    "docker-compose.yml",
+]
+
+[[rules]]
+id = "jwt-secret"
+description = "JWT Secret"
+regex = '''JWT_SECRET\s*=\s*["']?[^"'\s]{33,}["']?'''
+keywords = ["jwt_secret", "JWT_SECRET"]
+
+[[rules]]
+id = "database-url"
+description = "Database URL with credentials"
+regex = '''postgres://[^:]+:[^@]+@'''
+keywords = ["DATABASE_URL", "postgres://"]
+
+[[rules]]
+id = "s3-secret"
+description = "S3 Secret Access Key"
+regex = '''S3_SECRET_ACCESS_KEY\s*=\s*["']?[^"'\s]+["']?'''
+keywords = ["S3_SECRET", "secret_access_key"]

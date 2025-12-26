@@ -1,0 +1,209 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}{% if let Some(_) = recipe %}Edit Recipe{% else %}Create Recipe{% endif %} - Oppskrift{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">
+        {% if let Some(_) = recipe %}Edit Recipe{% else %}Create a New Recipe{% endif %}
+    </h1>
+
+    <form
+        method="post"
+        action="{% if let Some(r) = recipe %}/recipes/{{ r.id }}{% else %}/recipes{% endif %}"
+        hx-post="{% if let Some(r) = recipe %}/api/v1/recipes/{{ r.id }}{% else %}/api/v1/recipes{% endif %}"
+        hx-target="#form-result"
+        hx-swap="innerHTML"
+        class="space-y-8"
+    >
+        {# Basic Info #}
+        <section class="space-y-4">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Basic Information</h2>
+
+            <div>
+                <label for="title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Title <span class="text-red-500" aria-hidden="true">*</span>
+                </label>
+                <input
+                    type="text"
+                    id="title"
+                    name="title"
+                    required
+                    maxlength="200"
+                    value="{% if let Some(r) = recipe %}{{ r.title }}{% endif %}"
+                    class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    aria-describedby="title-help"
+                />
+                <p id="title-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Give your recipe a descriptive name (max 200 characters)
+                </p>
+            </div>
+
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Description
+                </label>
+                <textarea
+                    id="description"
+                    name="description"
+                    rows="3"
+                    class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    aria-describedby="description-help"
+                >{% if let Some(r) = recipe %}{% if let Some(desc) = r.description %}{{ desc }}{% endif %}{% endif %}</textarea>
+                <p id="description-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    A brief summary of your recipe
+                </p>
+            </div>
+        </section>
+
+        {# Time and Difficulty #}
+        <section class="space-y-4">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Time &amp; Difficulty</h2>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label for="prep_time_min" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Prep Time (minutes)
+                    </label>
+                    <input
+                        type="number"
+                        id="prep_time_min"
+                        name="prep_time_min"
+                        min="0"
+                        value="{% if let Some(r) = recipe %}{% if let Some(pt) = r.prep_time_min %}{{ pt }}{% endif %}{% endif %}"
+                        class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    />
+                </div>
+
+                <div>
+                    <label for="cook_time_min" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Cook Time (minutes)
+                    </label>
+                    <input
+                        type="number"
+                        id="cook_time_min"
+                        name="cook_time_min"
+                        min="0"
+                        value="{% if let Some(r) = recipe %}{% if let Some(ct) = r.cook_time_min %}{{ ct }}{% endif %}{% endif %}"
+                        class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    />
+                </div>
+
+                <div>
+                    <label for="difficulty" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Difficulty
+                    </label>
+                    <select
+                        id="difficulty"
+                        name="difficulty"
+                        class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    >
+                        <option value="">Select...</option>
+                        {% match recipe %}
+                        {% when Some with (r) %}
+                            {% match r.difficulty %}
+                            {% when Some with (crate::models::Difficulty::Easy) %}
+                        <option value="easy" selected>Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                            {% when Some with (crate::models::Difficulty::Medium) %}
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                            {% when Some with (crate::models::Difficulty::Hard) %}
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard" selected>Hard</option>
+                            {% when None %}
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                            {% endmatch %}
+                        {% when None %}
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                        {% endmatch %}
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label for="servings" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Servings
+                </label>
+                <input
+                    type="text"
+                    id="servings"
+                    name="servings"
+                    maxlength="50"
+                    placeholder="e.g., 4 servings, 12 cookies"
+                    value="{% if let Some(r) = recipe %}{% if let Some(s) = r.servings %}{{ s }}{% endif %}{% endif %}"
+                    class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+            </div>
+        </section>
+
+        {# Visibility #}
+        <section class="space-y-4">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Visibility</h2>
+
+            <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2">
+                    <input
+                        type="radio"
+                        name="visibility"
+                        value="public"
+                        {% match recipe %}
+                        {% when Some with (r) %}
+                            {% match r.visibility %}
+                            {% when crate::models::Visibility::Public %}checked
+                            {% when crate::models::Visibility::Private %}
+                            {% endmatch %}
+                        {% when None %}checked
+                        {% endmatch %}
+                        class="text-primary-600 focus:ring-primary-500"
+                    />
+                    <span class="text-gray-700 dark:text-gray-300">Public</span>
+                </label>
+                <label class="flex items-center gap-2">
+                    <input
+                        type="radio"
+                        name="visibility"
+                        value="private"
+                        {% match recipe %}
+                        {% when Some with (r) %}
+                            {% match r.visibility %}
+                            {% when crate::models::Visibility::Public %}
+                            {% when crate::models::Visibility::Private %}checked
+                            {% endmatch %}
+                        {% when None %}
+                        {% endmatch %}
+                        class="text-primary-600 focus:ring-primary-500"
+                    />
+                    <span class="text-gray-700 dark:text-gray-300">Private</span>
+                </label>
+            </div>
+        </section>
+
+        {# Form Result / Errors #}
+        <div id="form-result" aria-live="polite"></div>
+
+        {# Submit #}
+        <div class="flex items-center gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+                type="submit"
+                class="px-6 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+            >
+                {% if let Some(_) = recipe %}Update Recipe{% else %}Create Recipe{% endif %}
+            </button>
+            <a
+                href="{% if let Some(r) = recipe %}/recipes/{{ r.id }}{% else %}/recipes{% endif %}"
+                class="px-6 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+            >
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

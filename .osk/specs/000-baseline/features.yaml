@@ -1,0 +1,252 @@
+# .osk/specs/000-baseline/features.yaml
+# Liste des features pour les commandes /osk-analyze
+# Généré par /osk-baseline le 2025-12-26
+
+metadata:
+  generated: "2025-12-26"
+  validated: true
+  total_features: 8
+
+features:
+  - id: "auth"
+    name: "Authentification JWT"
+    description: "Système d'authentification par tokens JWT"
+    criticite: "critical"
+    status: "pending"
+    raison_criticite: "Point d'entrée sécurité, credentials, tokens"
+    files:
+      - "src/api/middleware/auth.rs"
+    endpoints:
+      - method: "GET"
+        path: "/api/v1/users/me"
+      - method: "PATCH"
+        path: "/api/v1/users/me"
+    models:
+      - "Claims"
+      - "AuthUser"
+    sensitive_data: true
+    next_command: "/osk-analyze auth"
+
+  - id: "federation"
+    name: "Fédération ActivityPub"
+    description: "Endpoints ActivityPub pour fédération avec le Fediverse"
+    criticite: "critical"
+    status: "pending"
+    raison_criticite: "Exposition Internet, signatures cryptographiques, inbox publique"
+    files:
+      - "src/api/activitypub.rs"
+      - "src/api/webfinger.rs"
+      - "src/jobs/federation.rs"
+      - "src/lib/activitypub/**/*.rs"
+    endpoints:
+      - method: "GET"
+        path: "/ap/users/:id"
+      - method: "POST"
+        path: "/ap/users/:id/inbox"
+      - method: "GET"
+        path: "/ap/users/:id/outbox"
+      - method: "GET"
+        path: "/ap/users/:id/followers"
+      - method: "GET"
+        path: "/ap/users/:id/following"
+      - method: "GET"
+        path: "/ap/recipes/:id"
+      - method: "GET"
+        path: "/ap/books/:id"
+      - method: "POST"
+        path: "/ap/inbox"
+      - method: "GET"
+        path: "/.well-known/webfinger"
+    models:
+      - "PersonActor"
+      - "RecipeObject"
+      - "RecipeBookCollection"
+    sensitive_data: true
+    next_command: "/osk-analyze federation"
+
+  - id: "users"
+    name: "Gestion utilisateurs"
+    description: "CRUD utilisateurs et profils"
+    criticite: "high"
+    status: "pending"
+    raison_criticite: "Données personnelles RGPD"
+    files:
+      - "src/api/users.rs"
+      - "src/services/user_service.rs"
+      - "src/models/user.rs"
+    endpoints:
+      - method: "GET"
+        path: "/api/v1/users/me"
+      - method: "PATCH"
+        path: "/api/v1/users/me"
+      - method: "GET"
+        path: "/api/v1/users/:id"
+    models:
+      - "User"
+      - "UserProfile"
+      - "CreateUser"
+      - "UpdateUser"
+    sensitive_data: true
+    next_command: "/osk-analyze users"
+
+  - id: "images"
+    name: "Upload images"
+    description: "Gestion des images de recettes (upload S3)"
+    criticite: "high"
+    status: "pending"
+    raison_criticite: "Upload de fichiers, stockage externe"
+    files:
+      - "src/api/recipes.rs"
+      - "src/services/image_service.rs"
+      - "src/lib/storage.rs"
+      - "src/models/recipe_image.rs"
+    endpoints:
+      - method: "POST"
+        path: "/api/v1/recipes/:id/images"
+    models:
+      - "RecipeImage"
+      - "CreateRecipeImage"
+    sensitive_data: false
+    next_command: "/osk-analyze images"
+
+  - id: "social"
+    name: "Interactions sociales"
+    description: "Follow, save, share, feed d'activité"
+    criticite: "high"
+    status: "pending"
+    raison_criticite: "Relations entre utilisateurs, activités traçables"
+    files:
+      - "src/api/social.rs"
+      - "src/services/follow_service.rs"
+      - "src/services/saved_recipe_service.rs"
+      - "src/services/activity_service.rs"
+      - "src/models/follow.rs"
+      - "src/models/saved_recipe.rs"
+      - "src/models/activity.rs"
+    endpoints:
+      - method: "POST"
+        path: "/api/v1/users/:id/follow"
+      - method: "DELETE"
+        path: "/api/v1/users/:id/follow"
+      - method: "POST"
+        path: "/api/v1/recipes/:id/save"
+      - method: "DELETE"
+        path: "/api/v1/recipes/:id/save"
+      - method: "GET"
+        path: "/api/v1/users/:id/saved"
+      - method: "POST"
+        path: "/api/v1/recipes/:id/share"
+      - method: "GET"
+        path: "/api/v1/feed"
+    models:
+      - "Follow"
+      - "FollowCounts"
+      - "SavedRecipe"
+      - "Activity"
+    sensitive_data: true
+    next_command: "/osk-analyze social"
+
+  - id: "recipes"
+    name: "Gestion recettes"
+    description: "CRUD recettes avec ingrédients et instructions"
+    criticite: "medium"
+    status: "pending"
+    raison_criticite: "Fonctionnalité principale, CRUD standard"
+    files:
+      - "src/api/recipes.rs"
+      - "src/services/recipe_service.rs"
+      - "src/models/recipe.rs"
+      - "src/models/ingredient.rs"
+      - "src/models/instruction_step.rs"
+    endpoints:
+      - method: "GET"
+        path: "/api/v1/recipes"
+      - method: "POST"
+        path: "/api/v1/recipes"
+      - method: "GET"
+        path: "/api/v1/recipes/:id"
+      - method: "PUT"
+        path: "/api/v1/recipes/:id"
+      - method: "DELETE"
+        path: "/api/v1/recipes/:id"
+    models:
+      - "Recipe"
+      - "RecipeSummary"
+      - "CreateRecipe"
+      - "UpdateRecipe"
+      - "Ingredient"
+      - "InstructionStep"
+    sensitive_data: false
+    next_command: "/osk-analyze recipes"
+
+  - id: "books"
+    name: "Livres de recettes"
+    description: "Collections de recettes organisées"
+    criticite: "medium"
+    status: "pending"
+    raison_criticite: "CRUD standard, gestion de collections"
+    files:
+      - "src/api/books.rs"
+      - "src/services/book_service.rs"
+      - "src/models/recipe_book.rs"
+      - "src/models/book_recipe_entry.rs"
+    endpoints:
+      - method: "GET"
+        path: "/api/v1/books"
+      - method: "POST"
+        path: "/api/v1/books"
+      - method: "GET"
+        path: "/api/v1/books/:id"
+      - method: "PUT"
+        path: "/api/v1/books/:id"
+      - method: "DELETE"
+        path: "/api/v1/books/:id"
+      - method: "GET"
+        path: "/api/v1/books/:id/recipes"
+      - method: "POST"
+        path: "/api/v1/books/:id/recipes"
+      - method: "DELETE"
+        path: "/api/v1/books/:id/recipes/:recipe_id"
+    models:
+      - "RecipeBook"
+      - "RecipeBookSummary"
+      - "CreateRecipeBook"
+      - "UpdateRecipeBook"
+      - "BookRecipeEntry"
+    sensitive_data: false
+    next_command: "/osk-analyze books"
+
+  - id: "feeds"
+    name: "Syndication RSS/Atom"
+    description: "Flux RSS et Atom pour les recettes"
+    criticite: "low"
+    status: "pending"
+    raison_criticite: "Lecture seule, données publiques"
+    files:
+      - "src/api/feeds.rs"
+      - "src/api/oembed.rs"
+    endpoints:
+      - method: "GET"
+        path: "/feeds/recipes.rss"
+      - method: "GET"
+        path: "/feeds/recipes.atom"
+      - method: "GET"
+        path: "/feeds/users/:id/recipes.rss"
+      - method: "GET"
+        path: "/feeds/users/:id/recipes.atom"
+      - method: "GET"
+        path: "/oembed"
+    models: []
+    sensitive_data: false
+    next_command: "/osk-analyze feeds"
+
+# Ordre recommandé d'analyse (par criticité)
+analysis_order:
+  - "auth"
+  - "federation"
+  - "users"
+  - "images"
+  - "social"
+  - "recipes"
+  - "books"
+  - "feeds"

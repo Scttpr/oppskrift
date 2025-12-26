@@ -1,0 +1,232 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}{{ recipe.title }} - Oppskrift{% endblock %}
+
+{% block meta_description %}{% if let Some(desc) = recipe.description %}{{ desc }}{% else %}A delicious recipe on Oppskrift{% endif %}{% endblock %}
+
+{% block head %}
+{# Schema.org JSON-LD #}
+<script type="application/ld+json">
+{{ schema_json|safe }}
+</script>
+{% endblock %}
+
+{% block content %}
+<article class="max-w-4xl mx-auto">
+    {# Header #}
+    <header class="mb-8">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                    {{ recipe.title }}
+                </h1>
+
+                {# Author #}
+                {% if let Some(author) = author %}
+                <p class="mt-2 text-gray-600 dark:text-gray-400">
+                    by <a href="/users/{{ author.id }}" class="text-primary-600 dark:text-primary-400 hover:underline">{{ author.display_name }}</a>
+                </p>
+                {% endif %}
+            </div>
+
+            {# Actions #}
+            <div class="flex items-center gap-2">
+                {# Save/Share buttons (for logged-in users) #}
+                {% if let Some(_) = user %}
+                {# Save Button #}
+                {% if is_saved %}
+                <button
+                    hx-delete="/api/v1/recipes/{{ recipe.id }}/save"
+                    hx-swap="outerHTML"
+                    hx-target="this"
+                    class="px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900 border border-primary-300 dark:border-primary-600 rounded-md hover:bg-primary-100 dark:hover:bg-primary-800"
+                    title="Unsave recipe"
+                >
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                </button>
+                {% else %}
+                <button
+                    hx-post="/api/v1/recipes/{{ recipe.id }}/save"
+                    hx-swap="outerHTML"
+                    hx-target="this"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                    title="Save recipe"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                </button>
+                {% endif %}
+
+                {# Share Button #}
+                <button
+                    hx-post="/api/v1/recipes/{{ recipe.id }}/share"
+                    hx-swap="none"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                    title="Share recipe"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                </button>
+
+                {# Add to Book dropdown (for logged-in users) #}
+                <details class="relative dropdown">
+                    <summary class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 inline-flex items-center gap-2 cursor-pointer list-none">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                        Add to Book
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </summary>
+                    <div class="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                        <div class="py-1" role="menu">
+                            {% if !user_books.is_empty() %}
+                            {% for book in user_books %}
+                            <button
+                                hx-post="/api/v1/books/{{ book.id }}/recipes"
+                                hx-vals='{"recipe_id": "{{ recipe.id }}"}'
+                                hx-swap="none"
+                                hx-on::after-request="if(event.detail.successful) this.closest('details').removeAttribute('open')"
+                                class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                role="menuitem"
+                            >
+                                {{ book.title }}
+                            </button>
+                            {% endfor %}
+                            <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                            {% else %}
+                            <p class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">No books yet</p>
+                            {% endif %}
+                            <a
+                                href="/books/new"
+                                class="block px-4 py-2 text-sm text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                role="menuitem"
+                            >
+                                + Create New Book
+                            </a>
+                        </div>
+                    </div>
+                </details>
+                {% endif %}
+
+                {# Owner actions #}
+                {% if is_owner %}
+                <a
+                    href="/recipes/{{ recipe.id }}/edit"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                    Edit
+                </a>
+                <button
+                    hx-delete="/api/v1/recipes/{{ recipe.id }}"
+                    hx-confirm="Are you sure you want to delete this recipe?"
+                    hx-on::after-request="if(event.detail.successful) window.location.href = '/recipes'"
+                    class="px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-600 rounded-md hover:bg-red-50 dark:hover:bg-red-900"
+                >
+                    Delete
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Recipe Meta #}
+        <div class="mt-4 flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+            {% if let Some(difficulty) = recipe.difficulty %}
+            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
+                {% match difficulty %}
+                {% when crate::models::Difficulty::Easy %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                {% when crate::models::Difficulty::Medium %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                {% when crate::models::Difficulty::Hard %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                {% endmatch %}
+            ">
+                {{ difficulty }}
+            </span>
+            {% endif %}
+
+            {% if let Some(prep) = recipe.prep_time_min %}
+            <span class="flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {{ prep }} min prep
+            </span>
+            {% endif %}
+
+            {% if let Some(cook) = recipe.cook_time_min %}
+            <span class="flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                </svg>
+                {{ cook }} min cook
+            </span>
+            {% endif %}
+
+            {% if let Some(servings) = recipe.servings %}
+            <span class="flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                {{ servings }}
+            </span>
+            {% endif %}
+        </div>
+
+        {# Description #}
+        {% if let Some(desc) = recipe.description %}
+        <p class="mt-4 text-lg text-gray-700 dark:text-gray-300">
+            {{ desc }}
+        </p>
+        {% endif %}
+    </header>
+
+    {# Primary Image #}
+    {% if let Some(img) = primary_image %}
+    <figure class="mb-8">
+        <img
+            src="{{ img.url }}"
+            alt="{% if let Some(alt) = img.alt_text %}{{ alt }}{% else %}{{ recipe.title }}{% endif %}"
+            class="w-full rounded-lg shadow-md"
+        />
+    </figure>
+    {% endif %}
+
+    {# Recipe Content #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {# Ingredients Sidebar #}
+        <aside class="lg:col-span-1">
+            {% include "components/ingredient_list.html" %}
+        </aside>
+
+        {# Instructions #}
+        <div class="lg:col-span-2">
+            {% include "components/instruction_steps.html" %}
+        </div>
+    </div>
+
+    {# Additional Images #}
+    {% if images.len() > 1 %}
+    <section class="mt-12" aria-labelledby="gallery-heading">
+        <h2 id="gallery-heading" class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            More Photos
+        </h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {% for image in images %}
+            {% if !image.is_primary %}
+            <img
+                src="{{ image.url }}"
+                alt="{% if let Some(alt) = image.alt_text %}{{ alt }}{% else %}Recipe photo{% endif %}"
+                class="rounded-lg object-cover aspect-square"
+                loading="lazy"
+            />
+            {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</article>
+{% endblock %}

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en" class="{% block html_class %}{% endblock %}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{% block meta_description %}Oppskrift - A federated recipe sharing platform{% endblock %}">
+    <title>{% block title %}Oppskrift{% endblock %}</title>
+
+    <!-- Tailwind CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="/static">
+
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <!-- Skip Links for Keyboard Navigation (Constitution IV) -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <a href="#main-nav" class="skip-link">Skip to navigation</a>
+
+    <!-- Header / Banner Landmark -->
+    <header role="banner" class="bg-white dark:bg-gray-800 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex-shrink-0">
+                    <a href="/" class="text-xl font-bold text-primary-600 dark:text-primary-400">
+                        Oppskrift
+                    </a>
+                </div>
+
+                <!-- Navigation Landmark -->
+                <nav id="main-nav" role="navigation" aria-label="Main navigation" class="hidden md:flex space-x-8">
+                    <a href="/recipes" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        Recipes
+                    </a>
+                    <a href="/books" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        Books
+                    </a>
+                    <a href="/feed" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        Feed
+                    </a>
+                    {% block nav_items %}{% endblock %}
+                </nav>
+
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
+                    <!-- High Contrast Toggle (T139) -->
+                    <button
+                        type="button"
+                        id="contrast-toggle"
+                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        aria-label="Toggle high contrast mode"
+                        title="Toggle high contrast mode"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                    </button>
+                    {% block user_menu %}
+                    <a href="/login" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        Sign In
+                    </a>
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Landmark -->
+    <main id="main-content" role="main" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer / Contentinfo Landmark -->
+    <footer role="contentinfo" class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="text-gray-500 dark:text-gray-400 text-sm">
+                    &copy; {% block copyright_year %}2025{% endblock %} Oppskrift.
+                    <a href="/about" class="hover:text-primary-600">About</a> |
+                    <a href="/privacy" class="hover:text-primary-600">Privacy</a> |
+                    <a href="/terms" class="hover:text-primary-600">Terms</a>
+                </div>
+                <div class="text-gray-500 dark:text-gray-400 text-sm mt-4 md:mt-0">
+                    Powered by <a href="https://activitypub.rocks/" class="hover:text-primary-600">ActivityPub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- HTMX -->
+    <script src="/static/js/htmx.min.js"></script>
+
+    <!-- HTMX Configuration -->
+    <script>
+        // Configure HTMX for accessibility
+        htmx.config.defaultSwapStyle = 'innerHTML';
+        htmx.config.historyCacheSize = 10;
+
+        // Announce dynamic content changes to screen readers
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            const target = event.detail.target;
+            if (target.getAttribute('aria-live')) {
+                // Content will be announced automatically
+            }
+        });
+
+        // High Contrast Toggle (T139)
+        const contrastToggle = document.getElementById('contrast-toggle');
+        if (contrastToggle) {
+            // Check saved preference
+            if (localStorage.getItem('high-contrast') === 'true') {
+                document.documentElement.classList.add('high-contrast');
+            }
+
+            contrastToggle.addEventListener('click', function() {
+                document.documentElement.classList.toggle('high-contrast');
+                const isHighContrast = document.documentElement.classList.contains('high-contrast');
+                localStorage.setItem('high-contrast', isHighContrast);
+
+                // Announce change to screen readers
+                const announcement = isHighContrast ? 'High contrast mode enabled' : 'High contrast mode disabled';
+                const liveRegion = document.createElement('div');
+                liveRegion.setAttribute('role', 'status');
+                liveRegion.setAttribute('aria-live', 'polite');
+                liveRegion.className = 'sr-only';
+                liveRegion.textContent = announcement;
+                document.body.appendChild(liveRegion);
+                setTimeout(() => liveRegion.remove(), 1000);
+            });
+        }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

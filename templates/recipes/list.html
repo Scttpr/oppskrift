@@ -1,0 +1,84 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Recipes - Oppskrift{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    {# Header #}
+    <div class="flex items-center justify-between mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+            Recipes
+        </h1>
+
+        {% if let Some(_) = user %}
+        <a
+            href="/recipes/new"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            New Recipe
+        </a>
+        {% endif %}
+    </div>
+
+    {# Recipe Grid #}
+    <div
+        id="recipe-list"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+    >
+        {% for recipe in recipes %}
+        {% include "components/recipe_card.html" %}
+        {% endfor %}
+    </div>
+
+    {# Empty State #}
+    {% if recipes.is_empty() %}
+    <div class="text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+        <h2 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No recipes yet</h2>
+        <p class="mt-2 text-gray-500 dark:text-gray-400">Get started by creating your first recipe.</p>
+        {% if let Some(_) = user %}
+        <a
+            href="/recipes/new"
+            class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700"
+        >
+            Create Recipe
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# Pagination #}
+    {% if pagination.total_pages > 1 %}
+    <nav class="mt-8 flex items-center justify-center gap-2" aria-label="Pagination">
+        {% if pagination.has_prev %}
+        <a
+            href="?page={{ pagination.page - 1 }}"
+            class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+            aria-label="Previous page"
+        >
+            Previous
+        </a>
+        {% endif %}
+
+        <span class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+            Page {{ pagination.page }} of {{ pagination.total_pages }}
+        </span>
+
+        {% if pagination.has_next %}
+        <a
+            href="?page={{ pagination.page + 1 }}"
+            class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+            aria-label="Next page"
+        >
+            Next
+        </a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

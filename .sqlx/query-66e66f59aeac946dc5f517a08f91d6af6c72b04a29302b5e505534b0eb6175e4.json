@@ -1,0 +1,74 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                b.id, b.owner_id, b.title, b.description, b.cover_image_url,\n                b.visibility as \"visibility: Visibility\",\n                b.created_at,\n                COUNT(e.id) as \"recipe_count!\"\n            FROM recipe_books b\n            LEFT JOIN book_recipe_entries e ON e.book_id = b.id\n            WHERE b.owner_id = $1\n            GROUP BY b.id\n            ORDER BY b.title\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "cover_image_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "visibility: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility_type",
+            "kind": {
+              "Enum": [
+                "public",
+                "private"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "recipe_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "66e66f59aeac946dc5f517a08f91d6af6c72b04a29302b5e505534b0eb6175e4"
+}

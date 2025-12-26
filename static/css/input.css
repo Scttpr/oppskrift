@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Instance theming - default colors (can be overridden per-instance) */
+:root {
+  --color-primary-50: #fef2f2;
+  --color-primary-100: #fee2e2;
+  --color-primary-200: #fecaca;
+  --color-primary-300: #fca5a5;
+  --color-primary-400: #f87171;
+  --color-primary-500: #ef4444;
+  --color-primary-600: #dc2626;
+  --color-primary-700: #b91c1c;
+  --color-primary-800: #991b1b;
+  --color-primary-900: #7f1d1d;
+  --color-primary-950: #450a0a;
+}
+
+/* High contrast mode support (T139: system preference) */
+@media (prefers-contrast: more) {
+  :root {
+    --color-primary-500: #000000;
+    --color-primary-600: #000000;
+  }
+}
+
+/* High contrast mode toggle class (T139: user preference) */
+.high-contrast {
+  --color-primary-50: #ffffff;
+  --color-primary-100: #f5f5f5;
+  --color-primary-200: #e5e5e5;
+  --color-primary-300: #d4d4d4;
+  --color-primary-400: #525252;
+  --color-primary-500: #262626;
+  --color-primary-600: #171717;
+  --color-primary-700: #0a0a0a;
+  --color-primary-800: #000000;
+  --color-primary-900: #000000;
+  --color-primary-950: #000000;
+}
+
+.high-contrast * {
+  border-color: currentColor !important;
+}
+
+.high-contrast a,
+.high-contrast button {
+  text-decoration: underline;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus indicators - AAA compliant (3:1 contrast) */
+@layer base {
+  *:focus-visible {
+    outline: 3px solid var(--color-primary-600);
+    outline-offset: 2px;
+  }
+}
+
+/* Skip link styles */
+@layer components {
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-primary-700 focus:font-semibold focus:rounded focus:shadow-lg;
+  }
+}
