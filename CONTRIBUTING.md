@@ -37,10 +37,35 @@
    make css
    ```
 
-6. Run the server:
+6. Install git hooks:
+   ```bash
+   ./.githooks/install.sh
+   ```
+
+7. Run the server:
    ```bash
    cargo run
    ```
+
+### Git Hooks
+
+The project includes pre-commit hooks to catch issues before pushing to CI:
+
+```bash
+# Install hooks (run once after cloning)
+./.githooks/install.sh
+```
+
+The pre-commit hook runs:
+- `cargo fmt --check` - Verify formatting
+- `cargo clippy` - Lint checks
+
+For faster local checks without a database, generate the SQLx offline cache:
+```bash
+# With DATABASE_URL set and migrations run:
+cargo sqlx prepare
+git add .sqlx
+```
 
 ### Makefile Commands
 
@@ -76,6 +101,7 @@ type(scope): description
 - refactor: Code refactoring
 - test: Test changes
 - perf: Performance improvement
+- security: Security hardening
 ```
 
 ### Pull Requests

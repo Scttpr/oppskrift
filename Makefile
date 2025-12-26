@@ -1,4 +1,4 @@
-.PHONY: all build run dev css css-watch test clean seed reset-db
+.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop lint fmt audit check
 
 # Default target
 all: css build
@@ -23,9 +23,10 @@ css:
 css-watch:
 	./tailwindcss -i static/css/input.css -o static/css/main.css --watch
 
-# Run tests
-test:
-	cargo test
+# Run tests (ensures database is running)
+test: db
+	@sqlx migrate run --source migrations > /dev/null 2>&1 || true
+	cargo test --all-features
 
 # Clean build artifacts
 clean:
@@ -43,10 +44,34 @@ reset-db:
 	sqlx migrate run
 	cargo run -- --seed
 
-# Lint and format
-lint:
-	cargo clippy -- -D warnings
+# Database URL for local development
+export DATABASE_URL ?= postgres://oppskrift:oppskrift@localhost:5432/oppskrift
+
+# Start database container
+db:
+	@docker-compose up -d db
+	@echo "Waiting for database to be ready..."
+	@until docker-compose exec -T db pg_isready -U oppskrift > /dev/null 2>&1; do sleep 1; done
+	@echo "Database is ready"
+
+# Stop database container
+db-stop:
+	docker-compose stop db
+
+# Run migrations (starts db if needed)
+migrate: db
+	sqlx migrate run
+
+# Lint and format (ensures database is running for SQLx)
+lint: db
+	@sqlx migrate run --source migrations > /dev/null 2>&1 || true
+	cargo clippy --all-features -- -D warnings
 	cargo fmt -- --check
+
+# Quick check (compile only, with database)
+check: db
+	@sqlx migrate run --source migrations > /dev/null 2>&1 || true
+	cargo check --all-features
 
 # Format code
 fmt:
