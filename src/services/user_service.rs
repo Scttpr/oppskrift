@@ -271,6 +271,7 @@ impl UserService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::MeasurementPref;
 
     #[test]
     fn test_create_user_input() {

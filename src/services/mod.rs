@@ -18,7 +18,7 @@ pub mod session_service;
 pub mod user_service;
 
 pub use activity_service::ActivityService;
-pub use auth_service::{AuthError, AuthService};
+pub use auth_service::{AuthError, AuthService, LoginResult};
 pub use book_service::BookService;
 pub use email_service::EmailService;
 pub use follow_service::FollowService;
