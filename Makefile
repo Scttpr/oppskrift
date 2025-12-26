@@ -64,7 +64,8 @@ db-stop:
 
 # Start all services (builds app first)
 up:
-	$(COMPOSE) up -d --build
+	$(COMPOSE) build app
+	$(COMPOSE) up -d
 
 # Stop all services
 down:
