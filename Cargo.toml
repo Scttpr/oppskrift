@@ -78,6 +78,10 @@ tower_governor = "0.4"
 # JWT (auth middleware stub)
 jsonwebtoken = "9"
 
+# RSA key generation for ActivityPub signatures
+rsa = "0.9"
+rand = "0.8"
+
 [dev-dependencies]
 tokio-test = "0.4"
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
