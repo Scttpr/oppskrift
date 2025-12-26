@@ -26,6 +26,9 @@ async fn main() -> anyhow::Result<()> {
     // Load environment variables from .env file
     dotenvy::dotenv().ok();
 
+    // Load and validate configuration (panics if required vars missing)
+    let config = lib::Config::from_env();
+
     // Initialize tracing
     tracing_subscriber::registry()
         .with(
@@ -45,14 +48,8 @@ async fn main() -> anyhow::Result<()> {
     // Build the router
     let app = create_router(state);
 
-    // Get host and port from environment
-    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-    let port: u16 = std::env::var("PORT")
-        .unwrap_or_else(|_| "3000".to_string())
-        .parse()
-        .expect("PORT must be a valid number");
-
-    let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
+    // Use validated config for host and port
+    let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
     tracing::info!("Listening on http://{}", addr);
 
     // Start the server
