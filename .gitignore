@@ -11,6 +11,10 @@ Cargo.lock
 .idea/
 .vscode/
 *.iml
+.claude
+.osk/domaines
+.osk/prompts
+.osk/templates
 
 # Environment
 .env
