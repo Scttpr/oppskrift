@@ -43,7 +43,7 @@ rust_decimal = { version = "1", features = ["serde", "db-postgres"] }
 rust_decimal_macros = "1"
 
 # Validation
-validator = { version = "0.18", features = ["derive"] }
+validator = { version = "0.20", features = ["derive"] }
 
 # OpenAPI documentation
 utoipa = { version = "5", features = ["axum_extras", "uuid", "chrono"] }
@@ -56,8 +56,8 @@ anyhow = "1"
 # Async traits
 async-trait = "0.1"
 
-# Image processing
-image = "0.25"
+# Image processing (only common formats, excludes unmaintained avif/ravif)
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 
 # S3-compatible storage
 aws-sdk-s3 = "1"
