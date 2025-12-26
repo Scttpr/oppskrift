@@ -1,0 +1,137 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE recipes\n            SET\n                title = COALESCE($2, title),\n                description = COALESCE($3, description),\n                visibility = COALESCE($4, visibility),\n                prep_time_min = COALESCE($5, prep_time_min),\n                cook_time_min = COALESCE($6, cook_time_min),\n                servings = COALESCE($7, servings),\n                difficulty = COALESCE($8, difficulty),\n                updated_at = NOW()\n            WHERE id = $1\n            RETURNING\n                id, author_id, title, description,\n                visibility as \"visibility: Visibility\",\n                prep_time_min, cook_time_min, servings,\n                difficulty as \"difficulty: Difficulty\",\n                created_at, updated_at, ap_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "author_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "visibility: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility_type",
+            "kind": {
+              "Enum": [
+                "public",
+                "private"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "prep_time_min",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "cook_time_min",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "servings",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "difficulty: Difficulty",
+        "type_info": {
+          "Custom": {
+            "name": "difficulty_type",
+            "kind": {
+              "Enum": [
+                "easy",
+                "medium",
+                "hard"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "ap_id",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Text",
+        {
+          "Custom": {
+            "name": "visibility_type",
+            "kind": {
+              "Enum": [
+                "public",
+                "private"
+              ]
+            }
+          }
+        },
+        "Int4",
+        "Int4",
+        "Varchar",
+        {
+          "Custom": {
+            "name": "difficulty_type",
+            "kind": {
+              "Enum": [
+                "easy",
+                "medium",
+                "hard"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "21c2a3f6c53672b9166de8453e76ad3c08f444d63a6c0197837c9b0b03e0c908"
+}

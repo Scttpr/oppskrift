@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM instruction_steps WHERE recipe_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fab9f92cbb4aa58fb06a26aabb20c969e525d1effa0a68adff87aecb27e1ef98"
+}

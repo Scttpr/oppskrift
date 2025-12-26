@@ -19,15 +19,17 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 RUN rm -rf src
 
-# Copy source code
+# Copy source code and SQLx offline data
 COPY src ./src
 COPY templates ./templates
 COPY migrations ./migrations
+COPY .sqlx ./.sqlx
 
 # Touch main.rs to force rebuild
 RUN touch src/main.rs
 
-# Build the application
+# Build the application (offline mode - no database needed)
+ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
 # Download and verify Tailwind CSS
