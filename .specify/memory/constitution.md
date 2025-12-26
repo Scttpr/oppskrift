@@ -1,31 +1,30 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.1.0 → 1.2.0
+Version change: 1.2.0 → 1.3.0
 
 Modified principles:
-- IV. User Experience: Strengthened accessibility requirements to "state-of-the-art"
+- II. Security by Default: Integrated OpenSecKit (osk) workflow reference
+
+Added sections:
+- VII. Security Integration (OpenSecKit): New principle for mandatory security workflow
 
 Added requirements:
-- WCAG 2.1 AAA as target (AA minimum)
-- Automated + manual accessibility testing required
-- Visible focus indicators (3:1 contrast)
-- Alt text requirements for all images
-- Form label and error association
-- Color not sole information carrier
-- High contrast user preference
-- Skip links for keyboard navigation
-- ARIA landmarks for page regions
+- All /speckit.* commands MUST integrate corresponding /osk-* commands
+- Security artifacts (.osk/) MUST be generated alongside feature specs
+- STRIDE threat modeling MUST precede implementation planning
+- Risk analysis MUST be completed before task generation
 
 Removed sections: None
 
 Templates requiring updates:
-- specs/*/spec.md: Update success criteria for AAA target
-- specs/*/tasks.md: Add accessibility validation tasks
-- specs/*/plan.md: Note accessibility requirements in constitution check
+- .specify/templates/plan-template.md: ✅ Constitution Check section already references security
+- .specify/templates/spec-template.md: ⚠ Add security requirements section reference
+- .specify/templates/tasks-template.md: ⚠ Add security hardening phase reference
 
 Follow-up TODOs:
-- Update 001-recipe-sharing spec, plan, and tasks for new accessibility standards
+- Update spec-template.md to include security requirements section
+- Update tasks-template.md to include security hardening phase from osk
 -->
 
 # Oppskrift Constitution
@@ -46,7 +45,7 @@ Oppskrift MUST implement ActivityPub as the primary federation protocol for all 
 
 ### II. Security by Default
 
-All features MUST be secure without requiring additional configuration or opt-in from users or administrators.
+All features MUST be secure without requiring additional configuration or opt-in from users or administrators. Security MUST be integrated from the design phase using OpenSecKit (osk) workflows.
 
 - Authentication MUST use modern, proven standards (OAuth 2.0, OIDC, or equivalent)
 - All network communication MUST use TLS 1.3 or higher; HTTP MUST redirect to HTTPS
@@ -55,8 +54,10 @@ All features MUST be secure without requiring additional configuration or opt-in
 - Rate limiting MUST be enabled by default on all public endpoints
 - Secrets, tokens, and credentials MUST never appear in logs, error messages, or client responses
 - Dependencies MUST be regularly audited for known vulnerabilities
+- Security requirements MUST be defined before implementation using `/osk-specify`
+- Threat modeling MUST be performed for new features using `/osk-analyze`
 
-**Rationale**: Users trust the platform with personal data and social connections. Security failures damage that trust irreparably and expose users to harm.
+**Rationale**: Users trust the platform with personal data and social connections. Security failures damage that trust irreparably and expose users to harm. Integrating security from design prevents costly retrofitting.
 
 ### III. Standards Compliance
 
@@ -119,6 +120,41 @@ Oppskrift MUST embody open source values in code, community, and governance.
 
 **Rationale**: Open source is more than a license—it is a commitment to transparency, collaboration, and user empowerment.
 
+### VII. Security Integration (OpenSecKit)
+
+All feature development workflows MUST integrate OpenSecKit (osk) security tooling from the design phase. Security is not a phase—it is woven into every step.
+
+- Every `/speckit.*` command MUST trigger or reference corresponding `/osk-*` security workflows
+- `/speckit.specify` MUST be followed by `/osk-analyze` for threat modeling before planning
+- `/speckit.plan` MUST include a security requirements section referencing `.osk/specs/` artifacts
+- `/speckit.tasks` MUST include security hardening tasks from `/osk-tasks` output
+- `/speckit.implement` MUST validate security controls are implemented per `/osk-harden` guidance
+- Security artifacts MUST be stored in `.osk/specs/[feature]/` alongside feature specs
+- Security documentation MUST be maintained in `docs/security/` for operational guidance
+
+**Workflow Integration**:
+
+| Speckit Command | Required OSK Integration | Artifacts |
+|-----------------|--------------------------|-----------|
+| `/speckit.specify` | `/osk-analyze` (threat model) | `.osk/specs/*/threats.md`, `risks.md` |
+| `/speckit.plan` | `/osk-specify` (requirements) | `.osk/specs/*/requirements.md`, `testing.md` |
+| `/speckit.tasks` | `/osk-tasks` (security tasks) | Merged into feature `tasks.md` |
+| `/speckit.implement` | `/osk-harden` + `/osk-implement` | Security controls verified |
+
+**OSK Commands Reference**:
+
+- `/osk-baseline` - Initial security posture assessment
+- `/osk-analyze` - STRIDE threat modeling and risk analysis
+- `/osk-specify` - Security requirements definition
+- `/osk-harden` - Hardening recommendations
+- `/osk-tasks` - Security task generation
+- `/osk-implement` - Security implementation guidance
+- `/osk-dashboard` - Security posture dashboard
+- `/osk-rgpd` - GDPR compliance checks
+- `/osk-rgs` - RGS (French government) compliance
+
+**Rationale**: Security vulnerabilities discovered in production are orders of magnitude more expensive to fix than those caught in design. Mandatory integration ensures security is never an afterthought and creates auditable artifacts for compliance.
+
 ## Technical Constraints
 
 ### Technology Requirements
@@ -144,6 +180,7 @@ Oppskrift MUST embody open source values in code, community, and governance.
 - Code review MUST be required for changes to security-sensitive components
 - Linting and formatting MUST be enforced via CI; style decisions MUST NOT be manual review items
 - Test coverage MUST be maintained or improved; coverage regressions MUST be justified
+- Security scans (SAST, SCA) MUST pass; findings above configured severity MUST block merge
 
 ### Commit Conventions
 
@@ -163,8 +200,9 @@ type(scope): description
 - `chore`: Build, tooling, dependencies, config
 - `perf`: Performance improvement
 - `ci`: CI/CD configuration
+- `security`: Security-related changes (new type for osk integration)
 
-**Scope** SHOULD match the task category or module (e.g., `recipe`, `auth`, `feed`, `api`, `db`).
+**Scope** SHOULD match the task category or module (e.g., `recipe`, `auth`, `feed`, `api`, `db`, `osk`).
 
 **Rules**:
 - Each task from tasks.md MUST result in exactly one commit
@@ -179,6 +217,7 @@ fix(auth): prevent self-follow in database constraint
 chore(db): create user table migration
 test(recipe): add seed data for limit testing
 docs(api): add openapi documentation generation
+security(osk): add http signature verification
 ```
 
 ### Documentation Requirements
@@ -187,12 +226,14 @@ docs(api): add openapi documentation generation
 - Configuration options MUST be documented with types, defaults, and effects
 - Architecture decisions MUST be recorded in ADRs (Architecture Decision Records)
 - User-facing changes MUST include changelog entries
+- Security requirements MUST be documented in `.osk/specs/` per feature
 
 ### Release Process
 
 - Releases MUST follow semantic versioning (MAJOR.MINOR.PATCH)
 - Breaking changes MUST be documented and migration paths provided
 - Security releases MUST be expedited and clearly communicated
+- Security audit MUST be performed before major releases using `/osk-dashboard`
 
 ## Governance
 
@@ -210,6 +251,7 @@ This constitution establishes the non-negotiable principles for Oppskrift develo
 - Pull requests MUST include a constitution compliance check for significant changes
 - Architecture Decision Records MUST reference relevant constitutional principles
 - Complexity beyond what principles require MUST be justified in writing
+- Security requirements from OSK MUST be validated before merge
 
 ### Versioning Policy
 
@@ -217,4 +259,4 @@ This constitution establishes the non-negotiable principles for Oppskrift develo
 - **MINOR**: New principle added, material expansion of existing guidance
 - **PATCH**: Clarifications, wording improvements, typo fixes
 
-**Version**: 1.2.0 | **Ratified**: 2025-12-25 | **Last Amended**: 2025-12-25
+**Version**: 1.3.0 | **Ratified**: 2025-12-25 | **Last Amended**: 2025-12-26
