@@ -5,51 +5,44 @@
 ### Prerequisites
 
 - Rust 1.75+ (stable)
-- PostgreSQL 15+
-- Docker and Docker Compose (optional)
-- Tailwind CSS CLI
+- Docker or Podman with Compose
+- Tailwind CSS CLI (for CSS changes)
 
 ### Quick Start
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/scttpr/oppskrift.git
-   cd oppskrift
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/scttpr/oppskrift.git
+cd oppskrift
 
-2. Copy environment file:
-   ```bash
-   cp .env.example .env
-   ```
+# Copy environment file
+cp .env.example .env
 
-3. Start PostgreSQL (Docker):
-   ```bash
-   docker-compose up -d postgres
-   ```
+# Install git hooks
+./.githooks/install.sh
 
-4. Run migrations:
-   ```bash
-   sqlx migrate run
-   ```
+# Start database
+make db
 
-5. Build CSS:
-   ```bash
-   make css
-   ```
+# Run migrations
+make migrate
 
-6. Install git hooks:
-   ```bash
-   ./.githooks/install.sh
-   ```
+# Run the app
+make run
+```
 
-7. Run the server:
-   ```bash
-   cargo run
-   ```
+The app will be available at http://localhost:3000
 
-### Git Hooks
+### Alternative: Full Docker Setup
 
-The project includes pre-commit hooks to catch issues before pushing to CI:
+```bash
+# Start everything (db, minio, app)
+make up
+```
+
+## Git Hooks
+
+Pre-commit hooks ensure code quality before pushing:
 
 ```bash
 # Install hooks (run once after cloning)
@@ -57,35 +50,78 @@ The project includes pre-commit hooks to catch issues before pushing to CI:
 ```
 
 The pre-commit hook runs:
-- `cargo fmt --check` - Verify formatting
-- `cargo clippy` - Lint checks
+- `cargo clippy --all-features -- -D warnings`
+- `cargo fmt -- --check`
 
-For faster local checks without a database, generate the SQLx offline cache:
+## Makefile Commands
+
+### Development
+
 ```bash
-# With DATABASE_URL set and migrations run:
+make run         # Build CSS and run app
+make dev         # Run with auto-reload (requires cargo-watch)
+make css         # Build Tailwind CSS
+make css-watch   # Watch CSS for changes
+```
+
+### Database
+
+```bash
+make db          # Start database container
+make db-stop     # Stop database container
+make migrate     # Run migrations
+make seed        # Seed with test data
+make reset-db    # Drop, recreate, migrate, and seed
+```
+
+### Docker/Podman
+
+```bash
+make up          # Build and start all services
+make rebuild     # Full rebuild (no cache)
+make down        # Stop all services
+```
+
+### Quality
+
+```bash
+make lint        # Run clippy + format check
+make test        # Run all tests (67 tests)
+make check       # Compile check only
+make fmt         # Format code
+make audit       # Security audit
+```
+
+### Build
+
+```bash
+make build       # Build release binary
+make clean       # Clean build artifacts
+```
+
+## SQLx Offline Mode
+
+For faster local checks without a database connection:
+
+```bash
+# Generate offline cache (with database running)
 cargo sqlx prepare
+
+# Commit the cache
 git add .sqlx
 ```
 
-### Makefile Commands
-
-```bash
-make dev       # Run development server with auto-reload
-make css       # Build Tailwind CSS
-make seed      # Seed database with test data
-make reset-db  # Drop, migrate, and seed database
-make test      # Run tests
-make lint      # Run clippy and rustfmt
-```
+The Docker build uses offline mode automatically.
 
 ## Code Style
 
 ### Rust
 
 - Follow Rust standard formatting (rustfmt)
-- Use clippy with default lints
+- Use clippy with `-D warnings` (treat warnings as errors)
 - Prefer descriptive variable names
 - Write doc comments for public items
+- Unit tests inline with `#[cfg(test)] mod tests { ... }`
 
 ### Commits
 
@@ -94,6 +130,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 type(scope): description
 
+Types:
 - feat: New feature
 - fix: Bug fix
 - docs: Documentation
@@ -109,7 +146,7 @@ type(scope): description
 1. Create a feature branch from `main`
 2. Make focused, atomic commits
 3. Write/update tests as needed
-4. Ensure CI passes
+4. Ensure `make lint` and `make test` pass
 5. Request review
 
 ## Project Structure
@@ -117,14 +154,22 @@ type(scope): description
 ```
 src/
 ├── api/          # REST API endpoints
+│   ├── auth.rs       # Authentication
+│   ├── recipes.rs    # Recipe CRUD
+│   ├── books.rs      # Recipe books
+│   ├── social.rs     # Follow, save, share
+│   ├── activitypub.rs# Federation
+│   ├── feeds.rs      # RSS/Atom
+│   ├── webfinger.rs  # Discovery
+│   └── oembed.rs     # Embeds
 ├── handlers/     # HTML page handlers
-├── jobs/         # Background job processing
-├── lib/          # Shared utilities
+├── services/     # Business logic
 ├── models/       # Database models
-└── services/     # Business logic
+├── jobs/         # Background jobs
+└── lib/          # Shared utilities
 
 templates/        # Askama HTML templates
-static/           # Static assets (CSS, JS)
+static/           # CSS, JS (HTMX vendored)
 migrations/       # SQLx database migrations
 ```
 
@@ -132,15 +177,29 @@ migrations/       # SQLx database migrations
 
 ```bash
 # Run all tests
-cargo test
+make test
 
 # Run specific test
 cargo test test_name
 
 # Run with logging
 RUST_LOG=debug cargo test
+
+# Run specific module tests
+cargo test models::recipe
 ```
+
+Current test count: 67 tests
+
+## Adding New Features
+
+1. Create migration if needed: `sqlx migrate add feature_name`
+2. Add model in `src/models/`
+3. Add service in `src/services/`
+4. Add API endpoint in `src/api/`
+5. Add tests inline with `#[cfg(test)]`
+6. Update SQLx offline cache: `cargo sqlx prepare`
 
 ## License
 
-This project is licensed under AGPL-3.0. Contributions are welcome under the same license.
+This project is licensed under AGPL-3.0-or-later. Contributions are welcome under the same license.

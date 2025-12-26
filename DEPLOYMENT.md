@@ -1,31 +1,129 @@
 # Deployment Guide
 
+## Quick Start (Development)
+
+```bash
+# Start all services with Docker/Podman
+make up
+
+# App available at http://localhost:3000
+```
+
 ## Prerequisites
 
-- Docker and Docker Compose
-- PostgreSQL 15+
-- S3-compatible storage (AWS S3, MinIO, etc.)
+- Docker or Podman with Compose
+- PostgreSQL 15+ (or use containerized)
+- S3-compatible storage (MinIO included for dev)
 
 ## Environment Variables
 
-```bash
-# Database
-DATABASE_URL=postgres://user:password@localhost:5432/oppskrift
+Copy `.env.example` to `.env` and configure:
 
-# Application
+```bash
+# Required
+DATABASE_URL=postgres://oppskrift:oppskrift@localhost:5432/oppskrift
+JWT_SECRET=your-secret-minimum-32-characters
+S3_BUCKET=oppskrift
+
+# Optional (have defaults)
+S3_ENDPOINT=http://localhost:9000
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_REGION=us-east-1
+
 HOST=0.0.0.0
 PORT=3000
-BASE_URL=https://your-domain.com
+BASE_URL=http://localhost:3000
+RUST_LOG=info,oppskrift=debug
 
-# S3 Storage
-S3_BUCKET=oppskrift-images
-S3_REGION=us-east-1
-S3_ENDPOINT=https://s3.amazonaws.com
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
+# Federation
+INSTANCE_DOMAIN=localhost:3000
+INSTANCE_NAME=Oppskrift Dev
+```
 
-# JWT (for future auth)
-JWT_SECRET=your-jwt-secret
+## Docker Compose
+
+The included `docker-compose.yml` is hardened but dev-friendly:
+
+```bash
+# Start all services
+make up
+
+# Rebuild from scratch
+make rebuild
+
+# Stop everything
+make down
+
+# View logs
+podman logs oppskrift_app_1
+```
+
+### Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| app | 3000 | Oppskrift application |
+| db | 5432 | PostgreSQL database |
+| minio | 9000/9001 | S3-compatible storage |
+
+### Security Features
+
+- `no-new-privileges` - Prevent privilege escalation
+- `cap_drop: ALL` - Drop all capabilities
+- `read_only: true` - Read-only root filesystem
+- Internal network for backend services
+- Localhost-only port bindings
+
+## Production Deployment
+
+### 1. Build Release Binary
+
+```bash
+cargo build --release
+```
+
+### 2. Database Setup
+
+```bash
+# Run migrations
+sqlx migrate run
+
+# Or with SQLx CLI
+sqlx database create
+sqlx migrate run
+```
+
+### 3. Reverse Proxy
+
+Configure nginx/Caddy with TLS:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### 4. Run Application
+
+```bash
+# Direct
+./target/release/oppskrift
+
+# Or with systemd
+sudo systemctl start oppskrift
 ```
 
 ## Security Requirements
@@ -34,63 +132,20 @@ JWT_SECRET=your-jwt-secret
 
 #### PostgreSQL
 
-PostgreSQL data encryption must be configured at the storage level:
-
-1. **AWS RDS**: Enable encryption at instance creation
-   ```
-   aws rds create-db-instance \
-     --storage-encrypted \
-     --kms-key-id alias/your-key
-   ```
-
-2. **Self-hosted**: Use encrypted filesystem (LUKS, dm-crypt)
-   ```bash
-   cryptsetup luksFormat /dev/sdX
-   cryptsetup open /dev/sdX pgdata
-   mkfs.ext4 /dev/mapper/pgdata
-   mount /dev/mapper/pgdata /var/lib/postgresql/data
-   ```
-
-3. **Docker**: Mount encrypted volume
-   ```yaml
-   volumes:
-     postgres_data:
-       driver: local
-       driver_opts:
-         type: none
-         device: /encrypted/postgres
-         o: bind
-   ```
+- **AWS RDS**: Enable encryption at instance creation
+- **Self-hosted**: Use LUKS/dm-crypt encrypted filesystem
+- **Docker**: Mount encrypted volume
 
 #### S3 Storage
 
-Enable server-side encryption for all buckets:
-
-1. **AWS S3**: Enable default encryption
-   ```bash
-   aws s3api put-bucket-encryption \
-     --bucket oppskrift-images \
-     --server-side-encryption-configuration '{
-       "Rules": [{
-         "ApplyServerSideEncryptionByDefault": {
-           "SSEAlgorithm": "aws:kms",
-           "KMSMasterKeyID": "alias/your-key"
-         }
-       }]
-     }'
-   ```
-
-2. **MinIO**: Enable auto-encryption
-   ```bash
-   mc admin config set myminio/ storage_class standard=EC:0
-   mc encrypt set sse-s3 myminio/oppskrift-images
-   ```
+- **AWS S3**: Enable default bucket encryption (SSE-S3 or SSE-KMS)
+- **MinIO**: Enable auto-encryption with `mc encrypt set`
 
 ### Encryption in Transit
 
 - All traffic must use TLS 1.2+
-- Configure reverse proxy (nginx/caddy) with valid certificates
 - Enable HSTS headers
+- Use valid certificates (Let's Encrypt)
 
 ### Access Control
 
@@ -98,32 +153,45 @@ Enable server-side encryption for all buckets:
 - Rotate credentials regularly
 - Enable audit logging
 
-## Deployment Steps
-
-### Docker Compose (Development)
+## Health Checks
 
 ```bash
-docker-compose up -d
+# Check app responds
+curl http://localhost:3000/recipes
+
+# Check database
+podman exec oppskrift_db_1 pg_isready -U oppskrift
 ```
 
-### Production
+## Troubleshooting
 
-1. Build the release binary:
-   ```bash
-   cargo build --release
-   ```
+### Container won't start
 
-2. Run migrations:
-   ```bash
-   sqlx migrate run
-   ```
+```bash
+# Check logs
+podman logs oppskrift_app_1
 
-3. Start the server:
-   ```bash
-   ./target/release/oppskrift
-   ```
+# Common issues:
+# - JWT_SECRET too short (needs 32+ chars)
+# - Database not ready (wait for healthy status)
+# - Port already in use
+```
 
-## Monitoring
+### Database connection failed
 
-- Health check: `GET /health`
-- Metrics: Configure tracing export to your observability stack
+```bash
+# Verify database is running
+make db
+
+# Check connectivity
+psql $DATABASE_URL -c "SELECT 1"
+```
+
+### Podman "container already exists"
+
+```bash
+# Clean up and restart
+make down
+podman system prune -f
+make up
+```
