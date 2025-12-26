@@ -68,13 +68,11 @@ impl HttpSignature {
                     method.to_lowercase(),
                     path
                 ));
-            } else {
-                if let Some((_, value)) = headers
-                    .iter()
-                    .find(|(k, _)| k.to_lowercase() == *header_name)
-                {
-                    parts.push(format!("{}: {}", header_name, value));
-                }
+            } else if let Some((_, value)) = headers
+                .iter()
+                .find(|(k, _)| k.to_lowercase() == *header_name)
+            {
+                parts.push(format!("{}: {}", header_name, value));
             }
         }
 
@@ -177,10 +175,8 @@ impl SigningContext {
                     method.to_lowercase(),
                     path
                 ));
-            } else {
-                if let Some((_, value)) = header_values.iter().find(|(k, _)| k == name) {
-                    parts.push(format!("{}: {}", name, value));
-                }
+            } else if let Some((_, value)) = header_values.iter().find(|(k, _)| k == name) {
+                parts.push(format!("{}: {}", name, value));
             }
         }
 

@@ -190,6 +190,8 @@ fn format_ingredient(ingredient: &Ingredient) -> String {
 
 #[cfg(test)]
 mod tests {
+    use uuid::Uuid;
+
     use super::*;
 
     #[test]

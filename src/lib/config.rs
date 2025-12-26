@@ -59,9 +59,6 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::env;
-
     #[test]
     fn test_jwt_secret_length_validation() {
         // This test documents the validation requirement

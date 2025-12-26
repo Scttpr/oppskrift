@@ -75,10 +75,8 @@ impl BookService {
         let book = Self::get_by_id(pool, id).await?;
 
         // Check visibility: private books only visible to owner
-        if book.visibility == Visibility::Private {
-            if viewer_id != Some(book.owner_id) {
-                return Err(AppError::NotFound(format!("Recipe book {} not found", id)));
-            }
+        if book.visibility == Visibility::Private && viewer_id != Some(book.owner_id) {
+            return Err(AppError::NotFound(format!("Recipe book {} not found", id)));
         }
 
         Ok(book)
@@ -405,8 +403,6 @@ impl BookService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_service_exists() {
         // Just verify the module compiles

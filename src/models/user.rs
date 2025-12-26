@@ -5,18 +5,13 @@ use uuid::Uuid;
 use validator::Validate;
 
 /// User measurement preference
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, Default)]
 #[sqlx(type_name = "measurement_pref", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum MeasurementPref {
+    #[default]
     Metric,
     Imperial,
-}
-
-impl Default for MeasurementPref {
-    fn default() -> Self {
-        Self::Metric
-    }
 }
 
 /// User entity - represents both local and federated users

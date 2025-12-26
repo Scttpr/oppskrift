@@ -121,10 +121,8 @@ impl RecipeService {
         let recipe = Self::get_by_id(pool, id).await?;
 
         // Check visibility: private recipes only visible to author
-        if recipe.visibility == Visibility::Private {
-            if viewer_id != Some(recipe.author_id) {
-                return Err(AppError::NotFound(format!("Recipe {} not found", id)));
-            }
+        if recipe.visibility == Visibility::Private && viewer_id != Some(recipe.author_id) {
+            return Err(AppError::NotFound(format!("Recipe {} not found", id)));
         }
 
         Ok(recipe)
