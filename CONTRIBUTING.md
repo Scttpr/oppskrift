@@ -86,7 +86,7 @@ make down        # Stop all services
 
 ```bash
 make lint        # Run clippy + format check
-make test        # Run all tests (67 tests)
+make test        # Run all tests
 make check       # Compile check only
 make fmt         # Format code
 make audit       # Security audit
@@ -154,7 +154,8 @@ Types:
 ```
 src/
 ├── api/          # REST API endpoints
-│   ├── auth.rs       # Authentication
+│   ├── auth.rs       # Authentication (register, login, logout)
+│   ├── account.rs    # Account management
 │   ├── recipes.rs    # Recipe CRUD
 │   ├── books.rs      # Recipe books
 │   ├── social.rs     # Follow, save, share
@@ -164,6 +165,9 @@ src/
 │   └── oembed.rs     # Embeds
 ├── handlers/     # HTML page handlers
 ├── services/     # Business logic
+│   ├── auth_service.rs    # Registration, login, sessions
+│   ├── password_service.rs# Password hashing
+│   └── session_service.rs # Session management
 ├── models/       # Database models
 ├── jobs/         # Background jobs
 └── lib/          # Shared utilities
@@ -171,6 +175,7 @@ src/
 templates/        # Askama HTML templates
 static/           # CSS, JS (HTMX vendored)
 migrations/       # SQLx database migrations
+tests/            # Integration and security tests
 ```
 
 ## Testing
@@ -187,9 +192,10 @@ RUST_LOG=debug cargo test
 
 # Run specific module tests
 cargo test models::recipe
-```
 
-Current test count: 67 tests
+# Run auth tests only
+cargo test --test login_test --test registration_test
+```
 
 ## Adding New Features
 

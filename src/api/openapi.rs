@@ -23,6 +23,8 @@ use crate::AppState;
         (url = "/api/v1", description = "API v1")
     ),
     tags(
+        (name = "auth", description = "Authentication endpoints (register, login, logout)"),
+        (name = "account", description = "Account management endpoints"),
         (name = "recipes", description = "Recipe management endpoints"),
         (name = "books", description = "Recipe book management endpoints"),
         (name = "users", description = "User profile endpoints"),
