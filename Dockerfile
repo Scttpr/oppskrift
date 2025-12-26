@@ -41,8 +41,8 @@ COPY static ./static
 
 RUN ./tailwindcss-linux-x64 -i static/css/input.css -o static/css/main.css --minify
 
-# Runtime stage
-FROM debian:bookworm-slim
+# Runtime stage - same base as builder for glibc compatibility
+FROM debian:trixie-slim
 
 WORKDIR /app
 
