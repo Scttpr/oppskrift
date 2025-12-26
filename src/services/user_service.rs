@@ -1,6 +1,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::lib::crypto::generate_rsa_keypair;
 use crate::lib::error::{AppError, AppResult};
 use crate::models::user::{CreateUser, MeasurementPref, UpdateUser, User};
 
@@ -46,11 +47,15 @@ impl UserService {
         .ok_or_else(|| AppError::NotFound(format!("User @{} not found", username)))
     }
 
-    /// Create a new user
+    /// Create a new user with RSA keypair for ActivityPub federation
     pub async fn create(pool: &PgPool, input: CreateUser) -> AppResult<User> {
         let measurement_pref = input.measurement_pref.unwrap_or_default();
 
-        sqlx::query_as!(
+        // Generate RSA keypair for ActivityPub HTTP Signatures
+        let keypair = generate_rsa_keypair()?;
+
+        // Create user
+        let user = sqlx::query_as!(
             User,
             r#"
             INSERT INTO users (username, display_name, bio, avatar_url, measurement_pref, ap_id)
@@ -77,7 +82,22 @@ impl UserService {
                 AppError::Conflict("ActivityPub ID already exists".to_string())
             }
             _ => AppError::from(e),
-        })
+        })?;
+
+        // Store RSA keypair for the user
+        sqlx::query!(
+            r#"
+            INSERT INTO user_keys (user_id, public_key_pem, private_key_pem)
+            VALUES ($1, $2, $3)
+            "#,
+            user.id,
+            keypair.public_key_pem,
+            keypair.private_key_pem
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(user)
     }
 
     /// Update a user's profile
@@ -119,6 +139,32 @@ impl UserService {
         .await?;
 
         Ok(!exists.unwrap_or(false))
+    }
+
+    /// Get the public key PEM for a user (for ActivityPub Actor profile)
+    pub async fn get_public_key(pool: &PgPool, user_id: Uuid) -> AppResult<String> {
+        let key = sqlx::query_scalar!(
+            "SELECT public_key_pem FROM user_keys WHERE user_id = $1",
+            user_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Keys not found for user {}", user_id)))?;
+
+        Ok(key)
+    }
+
+    /// Get the private key PEM for a user (for signing HTTP requests)
+    pub async fn get_private_key(pool: &PgPool, user_id: Uuid) -> AppResult<String> {
+        let key = sqlx::query_scalar!(
+            "SELECT private_key_pem FROM user_keys WHERE user_id = $1",
+            user_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Keys not found for user {}", user_id)))?;
+
+        Ok(key)
     }
 }
 
