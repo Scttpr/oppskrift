@@ -8,7 +8,7 @@
 
 mod common;
 
-use common::{ApiClient, TestContext};
+use common::{generate_totp_code, ApiClient, TestContext};
 use serde_json::json;
 
 /// Test: Registration creates user and returns success
@@ -754,4 +754,340 @@ async fn test_resend_confirmation_success() {
         response.status, 200,
         "Resend confirmation should always return 200"
     );
+}
+
+// =============================================================================
+// Two-Factor Authentication Tests
+// =============================================================================
+
+/// Test: 2FA setup requires authentication
+#[tokio::test]
+async fn test_2fa_setup_requires_auth() {
+    let ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let response = client.post("/api/v1/account/2fa/setup", json!({})).await;
+
+    assert_eq!(
+        response.status, 401,
+        "2FA setup should require authentication"
+    );
+}
+
+/// Test: 2FA setup returns secret and QR code
+#[tokio::test]
+async fn test_2fa_setup_success() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+    let password = "Xk9#mP2$vL5@nQ8!";
+
+    // Create verified user and login
+    ctx.create_user(&email, &username, password, true).await;
+
+    let login_response = client
+        .post(
+            "/api/v1/auth/login",
+            json!({
+                "email": email,
+                "password": password
+            }),
+        )
+        .await;
+
+    let session = login_response
+        .session_cookie
+        .expect("Login should return session");
+
+    // Setup 2FA
+    let response = client
+        .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
+        .await;
+
+    assert_eq!(
+        response.status, 200,
+        "2FA setup should succeed: {:?}",
+        response.body
+    );
+    assert!(response.get("secret").is_some(), "Should return secret");
+    assert!(response.get("qr_code").is_some(), "Should return QR code");
+
+    ctx.cleanup().await;
+}
+
+/// Test: 2FA enable with valid code
+#[tokio::test]
+async fn test_2fa_enable_success() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+    let password = "Xk9#mP2$vL5@nQ8!";
+
+    // Create verified user and login
+    ctx.create_user(&email, &username, password, true).await;
+
+    let login_response = client
+        .post(
+            "/api/v1/auth/login",
+            json!({
+                "email": email,
+                "password": password
+            }),
+        )
+        .await;
+
+    let session = login_response
+        .session_cookie
+        .expect("Login should return session");
+
+    // Setup 2FA
+    let setup_response = client
+        .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
+        .await;
+
+    let secret = setup_response
+        .get("secret")
+        .and_then(|v| v.as_str())
+        .expect("Should have secret");
+
+    // Generate valid TOTP code
+    let totp_code = generate_totp_code(secret);
+
+    // Enable 2FA
+    let enable_response = client
+        .post_with_session(
+            "/api/v1/account/2fa/enable",
+            json!({ "totp_code": totp_code }),
+            &session,
+        )
+        .await;
+
+    assert_eq!(
+        enable_response.status, 200,
+        "2FA enable should succeed: {:?}",
+        enable_response.body
+    );
+    assert!(
+        enable_response.get("recovery_codes").is_some(),
+        "Should return recovery codes"
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: 2FA enable with invalid code fails
+#[tokio::test]
+async fn test_2fa_enable_invalid_code() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+    let password = "Xk9#mP2$vL5@nQ8!";
+
+    // Create verified user and login
+    ctx.create_user(&email, &username, password, true).await;
+
+    let login_response = client
+        .post(
+            "/api/v1/auth/login",
+            json!({
+                "email": email,
+                "password": password
+            }),
+        )
+        .await;
+
+    let session = login_response
+        .session_cookie
+        .expect("Login should return session");
+
+    // Setup 2FA
+    client
+        .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
+        .await;
+
+    // Try to enable with invalid code
+    let enable_response = client
+        .post_with_session(
+            "/api/v1/account/2fa/enable",
+            json!({ "totp_code": "000000" }),
+            &session,
+        )
+        .await;
+
+    assert_eq!(
+        enable_response.status, 400,
+        "Invalid TOTP code should return 400"
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Login with 2FA enabled returns partial token
+#[tokio::test]
+async fn test_login_with_2fa_returns_partial_token() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+    let password = "Xk9#mP2$vL5@nQ8!";
+
+    // Create verified user and login
+    ctx.create_user(&email, &username, password, true).await;
+
+    let login_response = client
+        .post(
+            "/api/v1/auth/login",
+            json!({
+                "email": email,
+                "password": password
+            }),
+        )
+        .await;
+
+    let session = login_response
+        .session_cookie
+        .expect("Login should return session");
+
+    // Setup and enable 2FA
+    let setup_response = client
+        .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
+        .await;
+
+    let secret = setup_response
+        .get("secret")
+        .and_then(|v| v.as_str())
+        .expect("Should have secret");
+
+    let totp_code = generate_totp_code(secret);
+
+    client
+        .post_with_session(
+            "/api/v1/account/2fa/enable",
+            json!({ "totp_code": totp_code }),
+            &session,
+        )
+        .await;
+
+    // Now login again - should require 2FA
+    let login_2fa_response = client
+        .post(
+            "/api/v1/auth/login",
+            json!({
+                "email": email,
+                "password": password
+            }),
+        )
+        .await;
+
+    assert_eq!(login_2fa_response.status, 200, "Login should return 200");
+    assert_eq!(
+        login_2fa_response
+            .get("requires_2fa")
+            .and_then(|v| v.as_bool()),
+        Some(true),
+        "Should indicate 2FA required"
+    );
+    assert!(
+        login_2fa_response.get("partial_token").is_some(),
+        "Should return partial token"
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: 2FA verify completes login
+#[tokio::test]
+async fn test_2fa_verify_completes_login() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+    let password = "Xk9#mP2$vL5@nQ8!";
+
+    // Create verified user and login
+    ctx.create_user(&email, &username, password, true).await;
+
+    let login_response = client
+        .post(
+            "/api/v1/auth/login",
+            json!({
+                "email": email,
+                "password": password
+            }),
+        )
+        .await;
+
+    let session = login_response
+        .session_cookie
+        .expect("Login should return session");
+
+    // Setup and enable 2FA
+    let setup_response = client
+        .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
+        .await;
+
+    let secret = setup_response
+        .get("secret")
+        .and_then(|v| v.as_str())
+        .expect("Should have secret")
+        .to_string();
+
+    let totp_code = generate_totp_code(&secret);
+
+    client
+        .post_with_session(
+            "/api/v1/account/2fa/enable",
+            json!({ "totp_code": totp_code }),
+            &session,
+        )
+        .await;
+
+    // Login again - get partial token
+    let login_2fa_response = client
+        .post(
+            "/api/v1/auth/login",
+            json!({
+                "email": email,
+                "password": password
+            }),
+        )
+        .await;
+
+    let partial_token = login_2fa_response
+        .get("partial_token")
+        .and_then(|v| v.as_str())
+        .expect("Should have partial token");
+
+    // Generate fresh TOTP code and verify
+    let totp_code = generate_totp_code(&secret);
+
+    let verify_response = client
+        .post(
+            "/api/v1/auth/2fa/verify",
+            json!({
+                "partial_token": partial_token,
+                "totp_code": totp_code
+            }),
+        )
+        .await;
+
+    assert_eq!(
+        verify_response.status, 200,
+        "2FA verify should succeed: {:?}",
+        verify_response.body
+    );
+    assert!(
+        verify_response.session_cookie.is_some(),
+        "Should return session cookie"
+    );
+
+    ctx.cleanup().await;
 }

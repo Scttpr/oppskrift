@@ -6,6 +6,7 @@ use chrono::{Duration, Utc};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
 
 /// Test context with database connection
@@ -357,4 +358,22 @@ impl ApiResponse {
     pub fn error_message(&self) -> Option<&str> {
         self.body.get("message").and_then(|v| v.as_str())
     }
+}
+
+/// Generate a TOTP code from a base32 secret
+pub fn generate_totp_code(secret_base32: &str) -> String {
+    let secret = Secret::Encoded(secret_base32.to_string());
+    let totp = TOTP::new(
+        Algorithm::SHA1,
+        6,
+        1,
+        30,
+        secret.to_bytes().unwrap(),
+        None,
+        "test@example.com".to_string(),
+    )
+    .expect("Failed to create TOTP");
+
+    totp.generate_current()
+        .expect("Failed to generate TOTP code")
 }
