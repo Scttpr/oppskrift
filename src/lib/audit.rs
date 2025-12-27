@@ -47,12 +47,6 @@ impl AuditEvent {
         self
     }
 
-    /// Add IP address to the event
-    pub fn with_ip(mut self, ip: &str) -> Self {
-        self.ip = Some(ip.to_string());
-        self
-    }
-
     /// Add target resource to the event
     pub fn with_target(mut self, target_type: &str, target_id: Uuid) -> Self {
         self.target_type = Some(target_type.to_string());
@@ -79,13 +73,6 @@ impl AuditEvent {
     /// Set level to warn
     pub fn warn(mut self) -> Self {
         self.level = "warn".to_string();
-        self
-    }
-
-    /// Set level to error
-    #[allow(dead_code)]
-    pub fn error(mut self) -> Self {
-        self.level = "error".to_string();
         self
     }
 

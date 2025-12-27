@@ -28,8 +28,8 @@ async fn main() -> anyhow::Result<()> {
     // Load environment variables from .env file
     dotenvy::dotenv().ok();
 
-    // Load and validate configuration (panics if required vars missing)
-    let config = lib::Config::from_env();
+    // Validate configuration (panics if required vars missing)
+    lib::Config::from_env();
 
     // Initialize tracing with JSON format in production
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
@@ -63,8 +63,10 @@ async fn main() -> anyhow::Result<()> {
     // Build the router
     let app = create_router(state);
 
-    // Use validated config for host and port
-    let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
+    // Get host and port from environment
+    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
     tracing::info!("Listening on http://{}", addr);
 
     // Start the server with connect info for client IP extraction

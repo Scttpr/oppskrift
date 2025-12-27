@@ -2,11 +2,8 @@
 //!
 //! Supports both AWS S3 and S3-compatible services (MinIO, DigitalOcean Spaces, etc.)
 
-#![allow(dead_code)]
-
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::{config::Region, primitives::ByteStream, Client};
-use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::lib::error::{AppError, AppResult};
@@ -114,9 +111,6 @@ impl StorageClient {
         format!("recipes/{}/images/{}.{}", recipe_id, file_id, extension)
     }
 }
-
-/// Shared storage client for use across the application
-pub type SharedStorage = Arc<StorageClient>;
 
 #[cfg(test)]
 mod tests {
