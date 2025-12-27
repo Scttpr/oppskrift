@@ -15,12 +15,12 @@
 | 2 | Foundation (Database & Core Services) | ✅ Complete | T005-T019 |
 | 3 | User Story 1 - Registration | ✅ Complete | T020-T030 |
 | 4 | User Story 2 - Login | ✅ Complete | T031-T041 |
-| 5 | User Story 3 - Password Recovery | ⏳ Pending | T042-T049 |
-| 6 | User Story 4 - Account Security | ⏳ Pending | T050-T070 |
-| 7 | User Story 5 - Account Deletion | ⏳ Pending | T071-T080 |
-| 8 | Hardening & Documentation | ⏳ Pending | T081-T087 |
+| 5 | User Story 3 - Password Recovery | ✅ Complete | T042-T049 |
+| 6 | User Story 4 - Account Security | ✅ Complete | T050-T071 |
+| 7 | User Story 5 - Account Deletion | ✅ Complete | T072-T079 |
+| 8 | Hardening & Documentation | ✅ Complete | T080-T087 |
 
-**MVP Checkpoint**: Phases 1-4 complete (41/87 tasks) - Registration and Login functional.
+**Feature Complete**: All 87/87 tasks complete - Full authentication feature with security hardening.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -165,26 +165,26 @@ Single project structure at repository root:
 
 ### Models for User Story 3
 
-- [ ] T042 [P] [US3] Create src/models/password_reset.rs - PasswordResetToken, ForgotPasswordRequest, ResetPasswordRequest structs per data-model.md
+- [x] T042 [P] [US3] Create src/models/password_reset.rs - PasswordResetToken, ForgotPasswordRequest, ResetPasswordRequest structs per data-model.md
 
 ### Services for User Story 3
 
-- [ ] T043 [US3] Add forgot_password() to src/services/auth.rs - Generate token, send email (same response regardless of email existence)
-- [ ] T044 [US3] Add reset_password() to src/services/auth.rs - Validate token (1h expiry, single-use), hash new password, invalidate all sessions, log event
+- [x] T043 [US3] Add forgot_password() to src/services/auth.rs - Generate token, send email (same response regardless of email existence)
+- [x] T044 [US3] Add reset_password() to src/services/auth.rs - Validate token (1h expiry, single-use), hash new password, invalidate all sessions, log event
 
 ### API Endpoints for User Story 3
 
-- [ ] T045 [US3] Add POST /api/auth/forgot-password to src/api/auth.rs - Request password reset
-- [ ] T046 [US3] Add POST /api/auth/reset-password to src/api/auth.rs - Set new password with token
+- [x] T045 [US3] Add POST /api/auth/forgot-password to src/api/auth.rs - Request password reset
+- [x] T046 [US3] Add POST /api/auth/reset-password to src/api/auth.rs - Set new password with token
 
 ### Integration for User Story 3
 
-- [ ] T047 [US3] Add password_reset_email_template() to src/services/email.rs
+- [x] T047 [US3] Add password_reset_email_template() to src/services/email.rs
 
 ### Tests for User Story 3
 
-- [ ] T048 [P] [US3] Create tests/integration/password_reset_test.rs - Test full reset flow, expired token, used token, invalid token
-- [ ] T049 [P] [US3] Add enumeration test - Verify same response for registered/unregistered emails
+- [x] T048 [P] [US3] Create tests/integration/password_reset_test.rs - Test full reset flow, expired token, used token, invalid token
+- [x] T049 [P] [US3] Add enumeration test - Verify same response for registered/unregistered emails
 
 **Checkpoint**: User Story 3 complete - users can recover forgotten passwords
 
@@ -198,40 +198,40 @@ Single project structure at repository root:
 
 ### Models for User Story 4
 
-- [ ] T050 [P] [US4] Create src/models/two_factor.rs - TwoFactorSetupResponse, EnableTwoFactorRequest, DisableTwoFactorRequest structs
-- [ ] T051 [P] [US4] Create src/models/recovery_code.rs - RecoveryCode, RecoveryCodesResponse, RecoveryCodesStatus structs
-- [ ] T052 [P] [US4] Create src/models/account.rs - ChangePasswordRequest, ChangeEmailRequest structs
+- [x] T050 [P] [US4] Create src/models/two_factor.rs - TwoFactorSetupResponse, EnableTwoFactorRequest, DisableTwoFactorRequest structs
+- [x] T051 [P] [US4] Create src/models/recovery_code.rs - RecoveryCode, RecoveryCodesResponse, RecoveryCodesStatus structs
+- [x] T052 [P] [US4] Create src/models/account.rs - ChangePasswordRequest, ChangeEmailRequest structs
 
 ### Services for User Story 4
 
-- [ ] T053 [US4] Add change_password() to src/services/auth.rs - Verify current password, hash new, invalidate other sessions, log event
-- [ ] T054 [US4] Add change_email() to src/services/auth.rs - Generate confirmation token for new email, keep old until confirmed
-- [ ] T055 [US4] Add list_sessions() and revoke_session() to src/services/session.rs - Session management
-- [ ] T056 [US4] Create src/services/totp.rs - setup_2fa(), enable_2fa(), disable_2fa(), verify_totp(), encrypt/decrypt secret with AES-256-GCM
-- [ ] T057 [US4] Add generate_recovery_codes() and use_recovery_code() to src/services/totp.rs - 8 bcrypt-hashed codes, single-use
+- [x] T053 [US4] Add change_password() to src/services/auth.rs - Verify current password, hash new, invalidate other sessions, log event
+- [x] T054 [US4] Add change_email() to src/services/auth.rs - Generate confirmation token for new email, keep old until confirmed
+- [x] T055 [US4] Add list_sessions() and revoke_session() to src/services/session.rs - Session management
+- [x] T056 [US4] Create src/services/totp.rs - setup_2fa(), enable_2fa(), disable_2fa(), verify_totp(), encrypt/decrypt secret with AES-256-GCM
+- [x] T057 [US4] Add generate_recovery_codes() and use_recovery_code() to src/services/totp.rs - 8 bcrypt-hashed codes, single-use
 
 ### API Endpoints for User Story 4
 
-- [ ] T058 [US4] Add POST /api/account/change-password to src/api/account.rs
-- [ ] T059 [US4] Add POST /api/account/change-email to src/api/account.rs
-- [ ] T060 [US4] Add GET /api/account/sessions to src/api/account.rs
-- [ ] T061 [US4] Add DELETE /api/account/sessions/:id to src/api/account.rs
-- [ ] T062 [US4] Add POST /api/account/2fa/setup to src/api/account.rs - Returns QR code and secret
-- [ ] T063 [US4] Add POST /api/account/2fa/enable to src/api/account.rs - Verify TOTP, return recovery codes
-- [ ] T064 [US4] Add POST /api/account/2fa/disable to src/api/account.rs - Require password + TOTP
-- [ ] T065 [US4] Add GET /api/account/2fa/recovery-codes to src/api/account.rs - Remaining count
-- [ ] T066 [US4] Add POST /api/account/2fa/recovery-codes to src/api/account.rs - Regenerate codes
+- [x] T058 [US4] Add POST /api/account/change-password to src/api/account.rs
+- [x] T059 [US4] Add POST /api/account/change-email to src/api/account.rs
+- [x] T060 [US4] Add GET /api/account/sessions to src/api/account.rs
+- [x] T061 [US4] Add DELETE /api/account/sessions/:id to src/api/account.rs
+- [x] T062 [US4] Add POST /api/account/2fa/setup to src/api/account.rs - Returns QR code and secret
+- [x] T063 [US4] Add POST /api/account/2fa/enable to src/api/account.rs - Verify TOTP, return recovery codes
+- [x] T064 [US4] Add POST /api/account/2fa/disable to src/api/account.rs - Require password + TOTP
+- [x] T065 [US4] Add GET /api/account/2fa/recovery-codes to src/api/account.rs - Remaining count
+- [x] T066 [US4] Add POST /api/account/2fa/recovery-codes to src/api/account.rs - Regenerate codes
 
 ### Integration for User Story 4
 
-- [ ] T067 [US4] Update login() in src/services/auth.rs - Integrate TOTP verification for users with 2FA enabled
-- [ ] T068 [US4] Add security notification emails - password_changed, 2fa_enabled, 2fa_disabled templates
+- [x] T067 [US4] Update login() in src/services/auth.rs - Integrate TOTP verification for users with 2FA enabled
+- [x] T068 [US4] Add security notification emails - password_changed, 2fa_enabled, 2fa_disabled templates
 
 ### Tests for User Story 4
 
-- [ ] T069 [P] [US4] Create tests/integration/session_test.rs - Test list sessions, revoke session, session invalidation on password change
-- [ ] T070 [P] [US4] Create tests/integration/totp_test.rs - Test 2FA setup, enable, verify, disable, recovery codes
-- [ ] T071 [P] [US4] Add rate limit test for TOTP verification - Max 3 attempts per 10 minutes
+- [x] T069 [P] [US4] Create tests/integration/session_test.rs - Test list sessions, revoke session, session invalidation on password change
+- [x] T070 [P] [US4] Create tests/integration/totp_test.rs - Test 2FA setup, enable, verify, disable, recovery codes
+- [x] T071 [P] [US4] Add rate limit test for TOTP verification - Max 3 attempts per 10 minutes
 
 **Checkpoint**: User Story 4 complete - full account security management including 2FA
 
@@ -245,26 +245,26 @@ Single project structure at repository root:
 
 ### Models for User Story 5
 
-- [ ] T072 [P] [US5] Add DeleteAccountRequest, DeletionScheduledResponse to src/models/account.rs
+- [x] T072 [P] [US5] Add DeleteAccountRequest, DeletionScheduledResponse to src/models/account.rs
 
 ### Services for User Story 5
 
-- [ ] T073 [US5] Add request_deletion() to src/services/auth.rs - Set deletion_requested_at, log event
-- [ ] T074 [US5] Add cancel_deletion() to src/services/auth.rs - Clear deletion_requested_at, log event
-- [ ] T075 [US5] Add execute_deletion() to src/services/auth.rs - Hard delete user data, anonymize/delete recipes per user choice
+- [x] T073 [US5] Add request_deletion() to src/services/auth.rs - Set deletion_requested_at, log event
+- [x] T074 [US5] Add cancel_deletion() to src/services/auth.rs - Clear deletion_requested_at, log event
+- [x] T075 [US5] Add execute_deletion() to src/jobs/cleanup.rs - Hard delete user data, anonymize/delete recipes per user choice
 
 ### API Endpoints for User Story 5
 
-- [ ] T076 [US5] Add POST /api/account/delete to src/api/account.rs - Request deletion with password confirmation
-- [ ] T077 [US5] Add POST /api/account/cancel-deletion to src/api/account.rs - Cancel during grace period
+- [x] T076 [US5] Add POST /api/account/delete to src/api/account.rs - Request deletion with password confirmation
+- [x] T077 [US5] Add POST /api/account/cancel-deletion to src/api/account.rs - Cancel during grace period
 
 ### Background Jobs for User Story 5
 
-- [ ] T078 [US5] Create src/jobs/cleanup.rs - Scheduled job to execute deletions after grace period, cleanup expired tokens/sessions
+- [x] T078 [US5] Create src/jobs/cleanup.rs - Scheduled job to execute deletions after grace period, cleanup expired tokens/sessions
 
 ### Tests for User Story 5
 
-- [ ] T079 [P] [US5] Create tests/integration/deletion_test.rs - Test request, cancel, execute after grace period
+- [x] T079 [P] [US5] Create tests/integration/deletion_test.rs - Test request, cancel, execute after grace period
 
 **Checkpoint**: User Story 5 complete - GDPR-compliant account deletion
 
@@ -274,14 +274,14 @@ Single project structure at repository root:
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T080 [P] Update specs/002-user-auth/quickstart.md - Add actual curl examples with working endpoints
-- [ ] T081 [P] Add OpenAPI documentation to endpoints using utoipa macros in src/api/auth.rs and src/api/account.rs
-- [ ] T082 Implement session cleanup job in src/jobs/cleanup.rs - Remove expired sessions daily
-- [ ] T083 [P] Add security event export endpoint GET /api/account/security-events (audit trail for users)
-- [ ] T084 Review and harden all error messages - Ensure no information leakage
-- [ ] T085 Run cargo clippy and cargo fmt - Code quality pass
-- [ ] T086 Run cargo audit - Check for security vulnerabilities in dependencies
-- [ ] T087 Manual security review - Verify all OWASP controls from .osk/specs/002-user-auth/risks.md
+- [x] T080 [P] Update specs/002-user-auth/quickstart.md - Add actual curl examples with working endpoints
+- [x] T081 [P] Add OpenAPI documentation to endpoints using utoipa macros in src/api/auth.rs and src/api/account.rs
+- [x] T082 Implement session cleanup job in src/jobs/cleanup.rs - Remove expired sessions daily
+- [x] T083 [P] Add security event export endpoint GET /api/account/security-events (audit trail for users)
+- [x] T084 Review and harden all error messages - Ensure no information leakage
+- [x] T085 Run cargo clippy and cargo fmt - Code quality pass
+- [x] T086 Run cargo audit - Check for security vulnerabilities in dependencies
+- [x] T087 Manual security review - Verify all OWASP controls
 
 ---
 
