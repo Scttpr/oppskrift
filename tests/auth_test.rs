@@ -449,3 +449,309 @@ async fn test_logout_without_session() {
         "Logout without session should return 401"
     );
 }
+
+// =============================================================================
+// Password Reset Tests
+// =============================================================================
+
+/// Test: Forgot password always returns success (prevents enumeration)
+#[tokio::test]
+async fn test_forgot_password_success() {
+    let ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let response = client
+        .post(
+            "/api/v1/auth/forgot-password",
+            json!({
+                "email": "nonexistent@example.com"
+            }),
+        )
+        .await;
+
+    // Always returns 200 to prevent email enumeration
+    assert_eq!(
+        response.status, 200,
+        "Forgot password should always return 200"
+    );
+}
+
+/// Test: Reset password with valid token
+#[tokio::test]
+async fn test_reset_password_success() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+
+    // Create user
+    let user_id = ctx
+        .create_user(&email, &username, "OldPassword123!", true)
+        .await;
+
+    // Create reset token
+    let token = ctx.create_password_reset_token(user_id, false).await;
+
+    // Reset password
+    let response = client
+        .post(
+            "/api/v1/auth/reset-password",
+            json!({
+                "token": token,
+                "new_password": "NewSecurePass123!"
+            }),
+        )
+        .await;
+
+    assert_eq!(
+        response.status, 200,
+        "Reset password should succeed: {:?}",
+        response.body
+    );
+
+    // Verify can login with new password
+    let login_response = client
+        .post(
+            "/api/v1/auth/login",
+            json!({
+                "email": email,
+                "password": "NewSecurePass123!"
+            }),
+        )
+        .await;
+
+    assert_eq!(login_response.status, 200, "Should login with new password");
+
+    ctx.cleanup().await;
+}
+
+/// Test: Reset password with invalid token
+#[tokio::test]
+async fn test_reset_password_invalid_token() {
+    let ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let response = client
+        .post(
+            "/api/v1/auth/reset-password",
+            json!({
+                "token": "0000000000000000000000000000000000000000000000000000000000000000",
+                "new_password": "NewSecurePass123!"
+            }),
+        )
+        .await;
+
+    assert_eq!(response.status, 400, "Invalid token should return 400");
+}
+
+/// Test: Reset password with expired token
+#[tokio::test]
+async fn test_reset_password_expired_token() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+
+    // Create user
+    let user_id = ctx
+        .create_user(&email, &username, "OldPassword123!", true)
+        .await;
+
+    // Create expired token
+    let token = ctx.create_password_reset_token(user_id, true).await;
+
+    let response = client
+        .post(
+            "/api/v1/auth/reset-password",
+            json!({
+                "token": token,
+                "new_password": "NewSecurePass123!"
+            }),
+        )
+        .await;
+
+    assert_eq!(response.status, 400, "Expired token should return 400");
+
+    ctx.cleanup().await;
+}
+
+/// Test: Reset password with weak password
+#[tokio::test]
+async fn test_reset_password_weak_password() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+
+    // Create user
+    let user_id = ctx
+        .create_user(&email, &username, "OldPassword123!", true)
+        .await;
+
+    // Create reset token
+    let token = ctx.create_password_reset_token(user_id, false).await;
+
+    let response = client
+        .post(
+            "/api/v1/auth/reset-password",
+            json!({
+                "token": token,
+                "new_password": "weak"
+            }),
+        )
+        .await;
+
+    assert_eq!(response.status, 422, "Weak password should return 422");
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Email Confirmation Tests
+// =============================================================================
+
+/// Test: Confirm email with valid token
+#[tokio::test]
+async fn test_confirm_email_success() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+
+    // Create unverified user
+    let user_id = ctx
+        .create_user(&email, &username, "SecurePass123!", false)
+        .await;
+
+    // Create confirmation token
+    let token = ctx
+        .create_email_confirmation_token(user_id, &email, false)
+        .await;
+
+    // Confirm email
+    let response = client
+        .get(&format!("/api/v1/auth/confirm-email/{}", token))
+        .await;
+
+    assert_eq!(
+        response.status, 200,
+        "Confirm email should succeed: {:?}",
+        response.body
+    );
+
+    // Verify can now login
+    let login_response = client
+        .post(
+            "/api/v1/auth/login",
+            json!({
+                "email": email,
+                "password": "SecurePass123!"
+            }),
+        )
+        .await;
+
+    assert_eq!(
+        login_response.status, 200,
+        "Should be able to login after email confirmation"
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Confirm email with invalid token
+#[tokio::test]
+async fn test_confirm_email_invalid_token() {
+    let ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let response = client
+        .get("/api/v1/auth/confirm-email/0000000000000000000000000000000000000000000000000000000000000000")
+        .await;
+
+    assert_eq!(response.status, 400, "Invalid token should return 400");
+}
+
+/// Test: Confirm email with expired token
+#[tokio::test]
+async fn test_confirm_email_expired_token() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+
+    // Create unverified user
+    let user_id = ctx
+        .create_user(&email, &username, "SecurePass123!", false)
+        .await;
+
+    // Create expired token
+    let token = ctx
+        .create_email_confirmation_token(user_id, &email, true)
+        .await;
+
+    let response = client
+        .get(&format!("/api/v1/auth/confirm-email/{}", token))
+        .await;
+
+    assert_eq!(response.status, 400, "Expired token should return 400");
+
+    ctx.cleanup().await;
+}
+
+/// Test: Confirm email when already verified
+#[tokio::test]
+async fn test_confirm_email_already_verified() {
+    let mut ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+
+    // Create already verified user
+    let user_id = ctx
+        .create_user(&email, &username, "SecurePass123!", true)
+        .await;
+
+    // Create confirmation token anyway
+    let token = ctx
+        .create_email_confirmation_token(user_id, &email, false)
+        .await;
+
+    let response = client
+        .get(&format!("/api/v1/auth/confirm-email/{}", token))
+        .await;
+
+    assert_eq!(
+        response.status, 409,
+        "Already verified should return 409 Conflict"
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Resend confirmation always returns success (prevents enumeration)
+#[tokio::test]
+async fn test_resend_confirmation_success() {
+    let ctx = TestContext::new().await;
+    let client = ApiClient::new(&ctx.base_url);
+
+    let response = client
+        .post(
+            "/api/v1/auth/resend-confirmation",
+            json!({
+                "email": "nonexistent@example.com"
+            }),
+        )
+        .await;
+
+    // Always returns 200 to prevent email enumeration
+    assert_eq!(
+        response.status, 200,
+        "Resend confirmation should always return 200"
+    );
+}

@@ -2,7 +2,9 @@
 //!
 //! These tests run against a real database. Ensure DATABASE_URL is set.
 
+use chrono::{Duration, Utc};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -105,12 +107,86 @@ impl TestContext {
     #[allow(dead_code)]
     pub async fn get_confirmation_token(&self, user_id: Uuid) -> Option<String> {
         sqlx::query_scalar(
-            "SELECT token_hash FROM email_confirmation_tokens WHERE user_id = $1 AND expires_at > NOW()"
+            "SELECT token_hash FROM email_confirmation_tokens WHERE user_id = $1 AND expires_at > NOW()",
         )
         .bind(user_id)
         .fetch_optional(&self.db)
         .await
         .expect("Failed to query confirmation token")
+    }
+
+    /// Create an email confirmation token for testing
+    /// Returns the raw token (not hashed) to use in API calls
+    pub async fn create_email_confirmation_token(
+        &self,
+        user_id: Uuid,
+        email: &str,
+        expired: bool,
+    ) -> String {
+        // Generate a random token
+        let token = format!("{:064x}", Uuid::new_v4().as_u128());
+
+        // Hash it like the auth service does
+        let mut hasher = Sha256::new();
+        hasher.update(token.as_bytes());
+        let token_hash = hex::encode(hasher.finalize());
+
+        // Set expiry (24 hours normally, or in the past if expired)
+        let expires_at = if expired {
+            Utc::now() - Duration::hours(1)
+        } else {
+            Utc::now() + Duration::hours(24)
+        };
+
+        sqlx::query(
+            r#"
+            INSERT INTO email_confirmation_tokens (user_id, email, token_hash, expires_at)
+            VALUES ($1, $2, $3, $4)
+            "#,
+        )
+        .bind(user_id)
+        .bind(email)
+        .bind(&token_hash)
+        .bind(expires_at)
+        .execute(&self.db)
+        .await
+        .expect("Failed to create email confirmation token");
+
+        token
+    }
+
+    /// Create a password reset token for testing
+    /// Returns the raw token (not hashed) to use in API calls
+    pub async fn create_password_reset_token(&self, user_id: Uuid, expired: bool) -> String {
+        // Generate a random token
+        let token = format!("{:064x}", Uuid::new_v4().as_u128());
+
+        // Hash it like the auth service does
+        let mut hasher = Sha256::new();
+        hasher.update(token.as_bytes());
+        let token_hash = hex::encode(hasher.finalize());
+
+        // Set expiry (1 hour normally, or in the past if expired)
+        let expires_at = if expired {
+            Utc::now() - Duration::hours(1)
+        } else {
+            Utc::now() + Duration::hours(1)
+        };
+
+        sqlx::query(
+            r#"
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3)
+            "#,
+        )
+        .bind(user_id)
+        .bind(&token_hash)
+        .bind(expires_at)
+        .execute(&self.db)
+        .await
+        .expect("Failed to create password reset token");
+
+        token
     }
 
     /// Clean up all created test data
