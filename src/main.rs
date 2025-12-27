@@ -25,6 +25,10 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Parse CLI arguments
+    let args: Vec<String> = std::env::args().collect();
+    let should_seed = args.iter().any(|a| a == "--seed");
+
     // Load environment variables from .env file
     dotenvy::dotenv().ok();
 
@@ -56,6 +60,24 @@ async fn main() -> anyhow::Result<()> {
     // Create database connection pool
     let db = lib::db::create_default_pool().await?;
     tracing::info!("Database connection pool created");
+
+    // Run seeds if requested
+    if should_seed {
+        match lib::seeds::run(&db).await {
+            Ok(result) => {
+                tracing::info!(
+                    "Seeding complete: {} users, {} recipes, {} books",
+                    result.users,
+                    result.recipes,
+                    result.books
+                );
+            }
+            Err(e) => {
+                tracing::error!("Seeding failed: {}", e);
+                return Err(e.into());
+            }
+        }
+    }
 
     // Create application state
     let state = AppState { db };

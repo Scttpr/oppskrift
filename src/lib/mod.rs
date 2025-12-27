@@ -8,6 +8,7 @@ pub mod db;
 pub mod error;
 pub mod pagination;
 pub mod schema_org;
+pub mod seeds;
 pub mod storage;
 
 pub use config::Config;
