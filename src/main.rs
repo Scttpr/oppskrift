@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
     let db = lib::db::create_default_pool().await?;
     tracing::info!("Database connection pool created");
 
-    // Run seeds if requested
+    // Run seeds if requested (then exit)
     if should_seed {
         match lib::seeds::run(&db).await {
             Ok(result) => {
@@ -71,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
                     result.recipes,
                     result.books
                 );
+                return Ok(());
             }
             Err(e) => {
                 tracing::error!("Seeding failed: {}", e);
