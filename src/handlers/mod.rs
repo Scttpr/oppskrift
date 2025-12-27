@@ -1,5 +1,6 @@
 // Handlers module - HTML page handlers (serve templates)
 
+pub mod auth;
 pub mod books;
 pub mod feed;
 pub mod legal;
@@ -17,5 +18,6 @@ pub fn routes() -> Router<AppState> {
         .nest("/books", books::routes())
         .nest("/users", users::routes())
         .nest("/feed", feed::routes())
+        .merge(auth::routes())
         .merge(legal::routes())
 }
