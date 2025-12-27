@@ -71,14 +71,21 @@ impl EmailService {
             .body(body.to_string())
             .map_err(|e| EmailError::BuildError(e.to_string()))?;
 
-        let creds = Credentials::new(config.username.clone(), config.password.clone());
-
-        let mailer: AsyncSmtpTransport<Tokio1Executor> =
+        // Build SMTP transport - use plain SMTP for local dev (port 1025), TLS for production
+        let mailer: AsyncSmtpTransport<Tokio1Executor> = if config.port == 1025 {
+            // Local development (e.g., Mailpit) - no TLS, no auth
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&config.host)
+                .port(config.port)
+                .build()
+        } else {
+            // Production - use TLS and credentials
+            let creds = Credentials::new(config.username.clone(), config.password.clone());
             AsyncSmtpTransport::<Tokio1Executor>::relay(&config.host)
                 .map_err(|e| EmailError::SendError(e.to_string()))?
                 .credentials(creds)
                 .port(config.port)
-                .build();
+                .build()
+        };
 
         mailer
             .send(email)
@@ -91,7 +98,7 @@ impl EmailService {
 
     /// Send email confirmation link
     pub async fn send_confirmation(&self, to: &str, token: &str) -> Result<(), EmailError> {
-        let link = format!("{}/api/auth/confirm-email/{}", self.base_url, token);
+        let link = format!("{}/api/v1/auth/confirm-email/{}", self.base_url, token);
 
         let subject = "Confirm your Oppskrift account";
         let body = format!(

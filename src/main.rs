@@ -23,6 +23,11 @@ pub struct AppState {
     pub db: PgPool,
 }
 
+/// Create the application router (exposed for testing)
+pub fn app_router(state: AppState) -> Router {
+    create_router(state)
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Parse CLI arguments

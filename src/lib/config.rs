@@ -78,11 +78,9 @@ impl SmtpConfig {
             .and_then(|v| v.parse().ok())
             .unwrap_or(587);
 
-        let username =
-            env::var("SMTP_USER").expect("SMTP_USER must be set when SMTP_HOST is configured");
-
-        let password = env::var("SMTP_PASSWORD")
-            .expect("SMTP_PASSWORD must be set when SMTP_HOST is configured");
+        // Credentials are optional (e.g., Mailpit doesn't need them)
+        let username = env::var("SMTP_USER").unwrap_or_default();
+        let password = env::var("SMTP_PASSWORD").unwrap_or_default();
 
         let from_address =
             env::var("EMAIL_FROM_ADDRESS").unwrap_or_else(|_| format!("noreply@{}", host));
