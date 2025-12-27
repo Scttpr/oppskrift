@@ -1,0 +1,60 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}About - Oppskrift{% endblock %}
+{% block meta_description %}About Oppskrift - A federated recipe sharing platform{% endblock %}
+
+{% block content %}
+<article class="prose dark:prose-invert max-w-4xl mx-auto">
+    <h1>About Oppskrift</h1>
+
+    <section>
+        <h2>What is Oppskrift?</h2>
+        <p>
+            Oppskrift (Norwegian for "recipe") is a federated social platform for sharing recipes.
+            Built on the ActivityPub protocol, it allows users to share their culinary creations
+            with people across the fediverse.
+        </p>
+    </section>
+
+    <section>
+        <h2>Features</h2>
+        <ul>
+            <li><strong>Recipe Sharing</strong> - Create detailed recipes with ingredients, instructions, and photos</li>
+            <li><strong>Recipe Books</strong> - Organize recipes into themed collections</li>
+            <li><strong>Federation</strong> - Connect with users on other ActivityPub-compatible platforms</li>
+            <li><strong>Privacy-Focused</strong> - Your data stays on your instance</li>
+            <li><strong>Open Source</strong> - Fully open source under AGPL-3.0</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>Federation</h2>
+        <p>
+            Oppskrift uses the ActivityPub protocol, the same technology that powers Mastodon,
+            PeerTube, and other federated platforms. This means you can follow users and discover
+            recipes from other Oppskrift instances and compatible platforms.
+        </p>
+    </section>
+
+    <section>
+        <h2>Open Source</h2>
+        <p>
+            Oppskrift is free and open source software, licensed under the
+            <a href="https://www.gnu.org/licenses/agpl-3.0.html">GNU Affero General Public License v3.0</a>.
+            You can view the source code, contribute, or run your own instance.
+        </p>
+    </section>
+
+    <section>
+        <h2>Technology</h2>
+        <p>Built with:</p>
+        <ul>
+            <li>Rust &amp; Axum for the backend</li>
+            <li>PostgreSQL for data storage</li>
+            <li>HTMX for dynamic interactions</li>
+            <li>Tailwind CSS for styling</li>
+            <li>ActivityPub for federation</li>
+        </ul>
+    </section>
+</article>
+{% endblock %}
