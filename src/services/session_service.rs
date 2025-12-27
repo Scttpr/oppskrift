@@ -11,6 +11,8 @@ use std::net::IpAddr;
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::models::SessionInfo;
+
 /// Session token length in bytes (256 bits)
 const TOKEN_BYTES: usize = 32;
 
@@ -22,30 +24,6 @@ pub enum SessionError {
     Expired,
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
-}
-
-/// Session information for API responses
-#[derive(Debug, Clone)]
-pub struct SessionInfo {
-    pub id: Uuid,
-    pub device_info: Option<String>,
-    pub ip_address: Option<String>,
-    pub last_activity: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
-    pub is_current: bool,
-}
-
-/// Session record from database
-#[derive(Debug, Clone)]
-pub struct Session {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub device_info: Option<String>,
-    pub ip_address: Option<String>,
-    pub user_agent: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub last_activity: DateTime<Utc>,
-    pub expires_at: DateTime<Utc>,
 }
 
 /// Session service for managing user sessions
@@ -168,17 +146,6 @@ impl SessionService {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Revoke a session by token
-    pub async fn revoke_by_token(&self, token: &str) -> Result<bool, SessionError> {
-        let token_hash = Self::hash_token(token)?;
-
-        let result = sqlx::query!("DELETE FROM sessions WHERE token_hash = $1", token_hash)
-            .execute(&self.pool)
-            .await?;
-
-        Ok(result.rows_affected() > 0)
-    }
-
     /// Revoke all sessions for a user
     ///
     /// Returns the number of sessions revoked.
@@ -238,25 +205,6 @@ impl SessionService {
                 is_current: current_session_id == Some(s.id),
             })
             .collect())
-    }
-
-    /// Clean up expired sessions
-    ///
-    /// Should be called periodically (e.g., daily) by a background job.
-    /// Returns the number of sessions cleaned up.
-    pub async fn cleanup_expired(&self) -> Result<u64, SessionError> {
-        let result = sqlx::query!("DELETE FROM sessions WHERE expires_at < NOW()")
-            .execute(&self.pool)
-            .await?;
-
-        if result.rows_affected() > 0 {
-            tracing::info!(
-                count = result.rows_affected(),
-                "Cleaned up expired sessions"
-            );
-        }
-
-        Ok(result.rows_affected())
     }
 
     /// Get session count for a user

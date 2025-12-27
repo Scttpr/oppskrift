@@ -35,10 +35,8 @@ pub enum SecurityEventType {
     // Account deletion (GDPR)
     AccountDeleteRequest,
     AccountDeleteCancel,
+    #[allow(dead_code)] // Used by cleanup job (external scheduler)
     AccountDeleteExecute,
-    // Security alerts
-    RateLimitExceeded,
-    SuspiciousActivity,
 }
 
 impl SecurityEventType {
@@ -64,8 +62,6 @@ impl SecurityEventType {
             Self::AccountDeleteRequest => "account_delete_request",
             Self::AccountDeleteCancel => "account_delete_cancel",
             Self::AccountDeleteExecute => "account_delete_execute",
-            Self::RateLimitExceeded => "rate_limit_exceeded",
-            Self::SuspiciousActivity => "suspicious_activity",
         }
     }
 
@@ -91,10 +87,7 @@ impl SecurityEventType {
             | Self::RecoveryCodeUsed
             | Self::SessionRevokeAll
             | Self::AccountDeleteRequest
-            | Self::AccountDeleteExecute
-            | Self::RateLimitExceeded => tracing::Level::WARN,
-
-            Self::SuspiciousActivity => tracing::Level::ERROR,
+            | Self::AccountDeleteExecute => tracing::Level::WARN,
         }
     }
 }
@@ -126,27 +119,9 @@ impl SecurityEventBuilder {
         self
     }
 
-    /// Set optional user ID
-    pub fn maybe_user(mut self, user_id: Option<Uuid>) -> Self {
-        self.user_id = user_id;
-        self
-    }
-
-    /// Set the IP address
-    pub fn ip(mut self, ip: IpAddr) -> Self {
-        self.ip_address = Some(ip);
-        self
-    }
-
     /// Set optional IP address
     pub fn maybe_ip(mut self, ip: Option<IpAddr>) -> Self {
         self.ip_address = ip;
-        self
-    }
-
-    /// Set the user agent
-    pub fn user_agent(mut self, ua: impl Into<String>) -> Self {
-        self.user_agent = Some(ua.into());
         self
     }
 
@@ -373,6 +348,38 @@ impl SecurityLogService {
         .await
     }
 
+    /// Log a failed password change attempt
+    pub async fn password_change_failed(
+        &self,
+        user_id: Uuid,
+        reason: &str,
+        ip: Option<IpAddr>,
+    ) -> Result<Uuid, sqlx::Error> {
+        self.log(
+            SecurityEventBuilder::new(SecurityEventType::PasswordChange)
+                .user(user_id)
+                .maybe_ip(ip)
+                .with_metadata("success", false)
+                .with_metadata("reason", reason),
+        )
+        .await
+    }
+
+    /// Log an email change request (before confirmation)
+    pub async fn email_change_requested(
+        &self,
+        user_id: Uuid,
+        ip: Option<IpAddr>,
+    ) -> Result<Uuid, sqlx::Error> {
+        self.log(
+            SecurityEventBuilder::new(SecurityEventType::EmailChange)
+                .user(user_id)
+                .maybe_ip(ip)
+                .with_metadata("status", "requested"),
+        )
+        .await
+    }
+
     /// Log an email change
     pub async fn email_change(
         &self,
@@ -432,6 +439,40 @@ impl SecurityLogService {
             SecurityEventBuilder::new(SecurityEventType::TotpDisable)
                 .user(user_id)
                 .maybe_ip(ip),
+        )
+        .await
+    }
+
+    /// Log 2FA verification failure
+    pub async fn two_factor_failure(
+        &self,
+        user_id: Uuid,
+        reason: &str,
+        ip: Option<IpAddr>,
+    ) -> Result<Uuid, sqlx::Error> {
+        self.log(
+            SecurityEventBuilder::new(SecurityEventType::LoginFailure)
+                .user(user_id)
+                .maybe_ip(ip)
+                .with_metadata("reason", reason)
+                .with_metadata("2fa_step", true),
+        )
+        .await
+    }
+
+    /// Log successful login with 2FA
+    pub async fn login_success_2fa(
+        &self,
+        user_id: Uuid,
+        ip: Option<IpAddr>,
+        user_agent: Option<String>,
+    ) -> Result<Uuid, sqlx::Error> {
+        self.log(
+            SecurityEventBuilder::new(SecurityEventType::LoginSuccess)
+                .user(user_id)
+                .maybe_ip(ip)
+                .maybe_user_agent(user_agent)
+                .with_metadata("2fa_verified", true),
         )
         .await
     }
@@ -512,49 +553,56 @@ impl SecurityLogService {
         .await
     }
 
-    /// Log account deletion execution
+    /// Log account deletion execution (after grace period)
+    #[allow(dead_code)] // Used by cleanup job (external scheduler)
     pub async fn account_delete_execute(
         &self,
         user_id: Uuid,
-        recipes_orphaned: u32,
+        ip: Option<IpAddr>,
     ) -> Result<Uuid, sqlx::Error> {
         self.log(
             SecurityEventBuilder::new(SecurityEventType::AccountDeleteExecute)
                 .user(user_id)
-                .with_metadata("recipes_orphaned", recipes_orphaned),
+                .maybe_ip(ip),
         )
         .await
     }
 
-    /// Log rate limit exceeded
-    pub async fn rate_limit_exceeded(
+    /// List security events for a user (T083)
+    ///
+    /// Returns the most recent security events, ordered by timestamp descending.
+    pub async fn list_for_user(
         &self,
-        ip: Option<IpAddr>,
-        endpoint: &str,
-    ) -> Result<Uuid, sqlx::Error> {
-        self.log(
-            SecurityEventBuilder::new(SecurityEventType::RateLimitExceeded)
-                .maybe_ip(ip)
-                .with_metadata("endpoint", endpoint),
+        user_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<SecurityEvent>, sqlx::Error> {
+        let events = sqlx::query_as::<_, SecurityEvent>(
+            r#"
+            SELECT id, event_type, ip_address::text as ip_address, user_agent, metadata, created_at
+            FROM security_events
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
         )
-        .await
-    }
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
 
-    /// Log suspicious activity
-    pub async fn suspicious_activity(
-        &self,
-        user_id: Option<Uuid>,
-        ip: Option<IpAddr>,
-        reason: &str,
-    ) -> Result<Uuid, sqlx::Error> {
-        self.log(
-            SecurityEventBuilder::new(SecurityEventType::SuspiciousActivity)
-                .maybe_user(user_id)
-                .maybe_ip(ip)
-                .with_metadata("reason", reason),
-        )
-        .await
+        Ok(events)
     }
+}
+
+/// Security event record for API responses (T083)
+#[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
+pub struct SecurityEvent {
+    pub id: Uuid,
+    pub event_type: String,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[cfg(test)]

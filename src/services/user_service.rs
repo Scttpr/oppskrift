@@ -211,19 +211,6 @@ impl UserService {
         Ok(key)
     }
 
-    /// Get the private key PEM for a user (for signing HTTP requests)
-    pub async fn get_private_key(pool: &PgPool, user_id: Uuid) -> AppResult<String> {
-        let key = sqlx::query_scalar!(
-            "SELECT private_key_pem FROM user_keys WHERE user_id = $1",
-            user_id
-        )
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("Keys not found for user {}", user_id)))?;
-
-        Ok(key)
-    }
-
     /// Toggle federation for a user
     /// Returns the updated user and optionally a Delete activity to federate
     pub async fn set_federation_enabled(
@@ -258,20 +245,12 @@ impl UserService {
 
         Ok(user)
     }
-
-    /// Build a Delete activity for when a user disables federation
-    /// Caller should deliver this to known followers
-    pub fn build_delete_activity(user_id: Uuid) -> crate::lib::activitypub::Activity {
-        let base_url =
-            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-        crate::lib::activitypub::Activity::delete_actor(&base_url, user_id)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::MeasurementPref;
+    use crate::models::user::MeasurementPref;
 
     #[test]
     fn test_create_user_input() {

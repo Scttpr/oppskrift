@@ -19,8 +19,9 @@ use crate::api::middleware::{
 use crate::lib::config::SmtpConfig;
 use crate::lib::error::AppError;
 use crate::models::{
-    EmailConfirmationResponse, LoginRequest, LoginResponse, LogoutResponse, RegisterRequest,
-    ResendConfirmationRequest, UserProfile,
+    Complete2FALoginRequest, EmailConfirmationResponse, ForgotPasswordRequest,
+    ForgotPasswordResponse, LoginRequest, LoginResponse, LogoutResponse, RegisterRequest,
+    ResendConfirmationRequest, ResetPasswordRequest, ResetPasswordResponse, UserProfile,
 };
 use crate::services::{AuthError, AuthService, EmailService, LoginResult, PasswordService};
 use crate::AppState;
@@ -35,6 +36,11 @@ pub fn routes() -> Router<AppState> {
         // Session-based auth
         .route("/login", post(login))
         .route("/logout", post(logout))
+        // 2FA verification
+        .route("/2fa/verify", post(verify_2fa))
+        // Password recovery
+        .route("/forgot-password", post(forgot_password))
+        .route("/reset-password", post(reset_password))
 }
 
 // =============================================================================
@@ -259,10 +265,6 @@ async fn login(
             AuthError::EmailNotVerified => {
                 AppError::Forbidden("Please verify your email before logging in".to_string())
             }
-            AuthError::TwoFactorRequired => {
-                // This is a special case - 2FA is required
-                AppError::Validation("Two-factor authentication required".to_string())
-            }
             e => {
                 tracing::error!(error = %e, "Login failed");
                 AppError::Internal("Login failed".to_string())
@@ -290,18 +292,27 @@ async fn login(
             let cookie = create_session_cookie(&token, SESSION_EXPIRY_DAYS);
 
             Ok((
+                StatusCode::OK,
                 AppendHeaders([(SET_COOKIE, cookie)]),
-                Json(LoginResponse {
-                    user: profile,
-                    expires_at,
-                }),
-            ))
+                Json(serde_json::json!({
+                    "user": profile,
+                    "expires_at": expires_at,
+                    "requires_2fa": false
+                })),
+            )
+                .into_response())
         }
-        LoginResult::TwoFactorRequired { .. } => {
-            // Return a special response indicating 2FA is needed
-            Err(AppError::Validation(
-                "Two-factor authentication required".to_string(),
-            ))
+        LoginResult::TwoFactorRequired { partial_token } => {
+            // Return a response with the partial token for 2FA completion
+            Ok((
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "requires_2fa": true,
+                    "partial_token": partial_token,
+                    "message": "Two-factor authentication required"
+                })),
+            )
+                .into_response())
         }
     }
 }
@@ -338,6 +349,172 @@ async fn logout(
             message: "Logged out successfully".to_string(),
         }),
     ))
+}
+
+// =============================================================================
+// 2FA Verification Endpoint
+// =============================================================================
+
+/// POST /api/auth/2fa/verify
+///
+/// Complete login with 2FA verification. Called after initial login returns `requires_2fa: true`.
+///
+/// ## Request Body
+/// - `partial_token`: Token from initial login response (64 hex characters)
+/// - `totp_code`: TOTP code from authenticator app (6 digits)
+///
+/// ## Response
+/// - `200 OK`: Login successful, session cookie set
+/// - `400 Bad Request`: Invalid or expired token
+/// - `401 Unauthorized`: Invalid TOTP code
+async fn verify_2fa(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Json(input): Json<Complete2FALoginRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let ip = Some(addr.ip());
+
+    // Validate input
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    // Create auth service
+    let auth_service = create_auth_service(&state);
+
+    // Complete 2FA login
+    let result = auth_service
+        .complete_2fa_login(&input.partial_token, &input.totp_code, ip, None)
+        .await
+        .map_err(|e| match e {
+            AuthError::InvalidToken => {
+                AppError::BadRequest("Invalid or expired verification token".to_string())
+            }
+            AuthError::InvalidTwoFactorCode => {
+                AppError::Unauthorized("Invalid two-factor code".to_string())
+            }
+            e => {
+                tracing::error!(error = %e, "2FA verification failed");
+                AppError::Internal("2FA verification failed".to_string())
+            }
+        })?;
+
+    match result {
+        LoginResult::Success {
+            user_id,
+            token,
+            expires_at,
+            ..
+        } => {
+            // Get user profile for response
+            let user = crate::services::UserService::get_by_id(&state.db, user_id)
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "Failed to get user after 2FA verification");
+                    AppError::Internal("Login failed".to_string())
+                })?;
+
+            let profile = UserProfile::from(user);
+
+            // Set session cookie
+            let cookie = create_session_cookie(&token, SESSION_EXPIRY_DAYS);
+
+            Ok((
+                AppendHeaders([(SET_COOKIE, cookie)]),
+                Json(LoginResponse {
+                    user: profile,
+                    expires_at,
+                }),
+            ))
+        }
+        LoginResult::TwoFactorRequired { .. } => {
+            // This shouldn't happen after 2FA verification
+            Err(AppError::Internal("Unexpected 2FA state".to_string()))
+        }
+    }
+}
+
+// =============================================================================
+// Password Recovery Endpoints (T045-T046)
+// =============================================================================
+
+/// POST /api/auth/forgot-password
+///
+/// Request a password reset link. Always returns success to prevent email enumeration.
+///
+/// ## Request Body
+/// - `email`: Email address to send reset link to
+///
+/// ## Response
+/// - `200 OK`: Reset email sent (or appears to be sent for security)
+/// - `400 Bad Request`: Invalid email format
+async fn forgot_password(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Json(input): Json<ForgotPasswordRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let ip = Some(addr.ip());
+
+    // Validate input
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    // Create auth service
+    let auth_service = create_auth_service(&state);
+
+    // Request password reset
+    // Always returns success to prevent email enumeration
+    if let Err(e) = auth_service.forgot_password(&input.email, ip).await {
+        tracing::error!(error = %e, "Password reset request failed");
+        // Don't reveal internal errors
+    }
+
+    Ok(Json(ForgotPasswordResponse::success()))
+}
+
+/// POST /api/auth/reset-password
+///
+/// Reset password using the token from the reset email.
+///
+/// ## Request Body
+/// - `token`: Password reset token (64 hex characters)
+/// - `new_password`: New password (at least 10 characters)
+///
+/// ## Response
+/// - `200 OK`: Password reset successfully
+/// - `400 Bad Request`: Invalid token or weak password
+async fn reset_password(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Json(input): Json<ResetPasswordRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let ip = Some(addr.ip());
+
+    // Validate input
+    input
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    // Create auth service
+    let auth_service = create_auth_service(&state);
+
+    // Reset password
+    auth_service
+        .reset_password(&input.token, &input.new_password, ip)
+        .await
+        .map_err(|e| match e {
+            AuthError::InvalidToken => {
+                AppError::BadRequest("Invalid or expired reset token".to_string())
+            }
+            AuthError::InvalidPassword(msg) => AppError::Validation(msg),
+            e => {
+                tracing::error!(error = %e, "Password reset failed");
+                AppError::Internal("Password reset failed".to_string())
+            }
+        })?;
+
+    Ok(Json(ResetPasswordResponse::success()))
 }
 
 // =============================================================================

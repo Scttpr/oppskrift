@@ -3,8 +3,6 @@
 //! Supports both session cookie authentication (for browsers) and
 //! Bearer token authentication (for API clients).
 
-#![allow(dead_code)]
-
 use axum::{
     extract::FromRequestParts,
     http::{header::COOKIE, request::Parts, StatusCode},
@@ -12,7 +10,6 @@ use axum::{
     Json,
 };
 use serde::Serialize;
-use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::services::SessionService;
@@ -147,20 +144,6 @@ pub fn clear_session_cookie() -> String {
         "{}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0",
         SESSION_COOKIE_NAME
     )
-}
-
-/// Database pool extractor for services that need direct DB access
-pub struct DbPool(pub PgPool);
-
-impl FromRequestParts<crate::AppState> for DbPool {
-    type Rejection = std::convert::Infallible;
-
-    async fn from_request_parts(
-        _parts: &mut Parts,
-        state: &crate::AppState,
-    ) -> Result<Self, Self::Rejection> {
-        Ok(DbPool(state.db.clone()))
-    }
 }
 
 #[cfg(test)]

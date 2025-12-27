@@ -188,7 +188,8 @@ mod tests {
     #[test]
     fn test_logout_cookie_clearing() {
         // Expected clear cookie format
-        let clear_cookie = "oppskrift_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0";
+        let clear_cookie =
+            "oppskrift_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0";
 
         assert!(clear_cookie.contains("Max-Age=0"));
         assert!(clear_cookie.contains("oppskrift_session="));

@@ -17,8 +17,6 @@ pub enum EmailError {
     BuildError(String),
     #[error("Failed to send email: {0}")]
     SendError(String),
-    #[error("SMTP not configured")]
-    NotConfigured,
 }
 
 /// Email service for sending authentication emails
@@ -253,8 +251,9 @@ impl EmailService {
     pub async fn send_deletion_scheduled_notification(
         &self,
         to: &str,
-        deletion_date: &str,
+        deletion_date: chrono::DateTime<chrono::Utc>,
     ) -> Result<(), EmailError> {
+        let date_str = deletion_date.format("%Y-%m-%d %H:%M UTC").to_string();
         let subject = "Your Oppskrift account deletion is scheduled";
         let body = format!(
             r#"<!DOCTYPE html>
@@ -277,10 +276,35 @@ impl EmailService {
     </p>
 </body>
 </html>"#,
-            deletion_date
+            date_str
         );
 
         self.send(to, subject, &body).await
+    }
+
+    /// Send account deletion cancelled notification
+    pub async fn send_deletion_cancelled_notification(&self, to: &str) -> Result<(), EmailError> {
+        let subject = "Your Oppskrift account deletion has been cancelled";
+        let body = r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Account Deletion Cancelled</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h1 style="color: #333;">Account Deletion Cancelled</h1>
+    <p>Your Oppskrift account deletion has been cancelled.</p>
+    <p style="color: #059669; font-weight: bold;">
+        Your account is now active again and all your data has been preserved.
+    </p>
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    <p style="color: #999; font-size: 12px;">
+        This is an automated notification from Oppskrift.
+    </p>
+</body>
+</html>"#;
+
+        self.send(to, subject, body).await
     }
 }
 
