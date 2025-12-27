@@ -1,13 +1,13 @@
 use axum::{
     extract::{Multipart, Path, Query, State},
     http::{header, HeaderMap, StatusCode},
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::{AuthUser, OptionalAuthUser};
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
 use crate::lib::schema_org::SchemaOrgRecipe;
@@ -27,7 +27,9 @@ pub fn routes() -> Router<AppState> {
             "/{id}",
             get(get_recipe).put(update_recipe).delete(delete_recipe),
         )
-        .route("/{id}/images", post(upload_image))
+        .route("/{id}/images", get(list_images).post(upload_image))
+        .route("/{id}/images/{image_id}", delete(delete_image))
+        .route("/{id}/images/{image_id}/primary", post(set_primary_image))
 }
 
 /// Request body for creating a recipe with ingredients and instructions
@@ -91,6 +93,12 @@ async fn create_recipe(
         vec![]
     };
 
+    // Create ActivityPub activity for federation
+    let _ = crate::services::ActivityService::create_recipe_activity(
+        &state.db, auth.id, recipe.id, &base_url,
+    )
+    .await;
+
     Ok((
         StatusCode::CREATED,
         Json(RecipeResponse {
@@ -106,11 +114,13 @@ async fn create_recipe(
 async fn get_recipe(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    auth: OptionalAuthUser,
     headers: HeaderMap,
 ) -> AppResult<axum::response::Response> {
     use axum::response::IntoResponse;
 
-    let recipe = RecipeService::get_by_id(&state.db, id).await?;
+    let viewer_id = auth.0.map(|u| u.id);
+    let recipe = RecipeService::get_by_id_authorized(&state.db, id, viewer_id).await?;
     let ingredients = RecipeService::get_ingredients(&state.db, id).await?;
     let instructions = RecipeService::get_instructions(&state.db, id).await?;
     let images = ImageService::get_images(&state.db, id).await?;
@@ -286,4 +296,59 @@ async fn upload_image(
         ImageService::upload_image(&state.db, &storage, id, data, alt_text, is_primary).await?;
 
     Ok((StatusCode::CREATED, Json(image)))
+}
+
+/// GET /api/v1/recipes/{id}/images
+/// List all images for a recipe
+async fn list_images(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Vec<RecipeImage>>> {
+    // Verify recipe exists
+    let _ = RecipeService::get_by_id(&state.db, id).await?;
+
+    let images = ImageService::get_images(&state.db, id).await?;
+    Ok(Json(images))
+}
+
+/// DELETE /api/v1/recipes/{id}/images/{image_id}
+/// Delete an image from a recipe
+async fn delete_image(
+    State(state): State<AppState>,
+    Path((id, image_id)): Path<(Uuid, Uuid)>,
+    auth: AuthUser,
+) -> AppResult<StatusCode> {
+    // Check ownership
+    let recipe = RecipeService::get_by_id(&state.db, id).await?;
+    if recipe.author_id != auth.id {
+        return Err(AppError::Forbidden(
+            "Not authorized to modify this recipe".to_string(),
+        ));
+    }
+
+    // Delete the image
+    let storage = StorageClient::from_env().await?;
+    ImageService::delete_image(&state.db, &storage, image_id).await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/v1/recipes/{id}/images/{image_id}/primary
+/// Set an image as the primary image for a recipe
+async fn set_primary_image(
+    State(state): State<AppState>,
+    Path((id, image_id)): Path<(Uuid, Uuid)>,
+    auth: AuthUser,
+) -> AppResult<Json<RecipeImage>> {
+    // Check ownership
+    let recipe = RecipeService::get_by_id(&state.db, id).await?;
+    if recipe.author_id != auth.id {
+        return Err(AppError::Forbidden(
+            "Not authorized to modify this recipe".to_string(),
+        ));
+    }
+
+    // Set as primary
+    let image = ImageService::set_primary(&state.db, image_id).await?;
+    Ok(Json(image))
 }

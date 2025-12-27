@@ -6,7 +6,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::{AuthUser, OptionalAuthUser};
 use crate::lib::error::{AppError, AppResult};
 use crate::lib::pagination::{PaginatedResponse, PaginationParams};
 use crate::lib::storage::StorageClient;
@@ -120,16 +120,24 @@ async fn create_book(
 
     let book = BookService::create(&state.db, auth.id, input, &base_url).await?;
 
+    // Create ActivityPub activity for federation
+    let _ = crate::services::ActivityService::create_book_activity(
+        &state.db, auth.id, book.id, &base_url,
+    )
+    .await;
+
     Ok((StatusCode::CREATED, Json(book)))
 }
 
 /// GET /api/v1/books/{id}
-/// Get a recipe book by ID
+/// Get a recipe book by ID (respects visibility)
 async fn get_book(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    auth: OptionalAuthUser,
 ) -> AppResult<Json<BookResponse>> {
-    let book = BookService::get_by_id(&state.db, id).await?;
+    let viewer_id = auth.0.map(|u| u.id);
+    let book = BookService::get_by_id_authorized(&state.db, id, viewer_id).await?;
 
     // Get recipe count
     let recipe_count: i64 = sqlx::query_scalar!(
@@ -193,14 +201,26 @@ async fn list_books(
 }
 
 /// GET /api/v1/books/{id}/recipes
-/// Get recipes in a book
+/// Get recipes in a book (respects book visibility and recipe visibility)
 async fn get_book_recipes(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    auth: OptionalAuthUser,
     Query(params): Query<PaginationParams>,
 ) -> AppResult<Json<PaginatedResponse<RecipeSummary>>> {
-    let recipes = BookService::get_recipes_in_book(&state.db, id, &params).await?;
-    Ok(Json(recipes))
+    let viewer_id = auth.0.map(|u| u.id);
+
+    // First check if viewer can access the book
+    let book = BookService::get_by_id_authorized(&state.db, id, viewer_id).await?;
+
+    // If viewer is the owner, show all recipes; otherwise show only public ones
+    if viewer_id == Some(book.owner_id) {
+        let recipes = BookService::get_recipes_in_book(&state.db, id, &params).await?;
+        Ok(Json(recipes))
+    } else {
+        let recipes = BookService::get_public_recipes_in_book(&state.db, id, &params).await?;
+        Ok(Json(recipes))
+    }
 }
 
 /// POST /api/v1/books/{id}/recipes
