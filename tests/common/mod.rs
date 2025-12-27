@@ -123,12 +123,13 @@ impl TestContext {
         email: &str,
         expired: bool,
     ) -> String {
-        // Generate a random token
-        let token = format!("{:064x}", Uuid::new_v4().as_u128());
+        // Generate random bytes like the server does
+        let token_bytes: [u8; 32] = rand::random();
+        let token = hex::encode(token_bytes);
 
-        // Hash it like the auth service does
+        // Hash the raw bytes (not the hex string) like the server does
         let mut hasher = Sha256::new();
-        hasher.update(token.as_bytes());
+        hasher.update(token_bytes);
         let token_hash = hex::encode(hasher.finalize());
 
         // Set expiry (24 hours normally, or in the past if expired)
@@ -158,12 +159,13 @@ impl TestContext {
     /// Create a password reset token for testing
     /// Returns the raw token (not hashed) to use in API calls
     pub async fn create_password_reset_token(&self, user_id: Uuid, expired: bool) -> String {
-        // Generate a random token
-        let token = format!("{:064x}", Uuid::new_v4().as_u128());
+        // Generate random bytes like the server does
+        let token_bytes: [u8; 32] = rand::random();
+        let token = hex::encode(token_bytes);
 
-        // Hash it like the auth service does
+        // Hash the raw bytes (not the hex string) like the server does
         let mut hasher = Sha256::new();
-        hasher.update(token.as_bytes());
+        hasher.update(token_bytes);
         let token_hash = hex::encode(hasher.finalize());
 
         // Set expiry (1 hour normally, or in the past if expired)
@@ -353,6 +355,6 @@ impl ApiResponse {
     }
 
     pub fn error_message(&self) -> Option<&str> {
-        self.body.get("error").and_then(|v| v.as_str())
+        self.body.get("message").and_then(|v| v.as_str())
     }
 }

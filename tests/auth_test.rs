@@ -26,7 +26,7 @@ async fn test_registration_success() {
             json!({
                 "email": email,
                 "username": username,
-                "password": "SecurePass123!",
+                "password": "Xk9#mP2$vL5@nQ8!",
                 "display_name": "Test User"
             }),
         )
@@ -71,7 +71,7 @@ async fn test_registration_duplicate_email() {
             json!({
                 "email": email,
                 "username": username1,
-                "password": "SecurePass123!"
+                "password": "Xk9#mP2$vL5@nQ8!"
             }),
         )
         .await;
@@ -89,7 +89,7 @@ async fn test_registration_duplicate_email() {
             json!({
                 "email": email,
                 "username": username2,
-                "password": "SecurePass123!"
+                "password": "Xk9#mP2$vL5@nQ8!"
             }),
         )
         .await;
@@ -114,7 +114,7 @@ async fn test_registration_invalid_email() {
             json!({
                 "email": "not-an-email",
                 "username": TestContext::unique_username(),
-                "password": "SecurePass123!"
+                "password": "Xk9#mP2$vL5@nQ8!"
             }),
         )
         .await;
@@ -154,12 +154,12 @@ async fn test_registration_reserved_username() {
             json!({
                 "email": TestContext::unique_email(),
                 "username": "admin",
-                "password": "SecurePass123!"
+                "password": "Xk9#mP2$vL5@nQ8!"
             }),
         )
         .await;
 
-    assert_eq!(response.status, 409, "Expected 409 for reserved username");
+    assert_eq!(response.status, 400, "Expected 400 for reserved username");
 }
 
 /// Test: Login with valid credentials
@@ -170,7 +170,7 @@ async fn test_login_success() {
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
-    let password = "SecurePass123!";
+    let password = "Xk9#mP2$vL5@nQ8!";
 
     // Create verified user directly in DB
     ctx.create_user(&email, &username, password, true).await;
@@ -206,7 +206,7 @@ async fn test_login_unverified_email() {
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
-    let password = "SecurePass123!";
+    let password = "Xk9#mP2$vL5@nQ8!";
 
     // Create unverified user
     ctx.create_user(&email, &username, password, false).await;
@@ -312,7 +312,7 @@ async fn test_login_returns_session_cookie() {
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
-    let password = "SecurePass123!";
+    let password = "Xk9#mP2$vL5@nQ8!";
 
     // Create verified user
     ctx.create_user(&email, &username, password, true).await;
@@ -344,7 +344,7 @@ async fn test_access_protected_endpoint_with_session() {
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
-    let password = "SecurePass123!";
+    let password = "Xk9#mP2$vL5@nQ8!";
 
     // Create verified user and login
     ctx.create_user(&email, &username, password, true).await;
@@ -399,7 +399,7 @@ async fn test_logout_invalidates_session() {
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
-    let password = "SecurePass123!";
+    let password = "Xk9#mP2$vL5@nQ8!";
 
     // Create verified user and login
     ctx.create_user(&email, &username, password, true).await;
@@ -499,7 +499,7 @@ async fn test_reset_password_success() {
             "/api/v1/auth/reset-password",
             json!({
                 "token": token,
-                "new_password": "NewSecurePass123!"
+                "new_password": "NewXk9#mP2$vL5@nQ8!"
             }),
         )
         .await;
@@ -516,7 +516,7 @@ async fn test_reset_password_success() {
             "/api/v1/auth/login",
             json!({
                 "email": email,
-                "password": "NewSecurePass123!"
+                "password": "NewXk9#mP2$vL5@nQ8!"
             }),
         )
         .await;
@@ -537,7 +537,7 @@ async fn test_reset_password_invalid_token() {
             "/api/v1/auth/reset-password",
             json!({
                 "token": "0000000000000000000000000000000000000000000000000000000000000000",
-                "new_password": "NewSecurePass123!"
+                "new_password": "NewXk9#mP2$vL5@nQ8!"
             }),
         )
         .await;
@@ -567,7 +567,7 @@ async fn test_reset_password_expired_token() {
             "/api/v1/auth/reset-password",
             json!({
                 "token": token,
-                "new_password": "NewSecurePass123!"
+                "new_password": "NewXk9#mP2$vL5@nQ8!"
             }),
         )
         .await;
@@ -624,7 +624,7 @@ async fn test_confirm_email_success() {
 
     // Create unverified user
     let user_id = ctx
-        .create_user(&email, &username, "SecurePass123!", false)
+        .create_user(&email, &username, "Xk9#mP2$vL5@nQ8!", false)
         .await;
 
     // Create confirmation token
@@ -649,7 +649,7 @@ async fn test_confirm_email_success() {
             "/api/v1/auth/login",
             json!({
                 "email": email,
-                "password": "SecurePass123!"
+                "password": "Xk9#mP2$vL5@nQ8!"
             }),
         )
         .await;
@@ -686,7 +686,7 @@ async fn test_confirm_email_expired_token() {
 
     // Create unverified user
     let user_id = ctx
-        .create_user(&email, &username, "SecurePass123!", false)
+        .create_user(&email, &username, "Xk9#mP2$vL5@nQ8!", false)
         .await;
 
     // Create expired token
@@ -714,7 +714,7 @@ async fn test_confirm_email_already_verified() {
 
     // Create already verified user
     let user_id = ctx
-        .create_user(&email, &username, "SecurePass123!", true)
+        .create_user(&email, &username, "Xk9#mP2$vL5@nQ8!", true)
         .await;
 
     // Create confirmation token anyway
