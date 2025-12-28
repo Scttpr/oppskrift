@@ -111,6 +111,11 @@ pub struct RecipeSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use validator::Validate;
+
+    // ==========================================================================
+    // Visibility Tests (T046)
+    // ==========================================================================
 
     #[test]
     fn test_visibility_default() {
@@ -118,9 +123,315 @@ mod tests {
     }
 
     #[test]
+    fn test_visibility_display() {
+        assert_eq!(Visibility::Public.to_string(), "Public");
+        assert_eq!(Visibility::Private.to_string(), "Private");
+    }
+
+    #[test]
+    fn test_visibility_serialization() {
+        let public = Visibility::Public;
+        let json = serde_json::to_string(&public).unwrap();
+        assert_eq!(json, "\"public\"");
+
+        let private = Visibility::Private;
+        let json = serde_json::to_string(&private).unwrap();
+        assert_eq!(json, "\"private\"");
+    }
+
+    #[test]
+    fn test_visibility_deserialization() {
+        let public: Visibility = serde_json::from_str("\"public\"").unwrap();
+        assert_eq!(public, Visibility::Public);
+
+        let private: Visibility = serde_json::from_str("\"private\"").unwrap();
+        assert_eq!(private, Visibility::Private);
+    }
+
+    // ==========================================================================
+    // Difficulty Tests (T046)
+    // ==========================================================================
+
+    #[test]
     fn test_difficulty_serialization() {
         let easy = Difficulty::Easy;
         let json = serde_json::to_string(&easy).unwrap();
         assert_eq!(json, "\"easy\"");
+    }
+
+    #[test]
+    fn test_difficulty_all_variants_serialization() {
+        assert_eq!(
+            serde_json::to_string(&Difficulty::Easy).unwrap(),
+            "\"easy\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Difficulty::Medium).unwrap(),
+            "\"medium\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Difficulty::Hard).unwrap(),
+            "\"hard\""
+        );
+    }
+
+    #[test]
+    fn test_difficulty_deserialization() {
+        let easy: Difficulty = serde_json::from_str("\"easy\"").unwrap();
+        assert_eq!(easy, Difficulty::Easy);
+
+        let medium: Difficulty = serde_json::from_str("\"medium\"").unwrap();
+        assert_eq!(medium, Difficulty::Medium);
+
+        let hard: Difficulty = serde_json::from_str("\"hard\"").unwrap();
+        assert_eq!(hard, Difficulty::Hard);
+    }
+
+    #[test]
+    fn test_difficulty_display() {
+        assert_eq!(Difficulty::Easy.to_string(), "Easy");
+        assert_eq!(Difficulty::Medium.to_string(), "Medium");
+        assert_eq!(Difficulty::Hard.to_string(), "Hard");
+    }
+
+    // ==========================================================================
+    // CreateRecipe Validation Tests (T046)
+    // ==========================================================================
+
+    #[test]
+    fn test_create_recipe_valid() {
+        let recipe = CreateRecipe {
+            title: "Chocolate Cake".to_string(),
+            description: Some("A delicious cake".to_string()),
+            visibility: Some(Visibility::Public),
+            prep_time_min: Some(30),
+            cook_time_min: Some(45),
+            servings: Some("8 servings".to_string()),
+            difficulty: Some(Difficulty::Medium),
+        };
+        assert!(recipe.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_recipe_minimal() {
+        let recipe = CreateRecipe {
+            title: "Pasta".to_string(),
+            description: None,
+            visibility: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+        };
+        assert!(recipe.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_recipe_title_empty() {
+        let recipe = CreateRecipe {
+            title: "".to_string(),
+            description: None,
+            visibility: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+        };
+        assert!(recipe.validate().is_err());
+    }
+
+    #[test]
+    fn test_create_recipe_title_too_long() {
+        let recipe = CreateRecipe {
+            title: "x".repeat(201),
+            description: None,
+            visibility: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+        };
+        assert!(recipe.validate().is_err());
+    }
+
+    #[test]
+    fn test_create_recipe_title_at_max() {
+        let recipe = CreateRecipe {
+            title: "x".repeat(200),
+            description: None,
+            visibility: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+        };
+        assert!(recipe.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_recipe_description_too_long() {
+        let recipe = CreateRecipe {
+            title: "Test".to_string(),
+            description: Some("x".repeat(2001)),
+            visibility: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+        };
+        assert!(recipe.validate().is_err());
+    }
+
+    #[test]
+    fn test_create_recipe_prep_time_negative() {
+        let recipe = CreateRecipe {
+            title: "Test".to_string(),
+            description: None,
+            visibility: None,
+            prep_time_min: Some(-1),
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+        };
+        assert!(recipe.validate().is_err());
+    }
+
+    #[test]
+    fn test_create_recipe_prep_time_too_large() {
+        let recipe = CreateRecipe {
+            title: "Test".to_string(),
+            description: None,
+            visibility: None,
+            prep_time_min: Some(1441), // > 24 hours
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+        };
+        assert!(recipe.validate().is_err());
+    }
+
+    #[test]
+    fn test_create_recipe_cook_time_negative() {
+        let recipe = CreateRecipe {
+            title: "Test".to_string(),
+            description: None,
+            visibility: None,
+            prep_time_min: None,
+            cook_time_min: Some(-5),
+            servings: None,
+            difficulty: None,
+        };
+        assert!(recipe.validate().is_err());
+    }
+
+    #[test]
+    fn test_create_recipe_servings_too_long() {
+        let recipe = CreateRecipe {
+            title: "Test".to_string(),
+            description: None,
+            visibility: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            servings: Some("x".repeat(101)),
+            difficulty: None,
+        };
+        assert!(recipe.validate().is_err());
+    }
+
+    // ==========================================================================
+    // UpdateRecipe Validation Tests (T046)
+    // ==========================================================================
+
+    #[test]
+    fn test_update_recipe_valid() {
+        let update = UpdateRecipe {
+            title: Some("Updated Title".to_string()),
+            description: Some("New description".to_string()),
+            visibility: Some(Visibility::Private),
+            prep_time_min: Some(20),
+            cook_time_min: Some(30),
+            servings: Some("4".to_string()),
+            difficulty: Some(Difficulty::Easy),
+        };
+        assert!(update.validate().is_ok());
+    }
+
+    #[test]
+    fn test_update_recipe_all_none() {
+        let update = UpdateRecipe {
+            title: None,
+            description: None,
+            visibility: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+        };
+        assert!(update.validate().is_ok());
+    }
+
+    #[test]
+    fn test_update_recipe_title_too_short() {
+        let update = UpdateRecipe {
+            title: Some("".to_string()),
+            description: None,
+            visibility: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+        };
+        assert!(update.validate().is_err());
+    }
+
+    // ==========================================================================
+    // Recipe Serialization Round-Trip Tests (T046)
+    // ==========================================================================
+
+    #[test]
+    fn test_recipe_serialization_roundtrip() {
+        let recipe = Recipe {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "Test Recipe".to_string(),
+            description: Some("A test recipe".to_string()),
+            visibility: Visibility::Public,
+            prep_time_min: Some(30),
+            cook_time_min: Some(45),
+            servings: Some("4".to_string()),
+            difficulty: Some(Difficulty::Medium),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            ap_id: "https://example.com/recipes/123".to_string(),
+        };
+
+        let json = serde_json::to_string(&recipe).unwrap();
+        let deserialized: Recipe = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(recipe.id, deserialized.id);
+        assert_eq!(recipe.title, deserialized.title);
+        assert_eq!(recipe.visibility, deserialized.visibility);
+        assert_eq!(recipe.difficulty, deserialized.difficulty);
+    }
+
+    #[test]
+    fn test_recipe_summary_serialization() {
+        let summary = RecipeSummary {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "Summary Recipe".to_string(),
+            description: None,
+            prep_time_min: Some(10),
+            cook_time_min: None,
+            difficulty: Some(Difficulty::Easy),
+            created_at: Utc::now(),
+            primary_image_url: Some("https://example.com/image.jpg".to_string()),
+        };
+
+        let json = serde_json::to_string(&summary).unwrap();
+        let deserialized: RecipeSummary = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(summary.id, deserialized.id);
+        assert_eq!(summary.title, deserialized.title);
     }
 }
