@@ -628,10 +628,11 @@ impl AuthService {
             .await?;
 
         // Store new pending token
+        // Note: Cast IP to INET directly in SQL since sqlx doesn't auto-convert IpAddr
         sqlx::query(
             r#"
             INSERT INTO two_factor_pending_tokens (user_id, token_hash, ip_address, user_agent, expires_at)
-            VALUES ($1, $2, $3, $4, $5)
+            VALUES ($1, $2, $3::inet, $4, $5)
             "#,
         )
         .bind(user_id)
