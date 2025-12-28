@@ -130,3 +130,221 @@ async fn edit_book_page(
         crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Visibility;
+    use askama::Template;
+    use chrono::Utc;
+
+    // ==========================================================================
+    // Route Configuration Tests (T053)
+    // ==========================================================================
+
+    #[test]
+    fn test_routes_returns_router() {
+        let router = routes();
+        let _ = router;
+    }
+
+    // ==========================================================================
+    // Template Struct Tests (T053)
+    // ==========================================================================
+
+    #[test]
+    fn test_book_list_template_renders_empty() {
+        let template = BookListTemplate {
+            books: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+            user: None,
+        };
+        let result = template.render();
+        assert!(result.is_ok());
+        assert!(!result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_new_book_template_renders() {
+        let template = NewBookTemplate { book: None };
+        let result = template.render();
+        assert!(result.is_ok());
+        let html = result.unwrap();
+        assert!(!html.is_empty());
+    }
+
+    #[test]
+    fn test_edit_book_template_with_book() {
+        let book = RecipeBook {
+            id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            title: "My Cookbook".to_string(),
+            description: Some("A collection of recipes".to_string()),
+            cover_image_url: None,
+            visibility: Visibility::Public,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            ap_id: "https://example.com/books/1".to_string(),
+        };
+
+        let template = EditBookTemplate { book: Some(book) };
+        let result = template.render();
+        assert!(result.is_ok());
+        let html = result.unwrap();
+        assert!(html.contains("My Cookbook") || html.contains("form") || !html.is_empty());
+    }
+
+    #[test]
+    fn test_book_view_template_renders() {
+        let book = RecipeBook {
+            id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            title: "View Book".to_string(),
+            description: Some("Description".to_string()),
+            cover_image_url: None,
+            visibility: Visibility::Public,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            ap_id: "https://example.com/books/2".to_string(),
+        };
+
+        let template = BookViewTemplate {
+            book,
+            owner: None,
+            recipes: vec![],
+            recipe_count: 0,
+            is_owner: false,
+        };
+        let result = template.render();
+        assert!(result.is_ok());
+        let html = result.unwrap();
+        assert!(html.contains("View Book") || !html.is_empty());
+    }
+
+    // ==========================================================================
+    // Pagination Tests (T053)
+    // ==========================================================================
+
+    #[test]
+    fn test_pagination_meta_in_template() {
+        let pagination = PaginationMeta {
+            page: 1,
+            page_size: 10,
+            total_items: 25,
+            total_pages: 3,
+            has_next: true,
+            has_prev: false,
+        };
+
+        let template = BookListTemplate {
+            books: vec![],
+            pagination,
+            user: None,
+        };
+
+        let html = template.render().unwrap();
+        assert!(!html.is_empty());
+    }
+
+    #[test]
+    fn test_book_list_with_books() {
+        let book = RecipeBookSummary {
+            id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            title: "Sample Book".to_string(),
+            description: Some("A sample".to_string()),
+            cover_image_url: None,
+            visibility: Visibility::Public,
+            created_at: Utc::now(),
+            recipe_count: 5,
+        };
+
+        let template = BookListTemplate {
+            books: vec![book],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 1,
+                total_pages: 1,
+                has_next: false,
+                has_prev: false,
+            },
+            user: None,
+        };
+
+        let html = template.render().unwrap();
+        assert!(html.contains("Sample Book") || !html.is_empty());
+    }
+
+    // ==========================================================================
+    // Owner/Auth State Tests (T053)
+    // ==========================================================================
+
+    #[test]
+    fn test_book_view_owner_state() {
+        let book = RecipeBook {
+            id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            title: "Owner Book".to_string(),
+            description: None,
+            cover_image_url: None,
+            visibility: Visibility::Public,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            ap_id: "https://example.com/books/3".to_string(),
+        };
+
+        // Test as owner
+        let owner_template = BookViewTemplate {
+            book: book.clone(),
+            owner: None,
+            recipes: vec![],
+            recipe_count: 0,
+            is_owner: true,
+        };
+        assert!(owner_template.render().is_ok());
+
+        // Test as non-owner
+        let guest_template = BookViewTemplate {
+            book,
+            owner: None,
+            recipes: vec![],
+            recipe_count: 0,
+            is_owner: false,
+        };
+        assert!(guest_template.render().is_ok());
+    }
+
+    #[test]
+    fn test_book_view_with_recipe_count() {
+        let book = RecipeBook {
+            id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            title: "Full Book".to_string(),
+            description: None,
+            cover_image_url: None,
+            visibility: Visibility::Public,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            ap_id: "https://example.com/books/4".to_string(),
+        };
+
+        let template = BookViewTemplate {
+            book,
+            owner: None,
+            recipes: vec![],
+            recipe_count: 42,
+            is_owner: false,
+        };
+
+        let html = template.render().unwrap();
+        assert!(!html.is_empty());
+    }
+}

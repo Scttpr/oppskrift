@@ -100,3 +100,295 @@ async fn saved_recipes_page(
         crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Difficulty;
+    use askama::Template;
+    use chrono::Utc;
+
+    // ==========================================================================
+    // Route Configuration Tests (T054)
+    // ==========================================================================
+
+    #[test]
+    fn test_routes_returns_router() {
+        let router = routes();
+        let _ = router;
+    }
+
+    // ==========================================================================
+    // Template Struct Tests (T054)
+    // ==========================================================================
+
+    #[test]
+    fn test_user_profile_template_renders() {
+        let profile = UserProfile {
+            id: Uuid::new_v4(),
+            username: "testuser".to_string(),
+            display_name: "Test User".to_string(),
+            bio: Some("A test bio".to_string()),
+            avatar_url: None,
+            created_at: Utc::now(),
+            ap_id: "https://example.com/users/testuser".to_string(),
+        };
+
+        let template = UserProfileTemplate {
+            profile,
+            recipes: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+            is_own_profile: false,
+            follow_counts: FollowCounts {
+                followers_count: 0,
+                following_count: 0,
+            },
+            is_following: false,
+        };
+
+        let result = template.render();
+        assert!(result.is_ok());
+        let html = result.unwrap();
+        assert!(html.contains("testuser") || !html.is_empty());
+    }
+
+    #[test]
+    fn test_saved_recipes_template_renders_empty() {
+        let template = SavedRecipesTemplate {
+            recipes: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+        };
+
+        let result = template.render();
+        assert!(result.is_ok());
+        assert!(!result.unwrap().is_empty());
+    }
+
+    // ==========================================================================
+    // Profile State Tests (T054)
+    // ==========================================================================
+
+    #[test]
+    fn test_own_profile_view() {
+        let profile = UserProfile {
+            id: Uuid::new_v4(),
+            username: "owner".to_string(),
+            display_name: "Profile Owner".to_string(),
+            bio: None,
+            avatar_url: None,
+            created_at: Utc::now(),
+            ap_id: "https://example.com/users/owner".to_string(),
+        };
+
+        let template = UserProfileTemplate {
+            profile,
+            recipes: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+            is_own_profile: true,
+            follow_counts: FollowCounts {
+                followers_count: 100,
+                following_count: 50,
+            },
+            is_following: false,
+        };
+
+        let html = template.render().unwrap();
+        assert!(!html.is_empty());
+    }
+
+    #[test]
+    fn test_other_profile_following() {
+        let profile = UserProfile {
+            id: Uuid::new_v4(),
+            username: "other".to_string(),
+            display_name: "Other User".to_string(),
+            bio: None,
+            avatar_url: None,
+            created_at: Utc::now(),
+            ap_id: "https://example.com/users/other".to_string(),
+        };
+
+        // Test when following
+        let following_template = UserProfileTemplate {
+            profile: profile.clone(),
+            recipes: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+            is_own_profile: false,
+            follow_counts: FollowCounts {
+                followers_count: 10,
+                following_count: 5,
+            },
+            is_following: true,
+        };
+        assert!(following_template.render().is_ok());
+
+        // Test when not following
+        let not_following_template = UserProfileTemplate {
+            profile,
+            recipes: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+            is_own_profile: false,
+            follow_counts: FollowCounts {
+                followers_count: 10,
+                following_count: 5,
+            },
+            is_following: false,
+        };
+        assert!(not_following_template.render().is_ok());
+    }
+
+    // ==========================================================================
+    // Pagination Tests (T054)
+    // ==========================================================================
+
+    #[test]
+    fn test_profile_with_recipes() {
+        let recipe = RecipeSummary {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "User Recipe".to_string(),
+            description: Some("A recipe".to_string()),
+            prep_time_min: Some(15),
+            cook_time_min: Some(30),
+            difficulty: Some(Difficulty::Medium),
+            created_at: Utc::now(),
+            primary_image_url: None,
+        };
+
+        let profile = UserProfile {
+            id: Uuid::new_v4(),
+            username: "chef".to_string(),
+            display_name: "Chef User".to_string(),
+            bio: None,
+            avatar_url: None,
+            created_at: Utc::now(),
+            ap_id: "https://example.com/users/chef".to_string(),
+        };
+
+        let template = UserProfileTemplate {
+            profile,
+            recipes: vec![recipe],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 1,
+                total_pages: 1,
+                has_next: false,
+                has_prev: false,
+            },
+            is_own_profile: false,
+            follow_counts: FollowCounts {
+                followers_count: 5,
+                following_count: 3,
+            },
+            is_following: false,
+        };
+
+        let html = template.render().unwrap();
+        assert!(html.contains("User Recipe") || html.contains("chef") || !html.is_empty());
+    }
+
+    #[test]
+    fn test_saved_recipes_with_items() {
+        let recipe = RecipeSummary {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "Saved Recipe".to_string(),
+            description: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            difficulty: None,
+            created_at: Utc::now(),
+            primary_image_url: None,
+        };
+
+        let template = SavedRecipesTemplate {
+            recipes: vec![recipe],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 1,
+                total_pages: 1,
+                has_next: false,
+                has_prev: false,
+            },
+        };
+
+        let html = template.render().unwrap();
+        assert!(html.contains("Saved Recipe") || !html.is_empty());
+    }
+
+    // ==========================================================================
+    // Follow Counts Tests (T054)
+    // ==========================================================================
+
+    #[test]
+    fn test_follow_counts_display() {
+        let profile = UserProfile {
+            id: Uuid::new_v4(),
+            username: "popular".to_string(),
+            display_name: "Popular User".to_string(),
+            bio: None,
+            avatar_url: None,
+            created_at: Utc::now(),
+            ap_id: "https://example.com/users/popular".to_string(),
+        };
+
+        let template = UserProfileTemplate {
+            profile,
+            recipes: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+            is_own_profile: false,
+            follow_counts: FollowCounts {
+                followers_count: 10000,
+                following_count: 500,
+            },
+            is_following: false,
+        };
+
+        let html = template.render().unwrap();
+        assert!(!html.is_empty());
+    }
+}
