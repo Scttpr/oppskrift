@@ -234,6 +234,10 @@ impl ActivityService {
 mod tests {
     use super::*;
 
+    // ==========================================================================
+    // ActivityType Tests (T044 - Error Paths)
+    // ==========================================================================
+
     #[test]
     fn test_activity_type_mapping() {
         let create = ActivityType::Create;
@@ -243,5 +247,172 @@ mod tests {
         assert_eq!(create.to_string(), "create");
         assert_eq!(share.to_string(), "share");
         assert_eq!(follow.to_string(), "follow");
+    }
+
+    #[test]
+    fn test_activity_type_all_variants() {
+        // Ensure all activity types can be created
+        let types = [
+            ActivityType::Create,
+            ActivityType::Follow,
+            ActivityType::Share,
+        ];
+
+        for activity_type in types {
+            assert!(!activity_type.to_string().is_empty());
+        }
+    }
+
+    // ==========================================================================
+    // TargetType Tests (T044)
+    // ==========================================================================
+
+    #[test]
+    fn test_target_type_mapping() {
+        assert_eq!(TargetType::Recipe.to_string(), "recipe");
+        assert_eq!(TargetType::Book.to_string(), "book");
+        assert_eq!(TargetType::User.to_string(), "user");
+    }
+
+    #[test]
+    fn test_target_type_all_variants() {
+        let types = [TargetType::Recipe, TargetType::Book, TargetType::User];
+
+        for target_type in types {
+            assert!(!target_type.to_string().is_empty());
+        }
+    }
+
+    // ==========================================================================
+    // CreateActivity Input Tests (T044)
+    // ==========================================================================
+
+    #[test]
+    fn test_create_activity_recipe() {
+        let input = CreateActivity {
+            actor_id: Uuid::new_v4(),
+            activity_type: ActivityType::Create,
+            target_type: TargetType::Recipe,
+            target_id: Uuid::new_v4(),
+        };
+
+        assert_ne!(input.actor_id, input.target_id);
+    }
+
+    #[test]
+    fn test_create_activity_follow() {
+        let follower = Uuid::new_v4();
+        let following = Uuid::new_v4();
+
+        let input = CreateActivity {
+            actor_id: follower,
+            activity_type: ActivityType::Follow,
+            target_type: TargetType::User,
+            target_id: following,
+        };
+
+        assert_eq!(input.activity_type, ActivityType::Follow);
+        assert_eq!(input.target_type, TargetType::User);
+    }
+
+    #[test]
+    fn test_create_activity_share() {
+        let input = CreateActivity {
+            actor_id: Uuid::new_v4(),
+            activity_type: ActivityType::Share,
+            target_type: TargetType::Recipe,
+            target_id: Uuid::new_v4(),
+        };
+
+        assert_eq!(input.activity_type, ActivityType::Share);
+    }
+
+    // ==========================================================================
+    // AP ID Format Tests (T044)
+    // ==========================================================================
+
+    #[test]
+    fn test_activity_ap_id_format() {
+        let base_url = "https://oppskrift.example.com";
+        let id = Uuid::new_v4();
+        let ap_id = format!("{}/activities/{}", base_url, id);
+
+        assert!(ap_id.starts_with("https://"));
+        assert!(ap_id.contains("/activities/"));
+    }
+
+    #[test]
+    fn test_ap_id_uniqueness() {
+        let base_url = "https://example.com";
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+
+        let ap_id1 = format!("{}/activities/{}", base_url, id1);
+        let ap_id2 = format!("{}/activities/{}", base_url, id2);
+
+        assert_ne!(ap_id1, ap_id2);
+    }
+
+    // ==========================================================================
+    // Pagination Tests (T044)
+    // ==========================================================================
+
+    #[test]
+    fn test_pagination_params_defaults() {
+        let params = PaginationParams {
+            page: 1,
+            page_size: 20,
+        };
+        assert_eq!(params.page, 1);
+        assert_eq!(params.page_size, 20);
+    }
+
+    #[test]
+    fn test_pagination_offset_calculation() {
+        let params = PaginationParams {
+            page: 5,
+            page_size: 10,
+        };
+        assert_eq!(params.offset(), 40); // (5-1) * 10
+    }
+
+    // ==========================================================================
+    // ActivityWithActor Tests (T044)
+    // ==========================================================================
+
+    #[test]
+    fn test_activity_with_actor_display_name() {
+        let activity = ActivityWithActor {
+            id: Uuid::new_v4(),
+            actor_id: Uuid::new_v4(),
+            actor_username: "chef_jane".to_string(),
+            actor_display_name: "Chef Jane".to_string(),
+            actor_avatar_url: Some("https://example.com/avatar.jpg".to_string()),
+            activity_type: ActivityType::Create,
+            target_type: TargetType::Recipe,
+            target_id: Uuid::new_v4(),
+            created_at: chrono::Utc::now(),
+        };
+
+        assert_eq!(activity.actor_username, "chef_jane");
+        assert_eq!(activity.actor_display_name, "Chef Jane");
+    }
+
+    #[test]
+    fn test_activity_with_actor_no_avatar() {
+        let activity = ActivityWithActor {
+            id: Uuid::new_v4(),
+            actor_id: Uuid::new_v4(),
+            actor_username: "anonymous".to_string(),
+            actor_display_name: "Anonymous User".to_string(),
+            actor_avatar_url: None,
+            activity_type: ActivityType::Share,
+            target_type: TargetType::Recipe,
+            target_id: Uuid::new_v4(),
+            created_at: chrono::Utc::now(),
+        };
+
+        assert!(!activity.actor_display_name.is_empty());
+        assert!(activity.actor_avatar_url.is_none());
     }
 }

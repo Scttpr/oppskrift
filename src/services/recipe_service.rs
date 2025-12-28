@@ -426,6 +426,10 @@ impl RecipeService {
 mod tests {
     use super::*;
 
+    // ==========================================================================
+    // Pagination Tests
+    // ==========================================================================
+
     #[test]
     fn test_pagination_offset_calculation() {
         let params = PaginationParams {
@@ -442,10 +446,56 @@ mod tests {
     }
 
     #[test]
+    fn test_pagination_offset_large_page() {
+        let params = PaginationParams {
+            page: 100,
+            page_size: 25,
+        };
+        assert_eq!(params.offset(), 2475); // (100-1) * 25
+    }
+
+    // ==========================================================================
+    // Ingredient Validation Tests (T041 - Error Paths)
+    // ==========================================================================
+
+    #[test]
     fn test_validate_ingredients_ok() {
         let ingredients: Vec<CreateIngredient> = (1..=50)
             .map(|i| CreateIngredient {
                 position: i,
+                quantity: None,
+                unit: None,
+                name: format!("Ingredient {}", i),
+                notes: None,
+            })
+            .collect();
+
+        assert!(RecipeService::validate_ingredients(&ingredients).is_ok());
+    }
+
+    #[test]
+    fn test_validate_ingredients_empty() {
+        let ingredients: Vec<CreateIngredient> = vec![];
+        assert!(RecipeService::validate_ingredients(&ingredients).is_ok());
+    }
+
+    #[test]
+    fn test_validate_ingredients_single() {
+        let ingredients = vec![CreateIngredient {
+            position: 1,
+            quantity: Some(rust_decimal::Decimal::from(2)),
+            unit: Some("cups".to_string()),
+            name: "Flour".to_string(),
+            notes: Some("sifted".to_string()),
+        }];
+        assert!(RecipeService::validate_ingredients(&ingredients).is_ok());
+    }
+
+    #[test]
+    fn test_validate_ingredients_at_limit() {
+        let ingredients: Vec<CreateIngredient> = (1..=MAX_INGREDIENTS)
+            .map(|i| CreateIngredient {
+                position: i as i32,
                 quantity: None,
                 unit: None,
                 name: format!("Ingredient {}", i),
@@ -468,14 +518,74 @@ mod tests {
             })
             .collect();
 
+        let result = RecipeService::validate_ingredients(&ingredients);
+        assert!(result.is_err());
+
+        // Verify error message contains expected info
+        let err = result.unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("50"), "Error should mention max limit of 50");
+        assert!(
+            msg.contains("51"),
+            "Error should mention actual count of 51"
+        );
+    }
+
+    #[test]
+    fn test_validate_ingredients_way_too_many() {
+        let ingredients: Vec<CreateIngredient> = (1..=200)
+            .map(|i| CreateIngredient {
+                position: i,
+                quantity: None,
+                unit: None,
+                name: format!("Ingredient {}", i),
+                notes: None,
+            })
+            .collect();
+
         assert!(RecipeService::validate_ingredients(&ingredients).is_err());
     }
+
+    // ==========================================================================
+    // Instruction Validation Tests (T041 - Error Paths)
+    // ==========================================================================
 
     #[test]
     fn test_validate_instructions_ok() {
         let steps: Vec<CreateInstructionStep> = (1..=30)
             .map(|i| CreateInstructionStep {
                 step_number: i,
+                description: format!("Step {}", i),
+                image_url: None,
+                duration_min: None,
+            })
+            .collect();
+
+        assert!(RecipeService::validate_instructions(&steps).is_ok());
+    }
+
+    #[test]
+    fn test_validate_instructions_empty() {
+        let steps: Vec<CreateInstructionStep> = vec![];
+        assert!(RecipeService::validate_instructions(&steps).is_ok());
+    }
+
+    #[test]
+    fn test_validate_instructions_single() {
+        let steps = vec![CreateInstructionStep {
+            step_number: 1,
+            description: "Mix all ingredients together".to_string(),
+            image_url: Some("https://example.com/step1.jpg".to_string()),
+            duration_min: Some(5),
+        }];
+        assert!(RecipeService::validate_instructions(&steps).is_ok());
+    }
+
+    #[test]
+    fn test_validate_instructions_at_limit() {
+        let steps: Vec<CreateInstructionStep> = (1..=MAX_INSTRUCTIONS)
+            .map(|i| CreateInstructionStep {
+                step_number: i as i32,
                 description: format!("Step {}", i),
                 image_url: None,
                 duration_min: None,
@@ -496,6 +606,44 @@ mod tests {
             })
             .collect();
 
+        let result = RecipeService::validate_instructions(&steps);
+        assert!(result.is_err());
+
+        // Verify error message contains expected info
+        let err = result.unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("30"), "Error should mention max limit of 30");
+        assert!(
+            msg.contains("31"),
+            "Error should mention actual count of 31"
+        );
+    }
+
+    #[test]
+    fn test_validate_instructions_way_too_many() {
+        let steps: Vec<CreateInstructionStep> = (1..=100)
+            .map(|i| CreateInstructionStep {
+                step_number: i,
+                description: format!("Step {}", i),
+                image_url: None,
+                duration_min: None,
+            })
+            .collect();
+
         assert!(RecipeService::validate_instructions(&steps).is_err());
+    }
+
+    // ==========================================================================
+    // Constants Tests
+    // ==========================================================================
+
+    #[test]
+    fn test_max_ingredients_constant() {
+        assert_eq!(MAX_INGREDIENTS, 50);
+    }
+
+    #[test]
+    fn test_max_instructions_constant() {
+        assert_eq!(MAX_INSTRUCTIONS, 30);
     }
 }

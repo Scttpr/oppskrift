@@ -403,9 +403,149 @@ impl BookService {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    // ==========================================================================
+    // Visibility Tests (T042 - Error Paths)
+    // ==========================================================================
+
     #[test]
-    fn test_service_exists() {
-        // Just verify the module compiles
-        assert!(true);
+    fn test_visibility_default_is_public() {
+        let default = Visibility::default();
+        assert_eq!(default, Visibility::Public);
+    }
+
+    #[test]
+    fn test_visibility_variants() {
+        assert_eq!(Visibility::Public.to_string(), "Public");
+        assert_eq!(Visibility::Private.to_string(), "Private");
+    }
+
+    // ==========================================================================
+    // Pagination Parameter Tests (T042)
+    // ==========================================================================
+
+    #[test]
+    fn test_pagination_params_limit() {
+        let params = PaginationParams {
+            page: 1,
+            page_size: 20,
+        };
+        assert_eq!(params.limit(), 20);
+    }
+
+    #[test]
+    fn test_pagination_params_offset() {
+        let params = PaginationParams {
+            page: 3,
+            page_size: 10,
+        };
+        assert_eq!(params.offset(), 20); // (3-1) * 10
+    }
+
+    #[test]
+    fn test_pagination_params_first_page() {
+        let params = PaginationParams {
+            page: 1,
+            page_size: 25,
+        };
+        assert_eq!(params.offset(), 0);
+        assert_eq!(params.limit(), 25);
+    }
+
+    // ==========================================================================
+    // AddRecipeToBook Input Tests (T042)
+    // ==========================================================================
+
+    #[test]
+    fn test_add_recipe_to_book_with_position() {
+        let input = AddRecipeToBook {
+            recipe_id: Uuid::new_v4(),
+            position: Some(5),
+        };
+        assert_eq!(input.position, Some(5));
+    }
+
+    #[test]
+    fn test_add_recipe_to_book_without_position() {
+        let input = AddRecipeToBook {
+            recipe_id: Uuid::new_v4(),
+            position: None,
+        };
+        assert!(input.position.is_none());
+    }
+
+    // ==========================================================================
+    // CreateRecipeBook Input Tests (T042)
+    // ==========================================================================
+
+    #[test]
+    fn test_create_recipe_book_minimal() {
+        let input = CreateRecipeBook {
+            title: "My Favorites".to_string(),
+            description: None,
+            cover_image_url: None,
+            visibility: None,
+        };
+        assert_eq!(input.title, "My Favorites");
+        assert!(input.visibility.is_none());
+    }
+
+    #[test]
+    fn test_create_recipe_book_full() {
+        let input = CreateRecipeBook {
+            title: "Holiday Recipes".to_string(),
+            description: Some("Best recipes for the holidays".to_string()),
+            cover_image_url: Some("https://example.com/cover.jpg".to_string()),
+            visibility: Some(Visibility::Public),
+        };
+        assert_eq!(input.visibility, Some(Visibility::Public));
+    }
+
+    // ==========================================================================
+    // UpdateRecipeBook Input Tests (T042)
+    // ==========================================================================
+
+    #[test]
+    fn test_update_recipe_book_partial() {
+        let input = UpdateRecipeBook {
+            title: Some("Updated Title".to_string()),
+            description: None,
+            cover_image_url: None,
+            visibility: None,
+        };
+        assert_eq!(input.title, Some("Updated Title".to_string()));
+        assert!(input.description.is_none());
+    }
+
+    #[test]
+    fn test_update_recipe_book_visibility_only() {
+        let input = UpdateRecipeBook {
+            title: None,
+            description: None,
+            cover_image_url: None,
+            visibility: Some(Visibility::Public),
+        };
+        assert_eq!(input.visibility, Some(Visibility::Public));
+    }
+
+    // ==========================================================================
+    // UUID Tests (T042)
+    // ==========================================================================
+
+    #[test]
+    fn test_uuid_generation() {
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        assert_ne!(id1, id2, "UUIDs should be unique");
+    }
+
+    #[test]
+    fn test_ap_id_format() {
+        let base_url = "https://oppskrift.example.com";
+        let id = Uuid::new_v4();
+        let ap_id = format!("{}/books/{}", base_url, id);
+        assert!(ap_id.starts_with(base_url));
+        assert!(ap_id.contains("/books/"));
     }
 }
