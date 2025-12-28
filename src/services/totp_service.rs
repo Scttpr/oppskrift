@@ -10,13 +10,13 @@ use aes_gcm::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use rand::RngCore;
 use sqlx::PgPool;
-use std::net::IpAddr;
 use thiserror::Error;
 use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
 
+use crate::core::audit::AuditEvent;
+use crate::core::RequestContext;
 use crate::models::{RecoveryCode, RecoveryCodesResponse, TwoFactorSetupResponse};
-use crate::services::SecurityLogService;
 
 /// Number of recovery codes to generate
 const RECOVERY_CODE_COUNT: usize = 8;
@@ -58,7 +58,6 @@ pub struct TotpService {
     pool: PgPool,
     encryption_key: [u8; 32],
     issuer: String,
-    security_log: SecurityLogService,
 }
 
 impl TotpService {
@@ -66,13 +65,10 @@ impl TotpService {
     ///
     /// Requires a 32-byte (256-bit) encryption key for TOTP secret storage.
     pub fn new(pool: PgPool, encryption_key: [u8; 32], issuer: String) -> Self {
-        let security_log = SecurityLogService::new(pool.clone());
-
         Self {
             pool,
             encryption_key,
             issuer,
-            security_log,
         }
     }
 
@@ -176,7 +172,7 @@ impl TotpService {
         &self,
         user_id: Uuid,
         totp_code: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<Vec<String>, TotpError> {
         // Get pending secret (stored in totp_secret_encrypted but totp_enabled = false)
         let pending_secret: Option<Vec<u8>> = sqlx::query_scalar(
@@ -240,7 +236,11 @@ impl TotpService {
         tx.commit().await?;
 
         // Log security event
-        let _ = self.security_log.totp_enable(user_id, ip).await;
+        AuditEvent::new("auth.2fa.enable")
+            .with_user(user_id)
+            .with_context(ctx)
+            .persist(&self.pool)
+            .await;
 
         Ok(codes)
     }
@@ -252,10 +252,10 @@ impl TotpService {
         &self,
         user_id: Uuid,
         code: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<(), TotpError> {
         // Verify the code (either TOTP or recovery)
-        let is_valid = self.verify_2fa(user_id, code, ip).await?;
+        let is_valid = self.verify_2fa(user_id, code, ctx).await?;
 
         if !is_valid {
             return Err(TotpError::InvalidCode);
@@ -287,7 +287,12 @@ impl TotpService {
         tx.commit().await?;
 
         // Log security event
-        let _ = self.security_log.totp_disable(user_id, ip).await;
+        AuditEvent::new("auth.2fa.disable")
+            .with_user(user_id)
+            .with_context(ctx)
+            .warn()
+            .persist(&self.pool)
+            .await;
 
         Ok(())
     }
@@ -297,11 +302,11 @@ impl TotpService {
         &self,
         user_id: Uuid,
         code: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<bool, TotpError> {
         // Check if it's a recovery code format (XXXX-XXXX)
         if code.len() == 9 && code.chars().nth(4) == Some('-') {
-            return match self.use_recovery_code(user_id, code, ip).await {
+            return match self.use_recovery_code(user_id, code, ctx).await {
                 Ok(valid) => Ok(valid),
                 Err(TotpError::InvalidRecoveryCode) => Ok(false),
                 Err(e) => Err(e),
@@ -341,7 +346,7 @@ impl TotpService {
         &self,
         user_id: Uuid,
         recovery_code: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<bool, TotpError> {
         // Normalize code
         let code = recovery_code.to_uppercase().replace('-', "");
@@ -376,9 +381,12 @@ impl TotpService {
                 .await?;
 
                 // Log security event
-                let _ = self
-                    .security_log
-                    .recovery_code_used(user_id, remaining as u8, ip)
+                AuditEvent::new("auth.2fa.recovery.used")
+                    .with_user(user_id)
+                    .with_context(ctx)
+                    .with_metadata("codes_remaining", &remaining.to_string())
+                    .warn()
+                    .persist(&self.pool)
                     .await;
 
                 return Ok(true);
@@ -422,7 +430,7 @@ impl TotpService {
     pub async fn regenerate_recovery_codes(
         &self,
         user_id: Uuid,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<RecoveryCodesResponse, TotpError> {
         // Verify 2FA is enabled
         let totp_enabled: bool = sqlx::query_scalar("SELECT totp_enabled FROM users WHERE id = $1")
@@ -462,10 +470,12 @@ impl TotpService {
 
         tx.commit().await?;
 
-        // Log security event (using recovery_code_used with special indicator)
-        let _ = self
-            .security_log
-            .recovery_code_used(user_id, RECOVERY_CODE_COUNT as u8, ip)
+        // Log security event
+        AuditEvent::new("auth.2fa.recovery.regenerated")
+            .with_user(user_id)
+            .with_context(ctx)
+            .warn()
+            .persist(&self.pool)
             .await;
 
         Ok(RecoveryCodesResponse::new(codes))

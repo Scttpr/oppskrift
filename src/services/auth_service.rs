@@ -11,11 +11,11 @@ use std::net::IpAddr;
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::core::audit::AuditEvent;
 use crate::core::error::AppError;
+use crate::core::RequestContext;
 use crate::models::{RegisterRequest, RegisterResponse, User, RESERVED_USERNAMES};
-use crate::services::{
-    EmailService, PasswordService, SecurityLogService, SessionService, UserService,
-};
+use crate::services::{EmailService, PasswordService, SessionService, UserService};
 
 /// Email confirmation token expiry in hours
 const EMAIL_CONFIRMATION_EXPIRY_HOURS: i64 = 24;
@@ -109,7 +109,6 @@ pub struct AuthService {
     pool: PgPool,
     password_service: PasswordService,
     email_service: EmailService,
-    security_log: SecurityLogService,
     session_expiry_days: u32,
     base_url: String,
 }
@@ -123,13 +122,10 @@ impl AuthService {
         base_url: String,
         session_expiry_days: u32,
     ) -> Self {
-        let security_log = SecurityLogService::new(pool.clone());
-
         Self {
             pool,
             password_service,
             email_service,
-            security_log,
             session_expiry_days,
             base_url,
         }
@@ -176,32 +172,38 @@ impl AuthService {
     pub async fn register(
         &self,
         request: RegisterRequest,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<RegisterResponse, AuthError> {
         // Check if username is reserved
         let username_lower = request.username.to_lowercase();
         if RESERVED_USERNAMES.contains(&username_lower.as_str()) {
-            let _ = self
-                .security_log
-                .register_failure(&request.email, "reserved_username", ip)
+            AuditEvent::new("auth.register.failure")
+                .with_context(ctx)
+                .with_metadata("reason", "reserved_username")
+                .warn()
+                .persist(&self.pool)
                 .await;
             return Err(AuthError::UsernameReserved);
         }
 
         // Check email availability
         if !UserService::email_available(&self.pool, &request.email).await? {
-            let _ = self
-                .security_log
-                .register_failure(&request.email, "email_exists", ip)
+            AuditEvent::new("auth.register.failure")
+                .with_context(ctx)
+                .with_metadata("reason", "email_exists")
+                .warn()
+                .persist(&self.pool)
                 .await;
             return Err(AuthError::EmailExists);
         }
 
         // Check username availability
         if !UserService::username_available(&self.pool, &username_lower).await? {
-            let _ = self
-                .security_log
-                .register_failure(&request.email, "username_exists", ip)
+            AuditEvent::new("auth.register.failure")
+                .with_context(ctx)
+                .with_metadata("reason", "username_exists")
+                .warn()
+                .persist(&self.pool)
                 .await;
             return Err(AuthError::UsernameExists);
         }
@@ -212,9 +214,11 @@ impl AuthService {
             .validate_new_password(&request.password)
             .await
         {
-            let _ = self
-                .security_log
-                .register_failure(&request.email, "weak_password", ip)
+            AuditEvent::new("auth.register.failure")
+                .with_context(ctx)
+                .with_metadata("reason", "weak_password")
+                .warn()
+                .persist(&self.pool)
                 .await;
             return Err(AuthError::InvalidPassword(e.to_string()));
         }
@@ -276,9 +280,10 @@ impl AuthService {
         }
 
         // Log successful registration
-        let _ = self
-            .security_log
-            .register_success(user.id, &request.email, ip)
+        AuditEvent::new("auth.register.success")
+            .with_user(user.id)
+            .with_context(ctx)
+            .persist(&self.pool)
             .await;
 
         Ok(RegisterResponse {
@@ -297,7 +302,11 @@ impl AuthService {
     /// 4. Mark user email as verified
     /// 5. Delete used token
     /// 6. Log security event
-    pub async fn confirm_email(&self, token: &str, ip: Option<IpAddr>) -> Result<Uuid, AuthError> {
+    pub async fn confirm_email(
+        &self,
+        token: &str,
+        ctx: &RequestContext,
+    ) -> Result<Uuid, AuthError> {
         let token_hash = Self::hash_token(token)?;
 
         // Find the token (raw query)
@@ -362,16 +371,19 @@ impl AuthService {
             .execute(&self.pool)
             .await?;
 
-        // Log security events
+        // Log security event
         if is_email_change {
-            // Safe to unwrap because is_email_change is only true when old_email.is_some()
-            let old = old_email.as_deref().unwrap();
-            let _ = self
-                .security_log
-                .email_change(user_id, old, &token_record.email, ip)
+            AuditEvent::new("auth.email.change")
+                .with_user(user_id)
+                .with_context(ctx)
+                .persist(&self.pool)
                 .await;
         } else {
-            let _ = self.security_log.email_confirmed(user_id, ip).await;
+            AuditEvent::new("auth.email.confirmed")
+                .with_user(user_id)
+                .with_context(ctx)
+                .persist(&self.pool)
+                .await;
         }
 
         Ok(user_id)
@@ -389,7 +401,7 @@ impl AuthService {
     pub async fn resend_confirmation(
         &self,
         email: &str,
-        _ip: Option<IpAddr>,
+        _ctx: &RequestContext,
     ) -> Result<(), AuthError> {
         // Find user by email
         let user = UserService::get_by_email(&self.pool, email)
@@ -483,7 +495,7 @@ impl AuthService {
         &self,
         email: &str,
         password: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
         user_agent: Option<String>,
         device_info: Option<String>,
     ) -> Result<LoginResult, AuthError> {
@@ -497,9 +509,11 @@ impl AuthService {
                 // Perform fake password verification for timing attack prevention
                 self.password_service.fake_verify(password);
 
-                let _ = self
-                    .security_log
-                    .login_failure(email, "user_not_found", ip)
+                AuditEvent::new("auth.login.failure")
+                    .with_context(ctx)
+                    .with_metadata("reason", "user_not_found")
+                    .warn()
+                    .persist(&self.pool)
                     .await;
 
                 return Err(AuthError::InvalidCredentials);
@@ -509,9 +523,11 @@ impl AuthService {
         // Check lockout status
         if let Some(locked_until) = user.locked_until {
             if locked_until > Utc::now() {
-                let _ = self
-                    .security_log
-                    .login_locked(user.id, ip, &locked_until.to_rfc3339())
+                AuditEvent::new("auth.login.locked")
+                    .with_user(user.id)
+                    .with_context(ctx)
+                    .warn()
+                    .persist(&self.pool)
                     .await;
                 return Err(AuthError::AccountLocked(
                     locked_until.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
@@ -535,11 +551,14 @@ impl AuthService {
 
         if !is_valid {
             // Increment failed attempts
-            self.increment_failed_attempts(user.id, ip).await?;
+            self.increment_failed_attempts(user.id, ctx).await?;
 
-            let _ = self
-                .security_log
-                .login_failure(email, "invalid_password", ip)
+            AuditEvent::new("auth.login.failure")
+                .with_user(user.id)
+                .with_context(ctx)
+                .with_metadata("reason", "invalid_password")
+                .warn()
+                .persist(&self.pool)
                 .await;
 
             return Err(AuthError::InvalidCredentials);
@@ -547,9 +566,12 @@ impl AuthService {
 
         // Check email verification
         if !user.email_verified {
-            let _ = self
-                .security_log
-                .login_failure(email, "email_not_verified", ip)
+            AuditEvent::new("auth.login.failure")
+                .with_user(user.id)
+                .with_context(ctx)
+                .with_metadata("reason", "email_not_verified")
+                .warn()
+                .persist(&self.pool)
                 .await;
             return Err(AuthError::EmailNotVerified);
         }
@@ -558,7 +580,7 @@ impl AuthService {
         if user.totp_enabled {
             // Create a pending 2FA token instead of session
             let partial_token = self
-                .create_2fa_pending_token(user.id, ip, user_agent)
+                .create_2fa_pending_token(user.id, ctx.ip, user_agent)
                 .await?;
             return Ok(LoginResult::TwoFactorRequired { partial_token });
         }
@@ -569,14 +591,15 @@ impl AuthService {
         // Create session
         let session_service = self.session_service();
         let (_session_id, token, expires_at) = session_service
-            .create(user.id, ip, user_agent.clone(), device_info)
+            .create(user.id, ctx.ip, user_agent.clone(), device_info)
             .await
             .map_err(|e| AuthError::Session(e.to_string()))?;
 
         // Log successful login
-        let _ = self
-            .security_log
-            .login_success(user.id, ip, user_agent)
+        AuditEvent::new("auth.login.success")
+            .with_user(user.id)
+            .with_context(ctx)
+            .persist(&self.pool)
             .await;
 
         Ok(LoginResult::Success {
@@ -601,7 +624,11 @@ impl AuthService {
         }
 
         // Log the logout
-        let _ = self.security_log.logout(user_id, session_id).await;
+        AuditEvent::new("auth.logout")
+            .with_user(user_id)
+            .with_metadata("session_id", &session_id.to_string())
+            .persist(&self.pool)
+            .await;
 
         Ok(())
     }
@@ -654,7 +681,7 @@ impl AuthService {
         &self,
         partial_token: &str,
         totp_code: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
         device_info: Option<String>,
     ) -> Result<LoginResult, AuthError> {
         // Hash the token for lookup
@@ -706,9 +733,12 @@ impl AuthService {
             })?;
 
         if !is_valid {
-            let _ = self
-                .security_log
-                .two_factor_failure(pending.user_id, "invalid_totp", ip)
+            AuditEvent::new("auth.2fa.failure")
+                .with_user(pending.user_id)
+                .with_context(ctx)
+                .with_metadata("reason", "invalid_totp")
+                .warn()
+                .persist(&self.pool)
                 .await;
             return Err(AuthError::InvalidTwoFactorCode);
         }
@@ -725,14 +755,21 @@ impl AuthService {
         // Create session
         let session_service = self.session_service();
         let (_session_id, token, expires_at) = session_service
-            .create(pending.user_id, ip, pending.user_agent.clone(), device_info)
+            .create(
+                pending.user_id,
+                ctx.ip,
+                pending.user_agent.clone(),
+                device_info,
+            )
             .await
             .map_err(|e| AuthError::Session(e.to_string()))?;
 
         // Log successful login with 2FA
-        let _ = self
-            .security_log
-            .login_success_2fa(pending.user_id, ip, pending.user_agent)
+        AuditEvent::new("auth.login.success")
+            .with_user(pending.user_id)
+            .with_context(ctx)
+            .with_metadata("2fa_verified", "true")
+            .persist(&self.pool)
             .await;
 
         Ok(LoginResult::Success {
@@ -766,7 +803,7 @@ impl AuthService {
     async fn increment_failed_attempts(
         &self,
         user_id: Uuid,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<(), AuthError> {
         // Increment failed attempts
         let new_count: i32 = sqlx::query_scalar(
@@ -798,9 +835,11 @@ impl AuthService {
             .await?;
 
             // Log the lockout
-            let _ = self
-                .security_log
-                .login_locked(user_id, ip, &locked_until.to_rfc3339())
+            AuditEvent::new("auth.login.locked")
+                .with_user(user_id)
+                .with_context(ctx)
+                .warn()
+                .persist(&self.pool)
                 .await;
 
             tracing::warn!(
@@ -851,7 +890,11 @@ impl AuthService {
     ///
     /// Always returns success to prevent email enumeration.
     /// If user exists and email is verified, sends reset email.
-    pub async fn forgot_password(&self, email: &str, ip: Option<IpAddr>) -> Result<(), AuthError> {
+    pub async fn forgot_password(
+        &self,
+        email: &str,
+        ctx: &RequestContext,
+    ) -> Result<(), AuthError> {
         // Look up user - don't reveal if exists
         let user_result = UserService::get_by_email(&self.pool, email).await;
 
@@ -897,7 +940,11 @@ impl AuthService {
                 }
 
                 // Log security event
-                let _ = self.security_log.password_reset_request(email, ip).await;
+                AuditEvent::new("auth.password.reset.request")
+                    .with_context(ctx)
+                    .warn()
+                    .persist(&self.pool)
+                    .await;
 
                 tracing::info!(
                     user_id = %user.id,
@@ -923,7 +970,7 @@ impl AuthService {
         &self,
         token: &str,
         new_password: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<(), AuthError> {
         // Hash the provided token
         let token_hash = Self::hash_token(token).map_err(|_| AuthError::InvalidToken)?;
@@ -988,7 +1035,11 @@ impl AuthService {
         let _ = session_service.revoke_all_for_user(user_id).await;
 
         // Log security event
-        let _ = self.security_log.password_reset_complete(user_id, ip).await;
+        AuditEvent::new("auth.password.reset.complete")
+            .with_user(user_id)
+            .with_context(ctx)
+            .persist(&self.pool)
+            .await;
 
         tracing::info!(
             user_id = %user_id,
@@ -1012,7 +1063,7 @@ impl AuthService {
         current_session_id: Uuid,
         current_password: &str,
         new_password: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<u32, AuthError> {
         // Get user
         let user: User = UserService::get_by_id(&self.pool, user_id).await?;
@@ -1029,9 +1080,12 @@ impl AuthService {
             .map_err(|e| AuthError::Password(e.to_string()))?;
 
         if !is_valid {
-            let _ = self
-                .security_log
-                .password_change_failed(user_id, "invalid_current_password", ip)
+            AuditEvent::new("auth.password.change.failure")
+                .with_user(user_id)
+                .with_context(ctx)
+                .with_metadata("reason", "invalid_current_password")
+                .warn()
+                .persist(&self.pool)
                 .await;
             return Err(AuthError::InvalidCredentials);
         }
@@ -1069,11 +1123,17 @@ impl AuthService {
             .map_err(|e| AuthError::Session(e.to_string()))?;
 
         // Log security events
-        let _ = self.security_log.password_change(user_id, ip).await;
+        AuditEvent::new("auth.password.change")
+            .with_user(user_id)
+            .with_context(ctx)
+            .persist(&self.pool)
+            .await;
         if sessions_revoked > 0 {
-            let _ = self
-                .security_log
-                .session_revoke_all(user_id, sessions_revoked as u32, ip)
+            AuditEvent::new("auth.session.revoke.all")
+                .with_user(user_id)
+                .with_context(ctx)
+                .warn()
+                .persist(&self.pool)
                 .await;
         }
 
@@ -1106,7 +1166,7 @@ impl AuthService {
         user_id: Uuid,
         new_email: &str,
         password: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<(), AuthError> {
         // Get user
         let user: User = UserService::get_by_id(&self.pool, user_id).await?;
@@ -1173,7 +1233,11 @@ impl AuthService {
         }
 
         // Log security event
-        let _ = self.security_log.email_change_requested(user_id, ip).await;
+        AuditEvent::new("auth.email.change.request")
+            .with_user(user_id)
+            .with_context(ctx)
+            .persist(&self.pool)
+            .await;
 
         tracing::info!(
             user_id = %user_id,
@@ -1198,7 +1262,7 @@ impl AuthService {
         &self,
         user_id: Uuid,
         password: &str,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<DateTime<Utc>, AuthError> {
         // Get user
         let user: User = UserService::get_by_id(&self.pool, user_id).await?;
@@ -1240,7 +1304,12 @@ impl AuthService {
         .await?;
 
         // Log security event
-        let _ = self.security_log.account_delete_request(user_id, ip).await;
+        AuditEvent::new("auth.account.delete.request")
+            .with_user(user_id)
+            .with_context(ctx)
+            .warn()
+            .persist(&self.pool)
+            .await;
 
         // Send notification email (if user has email)
         if let Some(email) = &user.email {
@@ -1268,7 +1337,7 @@ impl AuthService {
     pub async fn cancel_deletion(
         &self,
         user_id: Uuid,
-        ip: Option<IpAddr>,
+        ctx: &RequestContext,
     ) -> Result<(), AuthError> {
         // Get user
         let user: User = UserService::get_by_id(&self.pool, user_id).await?;
@@ -1291,7 +1360,11 @@ impl AuthService {
         .await?;
 
         // Log security event
-        let _ = self.security_log.account_delete_cancel(user_id, ip).await;
+        AuditEvent::new("auth.account.delete.cancel")
+            .with_user(user_id)
+            .with_context(ctx)
+            .persist(&self.pool)
+            .await;
 
         // Send confirmation email (if user has email)
         if let Some(email) = &user.email {

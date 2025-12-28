@@ -16,7 +16,7 @@ use sqlx::PgPool;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::services::SecurityLogService;
+use crate::core::audit::AuditEvent;
 
 /// Cleanup job errors
 #[derive(Debug, Error)]
@@ -38,14 +38,12 @@ pub struct CleanupResult {
 /// Cleanup service for background maintenance tasks
 pub struct CleanupService {
     pool: PgPool,
-    security_log: SecurityLogService,
 }
 
 impl CleanupService {
     /// Create a new cleanup service
     pub fn new(pool: PgPool) -> Self {
-        let security_log = SecurityLogService::new(pool.clone());
-        Self { pool, security_log }
+        Self { pool }
     }
 
     /// Run all cleanup tasks (T078, T082)
@@ -197,9 +195,10 @@ impl CleanupService {
     /// This is GDPR compliant - all PII is removed.
     pub async fn execute_deletion(&self, user_id: Uuid) -> Result<(), CleanupError> {
         // Log the deletion event before we delete the user
-        let _ = self
-            .security_log
-            .account_delete_execute(user_id, None)
+        AuditEvent::new("auth.account.delete.execute")
+            .with_user(user_id)
+            .warn()
+            .persist(&self.pool)
             .await;
 
         // Start transaction for atomic deletion

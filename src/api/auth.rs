@@ -18,6 +18,7 @@ use crate::api::middleware::{
 };
 use crate::core::config::SmtpConfig;
 use crate::core::error::AppError;
+use crate::core::{RequestContext, RequestId};
 use crate::models::{
     Complete2FALoginRequest, EmailConfirmationResponse, ForgotPasswordRequest,
     ForgotPasswordResponse, LoginRequest, LoginResponse, LogoutResponse, RegisterRequest,
@@ -64,9 +65,10 @@ pub fn routes() -> Router<AppState> {
 async fn register(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     Json(input): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0));
 
     // Validate input
     input.validate().map_err(|e| {
@@ -79,7 +81,7 @@ async fn register(
 
     // Register user
     let response = auth_service
-        .register(input, ip)
+        .register(input, &ctx)
         .await
         .map_err(|e| match e {
             crate::services::AuthError::EmailExists => {
@@ -119,16 +121,17 @@ async fn register(
 async fn confirm_email(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     Path(token): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0));
 
     // Create auth service
     let auth_service = create_auth_service(&state);
 
     // Confirm email
     let _user_id = auth_service
-        .confirm_email(&token, ip)
+        .confirm_email(&token, &ctx)
         .await
         .map_err(|e| match e {
             crate::services::AuthError::InvalidToken => {
@@ -167,9 +170,10 @@ async fn confirm_email(
 async fn resend_confirmation(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     Json(input): Json<ResendConfirmationRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0));
 
     // Validate input
     input
@@ -181,7 +185,7 @@ async fn resend_confirmation(
 
     // Resend confirmation
     // Note: We return success even if user not found to prevent email enumeration
-    match auth_service.resend_confirmation(&input.email, ip).await {
+    match auth_service.resend_confirmation(&input.email, &ctx).await {
         Ok(()) => {}
         Err(crate::services::AuthError::UserNotFound) => {
             // Don't reveal if user exists - return success anyway
@@ -233,10 +237,11 @@ const USER_AGENT_HEADER: &str = "User-Agent";
 async fn login(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     headers: axum::http::HeaderMap,
     Json(input): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0));
     let user_agent = headers
         .get(USER_AGENT_HEADER)
         .and_then(|v| v.to_str().ok())
@@ -253,7 +258,13 @@ async fn login(
 
     // Attempt login
     let result = auth_service
-        .login(&input.email, &input.password, ip, user_agent.clone(), None)
+        .login(
+            &input.email,
+            &input.password,
+            &ctx,
+            user_agent.clone(),
+            None,
+        )
         .await
         .map_err(|e| match e {
             AuthError::InvalidCredentials => {
@@ -370,9 +381,10 @@ async fn logout(
 async fn verify_2fa(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     Json(input): Json<Complete2FALoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0));
 
     // Validate input
     input
@@ -384,7 +396,7 @@ async fn verify_2fa(
 
     // Complete 2FA login
     let result = auth_service
-        .complete_2fa_login(&input.partial_token, &input.totp_code, ip, None)
+        .complete_2fa_login(&input.partial_token, &input.totp_code, &ctx, None)
         .await
         .map_err(|e| match e {
             AuthError::InvalidToken => {
@@ -451,9 +463,10 @@ async fn verify_2fa(
 async fn forgot_password(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     Json(input): Json<ForgotPasswordRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0));
 
     // Validate input
     input
@@ -465,7 +478,7 @@ async fn forgot_password(
 
     // Request password reset
     // Always returns success to prevent email enumeration
-    if let Err(e) = auth_service.forgot_password(&input.email, ip).await {
+    if let Err(e) = auth_service.forgot_password(&input.email, &ctx).await {
         tracing::error!(error = %e, "Password reset request failed");
         // Don't reveal internal errors
     }
@@ -487,9 +500,10 @@ async fn forgot_password(
 async fn reset_password(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     Json(input): Json<ResetPasswordRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0));
 
     // Validate input
     input
@@ -501,7 +515,7 @@ async fn reset_password(
 
     // Reset password
     auth_service
-        .reset_password(&input.token, &input.new_password, ip)
+        .reset_password(&input.token, &input.new_password, &ctx)
         .await
         .map_err(|e| match e {
             AuthError::InvalidToken => {
@@ -520,6 +534,13 @@ async fn reset_password(
 // =============================================================================
 // Helper Functions
 // =============================================================================
+
+/// Create a RequestContext from request extensions
+fn create_request_context(addr: SocketAddr, request_id: Option<&RequestId>) -> RequestContext {
+    RequestContext::new()
+        .with_ip(addr.ip())
+        .maybe_request_id(request_id.map(|r| r.0))
+}
 
 /// Create an AuthService instance from AppState
 fn create_auth_service(state: &AppState) -> AuthService {

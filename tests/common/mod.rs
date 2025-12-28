@@ -207,7 +207,7 @@ impl TestContext {
                 "email_confirmation_tokens",
                 "password_reset_tokens",
                 "recovery_codes",
-                "security_logs",
+                "security_events",
                 "saved_recipes",
                 "follows",
             ];

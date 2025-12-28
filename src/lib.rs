@@ -3,7 +3,7 @@
 //! This library crate exposes the core functionality for use by the binary
 //! and integration tests.
 
-use axum::{extract::ConnectInfo, routing::get, Router};
+use axum::{extract::ConnectInfo, middleware, routing::get, Router};
 use sqlx::PgPool;
 use std::net::SocketAddr;
 use tower_http::{
@@ -11,6 +11,8 @@ use tower_http::{
     services::ServeDir,
     trace::TraceLayer,
 };
+
+use crate::core::request_id::request_id_middleware;
 
 pub mod api;
 pub mod core;
@@ -63,6 +65,7 @@ fn create_router(state: AppState) -> Router {
         .merge(handlers::routes())
         // Static file serving
         .nest_service("/static", ServeDir::new("static"))
+        .layer(middleware::from_fn(request_id_middleware))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state)

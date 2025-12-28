@@ -12,8 +12,10 @@ use std::net::SocketAddr;
 use validator::Validate;
 
 use crate::api::middleware::AuthUser;
+use crate::core::audit::AuditEvent;
 use crate::core::config::SmtpConfig;
 use crate::core::error::AppError;
+use crate::core::{RequestContext, RequestId};
 use crate::models::{
     CancelDeletionResponse, ChangeEmailRequest, ChangeEmailResponse, ChangePasswordRequest,
     ChangePasswordResponse, DeleteAccountRequest, DeletionScheduledResponse, RecoveryCodesResponse,
@@ -22,8 +24,7 @@ use crate::models::{
 };
 use crate::models::{DisableTwoFactorRequest, EnableTwoFactorRequest};
 use crate::services::{
-    AuthError, AuthService, EmailService, PasswordService, SecurityEvent, SecurityLogService,
-    TotpError, TotpService, UserService,
+    AuthError, AuthService, EmailService, PasswordService, TotpError, TotpService, UserService,
 };
 use crate::AppState;
 
@@ -143,6 +144,17 @@ async fn get_security_info(
     }))
 }
 
+/// Security event record for API responses (T083)
+#[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
+pub struct SecurityEvent {
+    pub id: uuid::Uuid,
+    pub event_type: String,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
 /// Security events list response (T083)
 #[derive(Debug, serde::Serialize)]
 pub struct SecurityEventsResponse {
@@ -173,14 +185,23 @@ async fn get_security_events(
     // Cap limit between 1 and 100
     let limit = query.limit.clamp(1, 100);
 
-    let security_log = SecurityLogService::new(state.db.clone());
-    let events = security_log
-        .list_for_user(auth_user.id, limit)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to get security events");
-            AppError::Internal("Failed to get security events".to_string())
-        })?;
+    let events = sqlx::query_as::<_, SecurityEvent>(
+        r#"
+        SELECT id, event_type, ip_address::text as ip_address, user_agent, metadata, created_at
+        FROM security_events
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(auth_user.id)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| {
+        tracing::error!(error = %e, "Failed to get security events");
+        AppError::Internal("Failed to get security events".to_string())
+    })?;
 
     let total = events.len();
     Ok(Json(SecurityEventsResponse { events, total }))
@@ -197,10 +218,15 @@ async fn get_security_events(
 async fn change_password(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth_user: AuthUser,
     Json(input): Json<ChangePasswordRequest>,
 ) -> Result<Json<ChangePasswordResponse>, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(
+        addr,
+        request_id.as_ref().map(|e| &e.0),
+        Some(auth_user.session_id),
+    );
 
     // Validate input
     input
@@ -217,7 +243,7 @@ async fn change_password(
             auth_user.session_id,
             &input.current_password,
             &input.new_password,
-            ip,
+            &ctx,
         )
         .await
         .map_err(|e| match e {
@@ -241,10 +267,15 @@ async fn change_password(
 async fn change_email(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth_user: AuthUser,
     Json(input): Json<ChangeEmailRequest>,
 ) -> Result<Json<ChangeEmailResponse>, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(
+        addr,
+        request_id.as_ref().map(|e| &e.0),
+        Some(auth_user.session_id),
+    );
 
     // Validate input
     input
@@ -256,7 +287,7 @@ async fn change_email(
 
     // Request email change
     auth_service
-        .change_email(auth_user.id, &input.new_email, &input.password, ip)
+        .change_email(auth_user.id, &input.new_email, &input.password, &ctx)
         .await
         .map_err(|e| match e {
             AuthError::InvalidCredentials => {
@@ -322,10 +353,15 @@ async fn list_sessions(
 async fn revoke_session(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth_user: AuthUser,
     Path(session_id): Path<uuid::Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(
+        addr,
+        request_id.as_ref().map(|e| &e.0),
+        Some(auth_user.session_id),
+    );
 
     // Prevent revoking current session
     if session_id == auth_user.session_id {
@@ -360,9 +396,11 @@ async fn revoke_session(
         })?;
 
     // Log security event
-    let security_log = crate::services::SecurityLogService::new(state.db.clone());
-    let _ = security_log
-        .session_revoke(auth_user.id, session_id, ip)
+    AuditEvent::new("auth.session.revoke")
+        .with_user(auth_user.id)
+        .with_context(&ctx)
+        .with_metadata("session_id", &session_id.to_string())
+        .persist(&state.db)
         .await;
 
     Ok(Json(serde_json::json!({
@@ -415,10 +453,15 @@ async fn setup_2fa(
 async fn enable_2fa(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth_user: AuthUser,
     Json(input): Json<EnableTwoFactorRequest>,
 ) -> Result<Json<TwoFactorEnabledResponse>, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(
+        addr,
+        request_id.as_ref().map(|e| &e.0),
+        Some(auth_user.session_id),
+    );
 
     // Validate input
     input
@@ -428,7 +471,7 @@ async fn enable_2fa(
     let totp_service = create_totp_service(&state)?;
 
     let recovery_codes = totp_service
-        .enable_2fa(auth_user.id, &input.totp_code, ip)
+        .enable_2fa(auth_user.id, &input.totp_code, &ctx)
         .await
         .map_err(|e| match e {
             TotpError::InvalidCode => {
@@ -466,10 +509,15 @@ async fn enable_2fa(
 async fn disable_2fa(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth_user: AuthUser,
     Json(input): Json<DisableTwoFactorRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(
+        addr,
+        request_id.as_ref().map(|e| &e.0),
+        Some(auth_user.session_id),
+    );
 
     // Validate input
     input
@@ -506,7 +554,7 @@ async fn disable_2fa(
     let user_email = user.email.clone();
 
     totp_service
-        .disable_2fa(auth_user.id, &input.code, ip)
+        .disable_2fa(auth_user.id, &input.code, &ctx)
         .await
         .map_err(|e| match e {
             TotpError::InvalidCode | TotpError::InvalidRecoveryCode => {
@@ -590,10 +638,15 @@ async fn get_recovery_codes_status(
 async fn regenerate_recovery_codes(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth_user: AuthUser,
     Json(input): Json<RegenerateRecoveryCodesRequest>,
 ) -> Result<Json<RecoveryCodesResponse>, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(
+        addr,
+        request_id.as_ref().map(|e| &e.0),
+        Some(auth_user.session_id),
+    );
 
     // Verify password first
     let auth_service = create_auth_service(&state);
@@ -621,7 +674,7 @@ async fn regenerate_recovery_codes(
     let totp_service = create_totp_service(&state)?;
 
     let response = totp_service
-        .regenerate_recovery_codes(auth_user.id, ip)
+        .regenerate_recovery_codes(auth_user.id, &ctx)
         .await
         .map_err(|e| match e {
             TotpError::NotEnabled => {
@@ -646,10 +699,15 @@ async fn regenerate_recovery_codes(
 async fn request_deletion(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth_user: AuthUser,
     Json(input): Json<DeleteAccountRequest>,
 ) -> Result<Json<DeletionScheduledResponse>, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(
+        addr,
+        request_id.as_ref().map(|e| &e.0),
+        Some(auth_user.session_id),
+    );
 
     // Validate input
     input
@@ -661,7 +719,7 @@ async fn request_deletion(
 
     // Request deletion
     let scheduled_for = auth_service
-        .request_deletion(auth_user.id, &input.password, ip)
+        .request_deletion(auth_user.id, &input.password, &ctx)
         .await
         .map_err(|e| match e {
             AuthError::InvalidCredentials => {
@@ -685,16 +743,21 @@ async fn request_deletion(
 async fn cancel_deletion(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth_user: AuthUser,
 ) -> Result<Json<CancelDeletionResponse>, AppError> {
-    let ip = Some(addr.ip());
+    let ctx = create_request_context(
+        addr,
+        request_id.as_ref().map(|e| &e.0),
+        Some(auth_user.session_id),
+    );
 
     // Create auth service
     let auth_service = create_auth_service(&state);
 
     // Cancel deletion
     auth_service
-        .cancel_deletion(auth_user.id, ip)
+        .cancel_deletion(auth_user.id, &ctx)
         .await
         .map_err(|e| match e {
             AuthError::App(msg) if msg.contains("No deletion") => {
@@ -712,6 +775,18 @@ async fn cancel_deletion(
 // =============================================================================
 // Helper Functions
 // =============================================================================
+
+/// Create a RequestContext from request components
+fn create_request_context(
+    addr: SocketAddr,
+    request_id: Option<&RequestId>,
+    session_id: Option<uuid::Uuid>,
+) -> RequestContext {
+    RequestContext::new()
+        .with_ip(addr.ip())
+        .maybe_request_id(request_id.map(|r| r.0))
+        .maybe_session_id(session_id)
+}
 
 /// Create an AuthService instance from AppState
 fn create_auth_service(state: &AppState) -> AuthService {
