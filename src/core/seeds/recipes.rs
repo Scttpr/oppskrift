@@ -236,3 +236,92 @@ pub async fn seed(pool: &PgPool, user_ids: &[Uuid]) -> Result<Vec<Uuid>, SeedErr
 
     Ok(recipe_ids)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_recipes_seed_data_count() {
+        assert_eq!(RECIPES.len(), 5, "Should have 5 sample recipes");
+    }
+
+    #[test]
+    fn test_recipes_have_ingredients() {
+        for recipe in RECIPES {
+            assert!(
+                !recipe.ingredients.is_empty(),
+                "Recipe '{}' should have ingredients",
+                recipe.title
+            );
+        }
+    }
+
+    #[test]
+    fn test_recipes_have_instructions() {
+        for recipe in RECIPES {
+            assert!(
+                !recipe.instructions.is_empty(),
+                "Recipe '{}' should have instructions",
+                recipe.title
+            );
+        }
+    }
+
+    #[test]
+    fn test_recipes_valid_difficulty() {
+        let valid_difficulties = ["easy", "medium", "hard"];
+        for recipe in RECIPES {
+            assert!(
+                valid_difficulties.contains(&recipe.difficulty),
+                "Recipe '{}' has invalid difficulty: {}",
+                recipe.title,
+                recipe.difficulty
+            );
+        }
+    }
+
+    #[test]
+    fn test_recipes_valid_times() {
+        for recipe in RECIPES {
+            assert!(
+                recipe.prep_time_min >= 0,
+                "Recipe '{}' has negative prep time",
+                recipe.title
+            );
+            assert!(
+                recipe.cook_time_min >= 0,
+                "Recipe '{}' has negative cook time",
+                recipe.title
+            );
+            assert!(
+                recipe.cook_time_min > 0 || recipe.prep_time_min > 0,
+                "Recipe '{}' should have some time",
+                recipe.title
+            );
+        }
+    }
+
+    #[test]
+    fn test_recipes_unique_titles() {
+        let titles: Vec<&str> = RECIPES.iter().map(|r| r.title).collect();
+        let unique: std::collections::HashSet<&str> = titles.iter().cloned().collect();
+        assert_eq!(titles.len(), unique.len(), "Titles should be unique");
+    }
+
+    #[test]
+    fn test_recipes_have_descriptions() {
+        for recipe in RECIPES {
+            assert!(
+                !recipe.description.is_empty(),
+                "Recipe '{}' should have description",
+                recipe.title
+            );
+            assert!(
+                recipe.description.len() >= 20,
+                "Recipe '{}' description too short",
+                recipe.title
+            );
+        }
+    }
+}

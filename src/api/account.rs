@@ -835,3 +835,13 @@ fn create_email_service() -> EmailService {
     let smtp_config = SmtpConfig::from_env(is_production);
     EmailService::new(smtp_config, base_url)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routes_are_configured() {
+        let _router = routes();
+    }
+}

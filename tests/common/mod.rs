@@ -2,6 +2,10 @@
 //!
 //! Uses axum-test to test against the app directly without HTTP server.
 
+pub mod assertions;
+pub mod fixtures;
+pub mod security;
+
 use axum_test::TestServer;
 use chrono::{Duration, Utc};
 use oppskrift::{test_app_router, AppState};
@@ -16,6 +20,8 @@ pub struct TestContext {
     pub db: PgPool,
     pub server: TestServer,
     created_users: Vec<Uuid>,
+    created_recipes: Vec<Uuid>,
+    created_books: Vec<Uuid>,
 }
 
 impl TestContext {
@@ -41,6 +47,8 @@ impl TestContext {
             db,
             server,
             created_users: Vec::new(),
+            created_recipes: Vec::new(),
+            created_books: Vec::new(),
         }
     }
 
@@ -99,6 +107,219 @@ impl TestContext {
     /// Track a user for cleanup
     pub fn track_user(&mut self, user_id: Uuid) {
         self.created_users.push(user_id);
+    }
+
+    // ==========================================================================
+    // Recipe Helpers (T005)
+    // ==========================================================================
+
+    /// Create a test recipe directly in database
+    pub async fn create_recipe(&mut self, user_id: Uuid, title: &str, visibility: &str) -> Uuid {
+        let ap_id = format!("http://localhost/recipes/{}", Uuid::new_v4());
+        let recipe_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO recipes (author_id, title, description, visibility, prep_time_min, cook_time_min, servings, difficulty, ap_id)
+            VALUES ($1, $2, $3, $4::visibility_type, 15, 30, '4', 'medium', $5)
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(title)
+        .bind(format!("Test description for {}", title))
+        .bind(visibility)
+        .bind(&ap_id)
+        .fetch_one(&self.db)
+        .await
+        .expect("Failed to create test recipe");
+
+        self.created_recipes.push(recipe_id);
+        recipe_id
+    }
+
+    /// Create test ingredients for a recipe
+    pub async fn create_ingredients(&self, recipe_id: Uuid, count: usize) {
+        for i in 1..=count {
+            sqlx::query(
+                r#"
+                INSERT INTO ingredients (recipe_id, name, quantity, unit, position)
+                VALUES ($1, $2, $3, $4, $5)
+                "#,
+            )
+            .bind(recipe_id)
+            .bind(format!("Ingredient {}", i))
+            .bind(i as f64)
+            .bind("units")
+            .bind(i as i32)
+            .execute(&self.db)
+            .await
+            .expect("Failed to create ingredient");
+        }
+    }
+
+    /// Create test instruction steps for a recipe
+    pub async fn create_instructions(&self, recipe_id: Uuid, count: usize) {
+        for i in 1..=count {
+            sqlx::query(
+                r#"
+                INSERT INTO instruction_steps (recipe_id, step_number, description)
+                VALUES ($1, $2, $3)
+                "#,
+            )
+            .bind(recipe_id)
+            .bind(i as i32)
+            .bind(format!("Step {} instructions", i))
+            .execute(&self.db)
+            .await
+            .expect("Failed to create instruction step");
+        }
+    }
+
+    /// Create a complete test recipe with ingredients and instructions
+    pub async fn create_complete_recipe(
+        &mut self,
+        user_id: Uuid,
+        title: &str,
+        visibility: &str,
+    ) -> Uuid {
+        let recipe_id = self.create_recipe(user_id, title, visibility).await;
+        self.create_ingredients(recipe_id, 3).await;
+        self.create_instructions(recipe_id, 3).await;
+        recipe_id
+    }
+
+    // ==========================================================================
+    // Book Helpers (T006)
+    // ==========================================================================
+
+    /// Create a test recipe book directly in database
+    pub async fn create_book(&mut self, user_id: Uuid, name: &str, visibility: &str) -> Uuid {
+        let ap_id = format!("http://localhost/books/{}", Uuid::new_v4());
+        let book_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO recipe_books (owner_id, title, description, visibility, ap_id)
+            VALUES ($1, $2, $3, $4::visibility_type, $5)
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(name)
+        .bind(format!("Description for {}", name))
+        .bind(visibility)
+        .bind(&ap_id)
+        .fetch_one(&self.db)
+        .await
+        .expect("Failed to create test book");
+
+        self.created_books.push(book_id);
+        book_id
+    }
+
+    /// Add a recipe to a book
+    pub async fn add_recipe_to_book(&self, book_id: Uuid, recipe_id: Uuid) {
+        // Get the next position in the book
+        let next_position: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM book_recipe_entries WHERE book_id = $1",
+        )
+        .bind(book_id)
+        .fetch_one(&self.db)
+        .await
+        .unwrap_or(1);
+
+        sqlx::query(
+            r#"
+            INSERT INTO book_recipe_entries (book_id, recipe_id, position)
+            VALUES ($1, $2, $3)
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(book_id)
+        .bind(recipe_id)
+        .bind(next_position as i32)
+        .execute(&self.db)
+        .await
+        .expect("Failed to add recipe to book");
+    }
+
+    // ==========================================================================
+    // Social Helpers (T007)
+    // ==========================================================================
+
+    /// Create a follow relationship between users
+    pub async fn create_follow(&self, follower_id: Uuid, following_id: Uuid) {
+        let ap_id = format!("http://localhost/follows/{}", Uuid::new_v4());
+        sqlx::query(
+            r#"
+            INSERT INTO follows (follower_id, following_id, ap_id)
+            VALUES ($1, $2, $3)
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(follower_id)
+        .bind(following_id)
+        .bind(&ap_id)
+        .execute(&self.db)
+        .await
+        .expect("Failed to create follow");
+    }
+
+    /// Create a test activity
+    pub async fn create_activity(
+        &self,
+        user_id: Uuid,
+        activity_type: &str,
+        target_type: &str,
+        target_id: Uuid,
+    ) -> Uuid {
+        let activity_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO activities (user_id, activity_type, target_type, target_id)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id
+            "#,
+        )
+        .bind(user_id)
+        .bind(activity_type)
+        .bind(target_type)
+        .bind(target_id)
+        .fetch_one(&self.db)
+        .await
+        .expect("Failed to create activity");
+
+        activity_id
+    }
+
+    // ==========================================================================
+    // Authentication Helpers (T009)
+    // ==========================================================================
+
+    /// Login a user and return the session cookie
+    pub async fn login_and_get_session(&self, email: &str, password: &str) -> Option<String> {
+        let response = self
+            .post(
+                "/api/v1/auth/login",
+                serde_json::json!({
+                    "email": email,
+                    "password": password
+                }),
+            )
+            .await;
+
+        response.session_cookie
+    }
+
+    /// Create a verified user and login, returning session
+    pub async fn create_and_login(&mut self, suffix: &str) -> (Uuid, String) {
+        let email = Self::unique_email();
+        let username = Self::unique_username();
+        let password = "Xk9#mP2$vL5@nQ8!";
+
+        let user_id = self.create_user(&email, &username, password, true).await;
+        let session = self
+            .login_and_get_session(&email, password)
+            .await
+            .unwrap_or_else(|| panic!("Failed to login user {}", suffix));
+
+        (user_id, session)
     }
 
     /// Get user by email
@@ -200,6 +421,47 @@ impl TestContext {
 
     /// Clean up all created test data
     pub async fn cleanup(&self) {
+        // Clean up books first (has FK to recipes)
+        for book_id in &self.created_books {
+            let _ = sqlx::query("DELETE FROM book_recipe_entries WHERE book_id = $1")
+                .bind(book_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM recipe_books WHERE id = $1")
+                .bind(book_id)
+                .execute(&self.db)
+                .await;
+        }
+
+        // Clean up recipes
+        for recipe_id in &self.created_recipes {
+            let _ = sqlx::query("DELETE FROM saved_recipes WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM book_recipe_entries WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM ingredients WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM instruction_steps WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM activities WHERE target_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM recipes WHERE id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+        }
+
+        // Clean up users
         for user_id in &self.created_users {
             // Delete in order respecting foreign keys
             let tables = [
@@ -210,12 +472,25 @@ impl TestContext {
                 "security_events",
                 "saved_recipes",
                 "follows",
+                "activities",
             ];
 
             for table in tables {
                 let query = format!("DELETE FROM {} WHERE user_id = $1", table);
                 let _ = sqlx::query(&query).bind(user_id).execute(&self.db).await;
             }
+
+            // Delete recipes owned by user (in case not tracked)
+            let _ = sqlx::query("DELETE FROM recipes WHERE author_id = $1")
+                .bind(user_id)
+                .execute(&self.db)
+                .await;
+
+            // Delete books owned by user (in case not tracked)
+            let _ = sqlx::query("DELETE FROM recipe_books WHERE owner_id = $1")
+                .bind(user_id)
+                .execute(&self.db)
+                .await;
 
             // Delete user
             let _ = sqlx::query("DELETE FROM users WHERE id = $1")

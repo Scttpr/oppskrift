@@ -261,3 +261,13 @@ async fn remove_recipe_from_book(
     BookService::remove_recipe(&state.db, id, recipe_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routes_are_configured() {
+        let _router = routes();
+    }
+}

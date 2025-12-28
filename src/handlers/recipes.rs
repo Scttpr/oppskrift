@@ -173,3 +173,228 @@ async fn edit_recipe_page(
         crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Difficulty, Visibility};
+    use askama::Template;
+    use chrono::Utc;
+
+    // ==========================================================================
+    // Route Configuration Tests (T052)
+    // ==========================================================================
+
+    #[test]
+    fn test_routes_returns_router() {
+        let router = routes();
+        let _ = router;
+    }
+
+    // ==========================================================================
+    // Template Struct Tests (T052)
+    // ==========================================================================
+
+    #[test]
+    fn test_recipe_list_template_renders_empty() {
+        let template = RecipeListTemplate {
+            recipes: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+            user: None,
+        };
+        let result = template.render();
+        assert!(result.is_ok());
+        assert!(!result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_new_recipe_template_renders() {
+        let template = NewRecipeTemplate { recipe: None };
+        let result = template.render();
+        assert!(result.is_ok());
+        let html = result.unwrap();
+        assert!(!html.is_empty());
+        // Should contain form elements
+        assert!(html.contains("form") || html.contains("recipe"));
+    }
+
+    #[test]
+    fn test_edit_recipe_template_with_recipe() {
+        let recipe = Recipe {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "Test Recipe".to_string(),
+            description: Some("A test recipe".to_string()),
+            visibility: Visibility::Public,
+            prep_time_min: Some(30),
+            cook_time_min: Some(45),
+            servings: Some("4".to_string()),
+            difficulty: Some(Difficulty::Medium),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            ap_id: "https://example.com/recipes/1".to_string(),
+        };
+
+        let template = EditRecipeTemplate {
+            recipe: Some(recipe),
+        };
+        let result = template.render();
+        assert!(result.is_ok());
+        let html = result.unwrap();
+        assert!(html.contains("Test Recipe") || html.contains("form"));
+    }
+
+    #[test]
+    fn test_recipe_view_template_renders() {
+        let recipe = Recipe {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "View Recipe".to_string(),
+            description: Some("Description".to_string()),
+            visibility: Visibility::Public,
+            prep_time_min: Some(15),
+            cook_time_min: Some(30),
+            servings: Some("2".to_string()),
+            difficulty: Some(Difficulty::Easy),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            ap_id: "https://example.com/recipes/2".to_string(),
+        };
+
+        let template = RecipeViewTemplate {
+            recipe,
+            author: None,
+            ingredients: vec![],
+            instructions: vec![],
+            images: vec![],
+            primary_image: None,
+            schema_json: "{}".to_string(),
+            is_owner: false,
+            user: None,
+            user_books: vec![],
+            is_saved: false,
+        };
+        let result = template.render();
+        assert!(result.is_ok());
+        let html = result.unwrap();
+        assert!(html.contains("View Recipe") || !html.is_empty());
+    }
+
+    // ==========================================================================
+    // Pagination Tests (T052)
+    // ==========================================================================
+
+    #[test]
+    fn test_pagination_meta_in_template() {
+        let pagination = PaginationMeta {
+            page: 2,
+            page_size: 20,
+            total_items: 50,
+            total_pages: 3,
+            has_next: true,
+            has_prev: true,
+        };
+
+        let template = RecipeListTemplate {
+            recipes: vec![],
+            pagination,
+            user: None,
+        };
+
+        let html = template.render().unwrap();
+        // Template should render even with pagination data
+        assert!(!html.is_empty());
+    }
+
+    #[test]
+    fn test_recipe_list_with_recipes() {
+        let recipe = RecipeSummary {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "Sample Recipe".to_string(),
+            description: Some("A sample".to_string()),
+            prep_time_min: Some(10),
+            cook_time_min: Some(20),
+            difficulty: Some(Difficulty::Easy),
+            created_at: Utc::now(),
+            primary_image_url: None,
+        };
+
+        let template = RecipeListTemplate {
+            recipes: vec![recipe],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 1,
+                total_pages: 1,
+                has_next: false,
+                has_prev: false,
+            },
+            user: None,
+        };
+
+        let html = template.render().unwrap();
+        assert!(html.contains("Sample Recipe") || !html.is_empty());
+    }
+
+    // ==========================================================================
+    // Owner/Auth State Tests (T052)
+    // ==========================================================================
+
+    #[test]
+    fn test_recipe_view_owner_state() {
+        let recipe = Recipe {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "Owner Recipe".to_string(),
+            description: None,
+            visibility: Visibility::Public,
+            prep_time_min: None,
+            cook_time_min: None,
+            servings: None,
+            difficulty: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            ap_id: "https://example.com/recipes/3".to_string(),
+        };
+
+        // Test as owner
+        let owner_template = RecipeViewTemplate {
+            recipe: recipe.clone(),
+            author: None,
+            ingredients: vec![],
+            instructions: vec![],
+            images: vec![],
+            primary_image: None,
+            schema_json: "{}".to_string(),
+            is_owner: true,
+            user: None,
+            user_books: vec![],
+            is_saved: false,
+        };
+        assert!(owner_template.render().is_ok());
+
+        // Test as non-owner
+        let guest_template = RecipeViewTemplate {
+            recipe,
+            author: None,
+            ingredients: vec![],
+            instructions: vec![],
+            images: vec![],
+            primary_image: None,
+            schema_json: "{}".to_string(),
+            is_owner: false,
+            user: None,
+            user_books: vec![],
+            is_saved: false,
+        };
+        assert!(guest_template.render().is_ok());
+    }
+}

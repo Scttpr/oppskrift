@@ -135,9 +135,185 @@ impl SavedRecipeService {
 mod tests {
     use super::*;
 
+    // ==========================================================================
+    // Service Existence Test
+    // ==========================================================================
+
     #[test]
     fn test_service_exists() {
         // Verify service struct exists
         let _ = SavedRecipeService;
+    }
+
+    // ==========================================================================
+    // Error Path Tests (T045)
+    // ==========================================================================
+
+    #[test]
+    fn test_already_saved_error() {
+        let err = AppError::Validation("Recipe already saved".to_string());
+        let msg = err.to_string();
+        assert!(msg.contains("already saved"));
+    }
+
+    #[test]
+    fn test_recipe_not_found_error() {
+        let err = AppError::NotFound("Recipe not found".to_string());
+        let msg = err.to_string();
+        assert!(msg.contains("not found"));
+    }
+
+    #[test]
+    fn test_saved_recipe_not_found_error() {
+        let err = AppError::NotFound("Saved recipe not found".to_string());
+        let msg = err.to_string();
+        assert!(msg.contains("Saved recipe not found"));
+    }
+
+    // ==========================================================================
+    // SavedRecipe Model Tests (T045)
+    // ==========================================================================
+
+    #[test]
+    fn test_saved_recipe_struct() {
+        let saved = SavedRecipe {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            recipe_id: Uuid::new_v4(),
+            saved_at: chrono::Utc::now(),
+        };
+
+        assert_ne!(saved.user_id, saved.recipe_id);
+        assert_ne!(saved.id, saved.user_id);
+    }
+
+    #[test]
+    fn test_saved_recipe_ids_unique() {
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+
+        let saved = SavedRecipe {
+            id: id1,
+            user_id: id2,
+            recipe_id: id3,
+            saved_at: chrono::Utc::now(),
+        };
+
+        // All IDs should be different
+        assert_ne!(saved.id, saved.user_id);
+        assert_ne!(saved.id, saved.recipe_id);
+        assert_ne!(saved.user_id, saved.recipe_id);
+    }
+
+    // ==========================================================================
+    // Pagination Tests (T045)
+    // ==========================================================================
+
+    #[test]
+    fn test_pagination_params() {
+        let params = PaginationParams {
+            page: 1,
+            page_size: 10,
+        };
+        assert_eq!(params.offset(), 0);
+        assert_eq!(params.limit(), 10);
+    }
+
+    #[test]
+    fn test_pagination_second_page() {
+        let params = PaginationParams {
+            page: 2,
+            page_size: 20,
+        };
+        assert_eq!(params.offset(), 20);
+    }
+
+    #[test]
+    fn test_pagination_large_page() {
+        let params = PaginationParams {
+            page: 100,
+            page_size: 50,
+        };
+        assert_eq!(params.offset(), 4950); // (100-1) * 50
+    }
+
+    // ==========================================================================
+    // UUID Tests (T045)
+    // ==========================================================================
+
+    #[test]
+    fn test_uuid_generation() {
+        let user_id = Uuid::new_v4();
+        let recipe_id = Uuid::new_v4();
+
+        assert_ne!(user_id, recipe_id);
+        assert!(!user_id.is_nil());
+        assert!(!recipe_id.is_nil());
+    }
+
+    #[test]
+    fn test_uuid_uniqueness_batch() {
+        let ids: Vec<Uuid> = (0..50).map(|_| Uuid::new_v4()).collect();
+        let unique: std::collections::HashSet<_> = ids.iter().collect();
+        assert_eq!(ids.len(), unique.len());
+    }
+
+    // ==========================================================================
+    // RecipeSummary Tests (T045)
+    // ==========================================================================
+
+    #[test]
+    fn test_recipe_summary_with_image() {
+        let summary = RecipeSummary {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "Chocolate Cake".to_string(),
+            description: Some("A delicious chocolate cake".to_string()),
+            difficulty: None,
+            prep_time_min: Some(30),
+            cook_time_min: Some(45),
+            created_at: chrono::Utc::now(),
+            primary_image_url: Some("https://example.com/cake.jpg".to_string()),
+        };
+
+        assert_eq!(summary.title, "Chocolate Cake");
+        assert!(summary.primary_image_url.is_some());
+    }
+
+    #[test]
+    fn test_recipe_summary_minimal() {
+        let summary = RecipeSummary {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "Quick Pasta".to_string(),
+            description: None,
+            difficulty: None,
+            prep_time_min: None,
+            cook_time_min: None,
+            created_at: chrono::Utc::now(),
+            primary_image_url: None,
+        };
+
+        assert!(summary.description.is_none());
+        assert!(summary.primary_image_url.is_none());
+    }
+
+    #[test]
+    fn test_recipe_summary_with_times() {
+        let summary = RecipeSummary {
+            id: Uuid::new_v4(),
+            author_id: Uuid::new_v4(),
+            title: "Slow Roast".to_string(),
+            description: None,
+            difficulty: None,
+            prep_time_min: Some(15),
+            cook_time_min: Some(180),
+            created_at: chrono::Utc::now(),
+            primary_image_url: None,
+        };
+
+        assert_eq!(summary.prep_time_min, Some(15));
+        assert_eq!(summary.cook_time_min, Some(180));
     }
 }

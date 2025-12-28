@@ -38,3 +38,69 @@ pub fn generate_rsa_keypair() -> AppResult<RsaKeyPair> {
         public_key_pem,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_rsa_keypair() {
+        let keypair = generate_rsa_keypair().expect("Should generate keypair");
+
+        // Private key should be PEM encoded
+        assert!(
+            keypair.private_key_pem.contains("BEGIN PRIVATE KEY"),
+            "Private key should be PEM encoded"
+        );
+        assert!(
+            keypair.private_key_pem.contains("END PRIVATE KEY"),
+            "Private key should be complete"
+        );
+
+        // Public key should be PEM encoded
+        assert!(
+            keypair.public_key_pem.contains("BEGIN PUBLIC KEY"),
+            "Public key should be PEM encoded"
+        );
+        assert!(
+            keypair.public_key_pem.contains("END PUBLIC KEY"),
+            "Public key should be complete"
+        );
+    }
+
+    #[test]
+    fn test_keypair_uniqueness() {
+        let keypair1 = generate_rsa_keypair().expect("Should generate keypair 1");
+        let keypair2 = generate_rsa_keypair().expect("Should generate keypair 2");
+
+        // Each keypair should be unique
+        assert_ne!(
+            keypair1.private_key_pem, keypair2.private_key_pem,
+            "Private keys should be unique"
+        );
+        assert_ne!(
+            keypair1.public_key_pem, keypair2.public_key_pem,
+            "Public keys should be unique"
+        );
+    }
+
+    #[test]
+    fn test_keypair_minimum_length() {
+        let keypair = generate_rsa_keypair().expect("Should generate keypair");
+
+        // 2048-bit RSA keys have substantial PEM output
+        // Private key should be at least 1600 chars in PEM format
+        assert!(
+            keypair.private_key_pem.len() > 1600,
+            "Private key should be substantial (got {} chars)",
+            keypair.private_key_pem.len()
+        );
+
+        // Public key should be at least 300 chars
+        assert!(
+            keypair.public_key_pem.len() > 300,
+            "Public key should be substantial (got {} chars)",
+            keypair.public_key_pem.len()
+        );
+    }
+}

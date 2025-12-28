@@ -568,3 +568,38 @@ fn create_auth_service(state: &AppState) -> AuthService {
         SESSION_EXPIRY_DAYS,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routes_are_configured() {
+        // This test verifies the routes() function doesn't panic
+        // and returns a valid Router
+        let _router = routes();
+    }
+
+    #[test]
+    fn test_request_context_creation() {
+        use std::net::{IpAddr, Ipv4Addr};
+
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)), 8080);
+        let request_id = RequestId(uuid::Uuid::new_v4());
+
+        let ctx = create_request_context(addr, Some(&request_id));
+        assert!(ctx.ip.is_some());
+        assert!(ctx.request_id.is_some());
+    }
+
+    #[test]
+    fn test_request_context_without_request_id() {
+        use std::net::{IpAddr, Ipv4Addr};
+
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3000);
+
+        let ctx = create_request_context(addr, None);
+        assert!(ctx.ip.is_some());
+        assert!(ctx.request_id.is_none());
+    }
+}
