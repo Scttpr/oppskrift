@@ -60,3 +60,32 @@ async fn webfinger(
 
     Ok(Json(resource))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routes_are_configured() {
+        let _router = routes();
+    }
+
+    #[test]
+    fn test_webfinger_query_deserialization() {
+        // Test that WebFingerQuery can deserialize correctly
+        let query: WebFingerQuery =
+            serde_json::from_str(r#"{"resource": "acct:alice@example.com"}"#)
+                .expect("Should deserialize");
+        assert_eq!(query.resource, "acct:alice@example.com");
+    }
+
+    #[test]
+    fn test_acct_uri_parsing() {
+        let resource = "acct:testuser@example.com";
+        let acct = resource.strip_prefix("acct:").unwrap();
+        let (username, domain) = acct.split_once('@').unwrap();
+
+        assert_eq!(username, "testuser");
+        assert_eq!(domain, "example.com");
+    }
+}

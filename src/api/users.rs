@@ -173,3 +173,13 @@ async fn get_user_books(
     let books = BookService::list_by_owner_paginated(&state.db, id, &params).await?;
     Ok(Json(books))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routes_are_configured() {
+        let _router = routes();
+    }
+}

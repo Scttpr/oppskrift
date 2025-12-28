@@ -170,3 +170,13 @@ async fn get_feed(
     let feed = ActivityService::get_feed(&state.db, auth.id, &params).await?;
     Ok(Json(feed))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routes_are_configured() {
+        let _router = routes();
+    }
+}

@@ -75,3 +75,29 @@ fn create_router(state: AppState) -> Router {
 async fn health_check() -> &'static str {
     "OK"
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that AppState can be created and cloned
+    #[test]
+    fn test_app_state_is_clone() {
+        // This is a compile-time check - AppState must implement Clone
+        fn assert_clone<T: Clone>() {}
+        assert_clone::<AppState>();
+    }
+
+    /// Test that the router modules are properly configured
+    /// This test doesn't need a database - it just verifies the routing
+    /// configuration doesn't panic during setup
+    #[test]
+    fn test_api_routes_compile() {
+        // These calls verify all route configurations compile correctly
+        let _ = api::routes();
+        let _ = api::federation_routes();
+        let _ = api::syndication_routes();
+        let _ = api::docs_routes();
+        let _ = handlers::routes();
+    }
+}

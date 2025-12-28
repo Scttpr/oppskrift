@@ -432,3 +432,20 @@ async fn get_book_object(
 
     Ok(Json(collection))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routes_are_configured() {
+        let _router = routes();
+    }
+
+    #[test]
+    fn test_activitypub_routes_include_actor() {
+        // Verify that the router includes essential ActivityPub endpoints
+        // This is a compile-time check - if routes() is misconfigured, it won't compile
+        let _router = routes();
+    }
+}

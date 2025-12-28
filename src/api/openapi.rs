@@ -60,3 +60,50 @@ pub fn routes() -> Router<AppState> {
 async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
     Json(ApiDoc::openapi())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routes_are_configured() {
+        let _router = routes();
+    }
+
+    #[test]
+    fn test_openapi_spec_generation() {
+        let spec = ApiDoc::openapi();
+
+        // Verify basic metadata
+        assert_eq!(spec.info.title, "Oppskrift API");
+        assert_eq!(spec.info.version, "1.0.0");
+    }
+
+    #[test]
+    fn test_openapi_has_required_tags() {
+        let spec = ApiDoc::openapi();
+
+        let tag_names: Vec<&str> = spec
+            .tags
+            .as_ref()
+            .map(|tags| tags.iter().map(|t| t.name.as_str()).collect())
+            .unwrap_or_default();
+
+        assert!(tag_names.contains(&"auth"), "Should have auth tag");
+        assert!(tag_names.contains(&"recipes"), "Should have recipes tag");
+        assert!(tag_names.contains(&"users"), "Should have users tag");
+    }
+
+    #[test]
+    fn test_openapi_has_servers() {
+        let spec = ApiDoc::openapi();
+
+        assert!(
+            spec.servers.is_some(),
+            "OpenAPI spec should have servers defined"
+        );
+        let servers = spec.servers.unwrap();
+        assert!(!servers.is_empty(), "Should have at least one server");
+        assert_eq!(servers[0].url, "/api/v1");
+    }
+}

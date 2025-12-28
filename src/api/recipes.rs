@@ -352,3 +352,13 @@ async fn set_primary_image(
     let image = ImageService::set_primary(&state.db, image_id).await?;
     Ok(Json(image))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routes_are_configured() {
+        let _router = routes();
+    }
+}
