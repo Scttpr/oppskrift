@@ -84,11 +84,15 @@ jobs:
             ~/.cargo/registry/
             ~/.cargo/git/
           key: build-${{ github.sha }}
-      - name: Install sqlx-cli
-        uses: taiki-e/cache-cargo-install-action@caa6f48d18d42462f9c30df89e2b4f71a42b7c2c # v2.1.1
+      - name: Cache sqlx-cli
+        id: cache-sqlx
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          tool: sqlx-cli
-          features: postgres
+          path: ~/.cargo/bin/sqlx
+          key: sqlx-cli-0.8
+      - name: Install sqlx-cli
+        if: steps.cache-sqlx.outputs.cache-hit != 'true'
+        run: cargo install sqlx-cli --no-default-features --features postgres --locked
       - name: Run migrations
         run: sqlx migrate run
       - name: Run tests

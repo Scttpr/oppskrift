@@ -40,10 +40,15 @@ jobs:
         run: ./gitleaks detect --source . --config .gitleaks.toml --verbose
 
       # Cargo audit - dependency vulnerabilities
-      - name: Install cargo-audit
-        uses: taiki-e/cache-cargo-install-action@caa6f48d18d42462f9c30df89e2b4f71a42b7c2c # v2.1.1
+      - name: Cache cargo-audit
+        id: cache-audit
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          tool: cargo-audit
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-0.21
+      - name: Install cargo-audit
+        if: steps.cache-audit.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked
 
       - name: Dependency Audit
         run: cargo audit --deny warnings --deny unmaintained --deny yanked
