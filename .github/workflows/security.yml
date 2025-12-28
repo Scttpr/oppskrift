@@ -13,71 +13,43 @@ env:
   SQLX_OFFLINE: true
 
 jobs:
-  audit:
-    name: Dependency Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561 # master
-        with:
-          toolchain: stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ~/.cargo/advisory-db
-          key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
-
-      - name: Run cargo audit
-        run: cargo audit --deny warnings --deny unmaintained --deny yanked
-
-  secrets:
-    name: Secret Scan
+  # All security checks in one job to reduce overhead
+  security:
+    name: Security Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
+      - uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561 # master
+        with:
+          toolchain: stable
+          components: clippy
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+
+      # Gitleaks - secret scanning
       - name: Install Gitleaks
         run: |
           curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz -o gitleaks.tar.gz
           tar xzf gitleaks.tar.gz
           chmod +x gitleaks
 
-      - name: Run Gitleaks
+      - name: Secret Scan
         run: ./gitleaks detect --source . --config .gitleaks.toml --verbose
 
-  clippy-security:
-    name: Security Lints
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561 # master
+      # Cargo audit - dependency vulnerabilities
+      - name: Install cargo-audit
+        uses: taiki-e/cache-cargo-install-action@caa6f48d18d42462f9c30df89e2b4f71a42b7c2c # v2.1.1
         with:
-          toolchain: stable
-          components: clippy
+          tool: cargo-audit
 
-      - name: Cache cargo
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-security-${{ hashFiles('**/Cargo.lock') }}
+      - name: Dependency Audit
+        run: cargo audit --deny warnings --deny unmaintained --deny yanked
 
-      - name: Run security-focused Clippy
+      # Security-focused clippy lints (warnings, not errors)
+      - name: Security Lints
         run: |
           cargo clippy --all-features -- \
             -W clippy::unwrap_used \
