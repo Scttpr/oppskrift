@@ -10,6 +10,8 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   DATABASE_URL: postgres://oppskrift:oppskrift@localhost:5432/oppskrift
+  # Test-only encryption key for 2FA (64 hex chars = 32 bytes)
+  TOTP_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 jobs:
   # Build first - all other jobs depend on this

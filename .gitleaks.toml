@@ -45,4 +45,6 @@ paths = [
     '''src/lib/crypto\.rs''',
     # OSK templates with example tokens
     '''\.osk/domaines/.*\.md''',
+    # CI workflows with test-only keys
+    '''\.github/workflows/.*\.yml''',
 ]
