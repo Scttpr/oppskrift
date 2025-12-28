@@ -1,32 +1,6 @@
-#![allow(special_module_name)]
-
-use axum::{routing::get, Router};
-use sqlx::PgPool;
+use oppskrift::{app_router, core, AppState};
 use std::net::SocketAddr;
-use tower_http::{
-    cors::{Any, CorsLayer},
-    services::ServeDir,
-    trace::TraceLayer,
-};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-mod api;
-mod handlers;
-mod jobs;
-mod lib;
-mod models;
-mod services;
-
-/// Application state shared across handlers
-#[derive(Clone)]
-pub struct AppState {
-    pub db: PgPool,
-}
-
-/// Create the application router (exposed for testing)
-pub fn app_router(state: AppState) -> Router {
-    create_router(state)
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -38,7 +12,7 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
     // Validate configuration (panics if required vars missing)
-    lib::Config::from_env();
+    core::Config::from_env();
 
     // Initialize tracing with JSON format in production
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
@@ -63,12 +37,12 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Create database connection pool
-    let db = lib::db::create_default_pool().await?;
+    let db = core::db::create_default_pool().await?;
     tracing::info!("Database connection pool created");
 
     // Run seeds if requested (then exit)
     if should_seed {
-        match lib::seeds::run(&db).await {
+        match core::seeds::run(&db).await {
             Ok(result) => {
                 tracing::info!(
                     "Seeding complete: {} users, {} recipes, {} books",
@@ -89,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
     let state = AppState { db };
 
     // Build the router
-    let app = create_router(state);
+    let app = app_router(state);
 
     // Get host and port from environment
     let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
@@ -106,37 +80,4 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
     Ok(())
-}
-
-/// Create the application router with all middleware
-fn create_router(state: AppState) -> Router {
-    // CORS configuration
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
-
-    Router::new()
-        // Health check endpoint
-        .route("/health", get(health_check))
-        // API routes
-        .nest("/api/v1", api::routes())
-        // ActivityPub federation routes
-        .merge(api::federation_routes())
-        // Content syndication routes (RSS, Atom, oEmbed)
-        .merge(api::syndication_routes())
-        // API documentation
-        .merge(api::docs_routes())
-        // HTML handler routes
-        .merge(handlers::routes())
-        // Static file serving
-        .nest_service("/static", ServeDir::new("static"))
-        .layer(TraceLayer::new_for_http())
-        .layer(cors)
-        .with_state(state)
-}
-
-/// Health check endpoint
-async fn health_check() -> &'static str {
-    "OK"
 }

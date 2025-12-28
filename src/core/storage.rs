@@ -6,7 +6,7 @@ use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::{config::Region, primitives::ByteStream, Client};
 use uuid::Uuid;
 
-use crate::lib::error::{AppError, AppResult};
+use crate::core::error::{AppError, AppResult};
 
 /// Storage configuration
 #[derive(Debug, Clone)]

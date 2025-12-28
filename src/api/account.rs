@@ -12,8 +12,8 @@ use std::net::SocketAddr;
 use validator::Validate;
 
 use crate::api::middleware::AuthUser;
-use crate::lib::config::SmtpConfig;
-use crate::lib::error::AppError;
+use crate::core::config::SmtpConfig;
+use crate::core::error::AppError;
 use crate::models::{
     CancelDeletionResponse, ChangeEmailRequest, ChangeEmailResponse, ChangePasswordRequest,
     ChangePasswordResponse, DeleteAccountRequest, DeletionScheduledResponse, RecoveryCodesResponse,

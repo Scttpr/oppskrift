@@ -1,7 +1,7 @@
 use askama::Template;
 use axum::{response::Html, routing::get, Router};
 
-use crate::lib::error::{AppError, AppResult};
+use crate::core::error::{AppError, AppResult};
 use crate::AppState;
 
 /// Legal page routes

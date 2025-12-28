@@ -3,7 +3,7 @@
 //! Uses lettre for SMTP delivery. If SMTP is not configured,
 //! emails are logged instead (useful for development).
 
-use crate::lib::config::SmtpConfig;
+use crate::core::config::SmtpConfig;
 use lettre::{
     message::{header::ContentType, Mailbox},
     transport::smtp::authentication::Credentials,

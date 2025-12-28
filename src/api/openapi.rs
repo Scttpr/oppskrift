@@ -5,8 +5,8 @@
 use axum::{routing::get, Json, Router};
 use utoipa::OpenApi;
 
-use crate::lib::error::ErrorResponse;
-use crate::lib::pagination::PaginationMeta;
+use crate::core::error::ErrorResponse;
+use crate::core::pagination::PaginationMeta;
 use crate::models::{
     LoginRequest, LoginResponse, LogoutResponse, RegisterRequest, RegisterResponse, UserProfile,
 };

@@ -8,10 +8,10 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::middleware::{AuthUser, OptionalAuthUser};
-use crate::lib::error::{AppError, AppResult};
-use crate::lib::pagination::{PaginatedResponse, PaginationParams};
-use crate::lib::schema_org::SchemaOrgRecipe;
-use crate::lib::storage::StorageClient;
+use crate::core::error::{AppError, AppResult};
+use crate::core::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::schema_org::SchemaOrgRecipe;
+use crate::core::storage::StorageClient;
 use crate::models::{
     CreateIngredient, CreateInstructionStep, CreateRecipe, Ingredient, InstructionStep, Recipe,
     RecipeImage, RecipeSummary, UpdateRecipe,

@@ -6,7 +6,7 @@ use rsa::{
     RsaPrivateKey, RsaPublicKey,
 };
 
-use crate::lib::error::{AppError, AppResult};
+use crate::core::error::{AppError, AppResult};
 
 /// RSA key pair for ActivityPub HTTP signatures
 pub struct RsaKeyPair {

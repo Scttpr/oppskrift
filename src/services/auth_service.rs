@@ -11,7 +11,7 @@ use std::net::IpAddr;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::lib::error::AppError;
+use crate::core::error::AppError;
 use crate::models::{RegisterRequest, RegisterResponse, User, RESERVED_USERNAMES};
 use crate::services::{
     EmailService, PasswordService, SecurityLogService, SessionService, UserService,

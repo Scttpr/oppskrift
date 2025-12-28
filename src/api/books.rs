@@ -7,9 +7,9 @@ use axum::{
 use uuid::Uuid;
 
 use crate::api::middleware::{AuthUser, OptionalAuthUser};
-use crate::lib::error::{AppError, AppResult};
-use crate::lib::pagination::{PaginatedResponse, PaginationParams};
-use crate::lib::storage::StorageClient;
+use crate::core::error::{AppError, AppResult};
+use crate::core::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::storage::StorageClient;
 use crate::models::{
     AddRecipeToBook, BookRecipeEntry, CreateRecipeBook, RecipeBook, RecipeBookSummary,
     RecipeSummary, UpdateRecipeBook,

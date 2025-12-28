@@ -12,7 +12,7 @@ use axum::{
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::lib::pagination::PaginationParams;
+use crate::core::pagination::PaginationParams;
 use crate::services::{RecipeService, UserService};
 use crate::AppState;
 

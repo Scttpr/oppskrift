@@ -1,26 +1,24 @@
 //! Integration tests for authentication
 //!
-//! These tests require:
-//! - A running PostgreSQL database (DATABASE_URL)
-//! - The app server running (TEST_BASE_URL, defaults to localhost:3000)
+//! These tests require a PostgreSQL database (DATABASE_URL).
+//! Uses axum-test to test directly without needing a running HTTP server.
 //!
 //! Run with: cargo test --test auth_test -- --test-threads=1
 
 mod common;
 
-use common::{generate_totp_code, ApiClient, TestContext};
+use common::{generate_totp_code, TestContext};
 use serde_json::json;
 
 /// Test: Registration creates user and returns success
 #[tokio::test]
 async fn test_registration_success() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/register",
             json!({
@@ -58,14 +56,13 @@ async fn test_registration_success() {
 #[tokio::test]
 async fn test_registration_duplicate_email() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username1 = TestContext::unique_username();
     let username2 = TestContext::unique_username();
 
     // First registration
-    let response1 = client
+    let response1 = ctx
         .post(
             "/api/v1/auth/register",
             json!({
@@ -83,7 +80,7 @@ async fn test_registration_duplicate_email() {
     }
 
     // Second registration with same email
-    let response2 = client
+    let response2 = ctx
         .post(
             "/api/v1/auth/register",
             json!({
@@ -106,9 +103,8 @@ async fn test_registration_duplicate_email() {
 #[tokio::test]
 async fn test_registration_invalid_email() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/register",
             json!({
@@ -126,9 +122,8 @@ async fn test_registration_invalid_email() {
 #[tokio::test]
 async fn test_registration_short_password() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/register",
             json!({
@@ -146,9 +141,8 @@ async fn test_registration_short_password() {
 #[tokio::test]
 async fn test_registration_reserved_username() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/register",
             json!({
@@ -166,7 +160,6 @@ async fn test_registration_reserved_username() {
 #[tokio::test]
 async fn test_login_success() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -175,7 +168,7 @@ async fn test_login_success() {
     // Create verified user directly in DB
     ctx.create_user(&email, &username, password, true).await;
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -202,7 +195,6 @@ async fn test_login_success() {
 #[tokio::test]
 async fn test_login_unverified_email() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -211,7 +203,7 @@ async fn test_login_unverified_email() {
     // Create unverified user
     ctx.create_user(&email, &username, password, false).await;
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -234,7 +226,6 @@ async fn test_login_unverified_email() {
 #[tokio::test]
 async fn test_login_wrong_password() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -243,7 +234,7 @@ async fn test_login_wrong_password() {
     ctx.create_user(&email, &username, "CorrectPass123!", true)
         .await;
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -268,9 +259,8 @@ async fn test_login_wrong_password() {
 #[tokio::test]
 async fn test_login_nonexistent_email() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -293,9 +283,8 @@ async fn test_login_nonexistent_email() {
 #[tokio::test]
 async fn test_health_check() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client.get("/health").await;
+    let response = ctx.get("/health").await;
 
     assert_eq!(response.status, 200, "Health check should return 200");
 }
@@ -308,7 +297,6 @@ async fn test_health_check() {
 #[tokio::test]
 async fn test_login_returns_session_cookie() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -317,7 +305,7 @@ async fn test_login_returns_session_cookie() {
     // Create verified user
     ctx.create_user(&email, &username, password, true).await;
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -340,7 +328,6 @@ async fn test_login_returns_session_cookie() {
 #[tokio::test]
 async fn test_access_protected_endpoint_with_session() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -349,7 +336,7 @@ async fn test_access_protected_endpoint_with_session() {
     // Create verified user and login
     ctx.create_user(&email, &username, password, true).await;
 
-    let login_response = client
+    let login_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -364,7 +351,7 @@ async fn test_access_protected_endpoint_with_session() {
         .expect("Login should return session");
 
     // Access /users/me with session
-    let me_response = client.get_with_session("/api/v1/users/me", &session).await;
+    let me_response = ctx.get_with_session("/api/v1/users/me", &session).await;
 
     assert_eq!(
         me_response.status, 200,
@@ -384,9 +371,8 @@ async fn test_access_protected_endpoint_with_session() {
 #[tokio::test]
 async fn test_access_protected_endpoint_without_session() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client.get("/api/v1/users/me").await;
+    let response = ctx.get("/api/v1/users/me").await;
 
     assert_eq!(response.status, 401, "Should return 401 without session");
 }
@@ -395,7 +381,6 @@ async fn test_access_protected_endpoint_without_session() {
 #[tokio::test]
 async fn test_logout_invalidates_session() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -404,7 +389,7 @@ async fn test_logout_invalidates_session() {
     // Create verified user and login
     ctx.create_user(&email, &username, password, true).await;
 
-    let login_response = client
+    let login_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -419,14 +404,14 @@ async fn test_logout_invalidates_session() {
         .expect("Login should return session");
 
     // Logout
-    let logout_response = client
+    let logout_response = ctx
         .post_with_session("/api/v1/auth/logout", json!({}), &session)
         .await;
 
     assert_eq!(logout_response.status, 200, "Logout should succeed");
 
     // Try to access protected endpoint with old session
-    let me_response = client.get_with_session("/api/v1/users/me", &session).await;
+    let me_response = ctx.get_with_session("/api/v1/users/me", &session).await;
 
     assert_eq!(
         me_response.status, 401,
@@ -440,9 +425,8 @@ async fn test_logout_invalidates_session() {
 #[tokio::test]
 async fn test_logout_without_session() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client.post("/api/v1/auth/logout", json!({})).await;
+    let response = ctx.post("/api/v1/auth/logout", json!({})).await;
 
     assert_eq!(
         response.status, 401,
@@ -458,9 +442,8 @@ async fn test_logout_without_session() {
 #[tokio::test]
 async fn test_forgot_password_success() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/forgot-password",
             json!({
@@ -480,7 +463,6 @@ async fn test_forgot_password_success() {
 #[tokio::test]
 async fn test_reset_password_success() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -494,7 +476,7 @@ async fn test_reset_password_success() {
     let token = ctx.create_password_reset_token(user_id, false).await;
 
     // Reset password
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/reset-password",
             json!({
@@ -511,7 +493,7 @@ async fn test_reset_password_success() {
     );
 
     // Verify can login with new password
-    let login_response = client
+    let login_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -530,9 +512,8 @@ async fn test_reset_password_success() {
 #[tokio::test]
 async fn test_reset_password_invalid_token() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/reset-password",
             json!({
@@ -549,7 +530,6 @@ async fn test_reset_password_invalid_token() {
 #[tokio::test]
 async fn test_reset_password_expired_token() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -562,7 +542,7 @@ async fn test_reset_password_expired_token() {
     // Create expired token
     let token = ctx.create_password_reset_token(user_id, true).await;
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/reset-password",
             json!({
@@ -581,7 +561,6 @@ async fn test_reset_password_expired_token() {
 #[tokio::test]
 async fn test_reset_password_weak_password() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -594,7 +573,7 @@ async fn test_reset_password_weak_password() {
     // Create reset token
     let token = ctx.create_password_reset_token(user_id, false).await;
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/reset-password",
             json!({
@@ -617,7 +596,6 @@ async fn test_reset_password_weak_password() {
 #[tokio::test]
 async fn test_confirm_email_success() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -633,7 +611,7 @@ async fn test_confirm_email_success() {
         .await;
 
     // Confirm email
-    let response = client
+    let response = ctx
         .get(&format!("/api/v1/auth/confirm-email/{}", token))
         .await;
 
@@ -644,7 +622,7 @@ async fn test_confirm_email_success() {
     );
 
     // Verify can now login
-    let login_response = client
+    let login_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -666,9 +644,8 @@ async fn test_confirm_email_success() {
 #[tokio::test]
 async fn test_confirm_email_invalid_token() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client
+    let response = ctx
         .get("/api/v1/auth/confirm-email/0000000000000000000000000000000000000000000000000000000000000000")
         .await;
 
@@ -679,7 +656,6 @@ async fn test_confirm_email_invalid_token() {
 #[tokio::test]
 async fn test_confirm_email_expired_token() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -694,7 +670,7 @@ async fn test_confirm_email_expired_token() {
         .create_email_confirmation_token(user_id, &email, true)
         .await;
 
-    let response = client
+    let response = ctx
         .get(&format!("/api/v1/auth/confirm-email/{}", token))
         .await;
 
@@ -707,7 +683,6 @@ async fn test_confirm_email_expired_token() {
 #[tokio::test]
 async fn test_confirm_email_already_verified() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -722,7 +697,7 @@ async fn test_confirm_email_already_verified() {
         .create_email_confirmation_token(user_id, &email, false)
         .await;
 
-    let response = client
+    let response = ctx
         .get(&format!("/api/v1/auth/confirm-email/{}", token))
         .await;
 
@@ -738,9 +713,8 @@ async fn test_confirm_email_already_verified() {
 #[tokio::test]
 async fn test_resend_confirmation_success() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client
+    let response = ctx
         .post(
             "/api/v1/auth/resend-confirmation",
             json!({
@@ -764,9 +738,8 @@ async fn test_resend_confirmation_success() {
 #[tokio::test]
 async fn test_2fa_setup_requires_auth() {
     let ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
-    let response = client.post("/api/v1/account/2fa/setup", json!({})).await;
+    let response = ctx.post("/api/v1/account/2fa/setup", json!({})).await;
 
     assert_eq!(
         response.status, 401,
@@ -778,7 +751,6 @@ async fn test_2fa_setup_requires_auth() {
 #[tokio::test]
 async fn test_2fa_setup_success() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -787,7 +759,7 @@ async fn test_2fa_setup_success() {
     // Create verified user and login
     ctx.create_user(&email, &username, password, true).await;
 
-    let login_response = client
+    let login_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -802,7 +774,7 @@ async fn test_2fa_setup_success() {
         .expect("Login should return session");
 
     // Setup 2FA
-    let response = client
+    let response = ctx
         .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
         .await;
 
@@ -821,7 +793,6 @@ async fn test_2fa_setup_success() {
 #[tokio::test]
 async fn test_2fa_enable_success() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -830,7 +801,7 @@ async fn test_2fa_enable_success() {
     // Create verified user and login
     ctx.create_user(&email, &username, password, true).await;
 
-    let login_response = client
+    let login_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -845,7 +816,7 @@ async fn test_2fa_enable_success() {
         .expect("Login should return session");
 
     // Setup 2FA
-    let setup_response = client
+    let setup_response = ctx
         .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
         .await;
 
@@ -858,7 +829,7 @@ async fn test_2fa_enable_success() {
     let totp_code = generate_totp_code(secret);
 
     // Enable 2FA
-    let enable_response = client
+    let enable_response = ctx
         .post_with_session(
             "/api/v1/account/2fa/enable",
             json!({ "totp_code": totp_code }),
@@ -883,7 +854,6 @@ async fn test_2fa_enable_success() {
 #[tokio::test]
 async fn test_2fa_enable_invalid_code() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -892,7 +862,7 @@ async fn test_2fa_enable_invalid_code() {
     // Create verified user and login
     ctx.create_user(&email, &username, password, true).await;
 
-    let login_response = client
+    let login_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -907,12 +877,11 @@ async fn test_2fa_enable_invalid_code() {
         .expect("Login should return session");
 
     // Setup 2FA
-    client
-        .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
+    ctx.post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
         .await;
 
     // Try to enable with invalid code
-    let enable_response = client
+    let enable_response = ctx
         .post_with_session(
             "/api/v1/account/2fa/enable",
             json!({ "totp_code": "000000" }),
@@ -932,7 +901,6 @@ async fn test_2fa_enable_invalid_code() {
 #[tokio::test]
 async fn test_login_with_2fa_returns_partial_token() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -941,7 +909,7 @@ async fn test_login_with_2fa_returns_partial_token() {
     // Create verified user and login
     ctx.create_user(&email, &username, password, true).await;
 
-    let login_response = client
+    let login_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -956,7 +924,7 @@ async fn test_login_with_2fa_returns_partial_token() {
         .expect("Login should return session");
 
     // Setup and enable 2FA
-    let setup_response = client
+    let setup_response = ctx
         .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
         .await;
 
@@ -967,16 +935,15 @@ async fn test_login_with_2fa_returns_partial_token() {
 
     let totp_code = generate_totp_code(secret);
 
-    client
-        .post_with_session(
-            "/api/v1/account/2fa/enable",
-            json!({ "totp_code": totp_code }),
-            &session,
-        )
-        .await;
+    ctx.post_with_session(
+        "/api/v1/account/2fa/enable",
+        json!({ "totp_code": totp_code }),
+        &session,
+    )
+    .await;
 
     // Now login again - should require 2FA
-    let login_2fa_response = client
+    let login_2fa_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -1006,7 +973,6 @@ async fn test_login_with_2fa_returns_partial_token() {
 #[tokio::test]
 async fn test_2fa_verify_completes_login() {
     let mut ctx = TestContext::new().await;
-    let client = ApiClient::new(&ctx.base_url);
 
     let email = TestContext::unique_email();
     let username = TestContext::unique_username();
@@ -1015,7 +981,7 @@ async fn test_2fa_verify_completes_login() {
     // Create verified user and login
     ctx.create_user(&email, &username, password, true).await;
 
-    let login_response = client
+    let login_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -1030,7 +996,7 @@ async fn test_2fa_verify_completes_login() {
         .expect("Login should return session");
 
     // Setup and enable 2FA
-    let setup_response = client
+    let setup_response = ctx
         .post_with_session("/api/v1/account/2fa/setup", json!({}), &session)
         .await;
 
@@ -1042,16 +1008,15 @@ async fn test_2fa_verify_completes_login() {
 
     let totp_code = generate_totp_code(&secret);
 
-    client
-        .post_with_session(
-            "/api/v1/account/2fa/enable",
-            json!({ "totp_code": totp_code }),
-            &session,
-        )
-        .await;
+    ctx.post_with_session(
+        "/api/v1/account/2fa/enable",
+        json!({ "totp_code": totp_code }),
+        &session,
+    )
+    .await;
 
     // Login again - get partial token
-    let login_2fa_response = client
+    let login_2fa_response = ctx
         .post(
             "/api/v1/auth/login",
             json!({
@@ -1069,7 +1034,7 @@ async fn test_2fa_verify_completes_login() {
     // Generate fresh TOTP code and verify
     let totp_code = generate_totp_code(&secret);
 
-    let verify_response = client
+    let verify_response = ctx
         .post(
             "/api/v1/auth/2fa/verify",
             json!({

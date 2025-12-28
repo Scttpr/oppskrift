@@ -12,9 +12,9 @@ use axum::{
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::lib::activitypub::{PersonActor, RecipeBookCollection, RecipeObject};
-use crate::lib::audit::AuditEvent;
-use crate::lib::pagination::PaginationParams;
+use crate::core::activitypub::{PersonActor, RecipeBookCollection, RecipeObject};
+use crate::core::audit::AuditEvent;
+use crate::core::pagination::PaginationParams;
 use crate::services::{ActivityService, BookService, RecipeService, UserService};
 use crate::AppState;
 

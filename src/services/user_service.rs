@@ -1,9 +1,9 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::lib::audit::AuditEvent;
-use crate::lib::crypto::generate_rsa_keypair;
-use crate::lib::error::{AppError, AppResult};
+use crate::core::audit::AuditEvent;
+use crate::core::crypto::generate_rsa_keypair;
+use crate::core::error::{AppError, AppResult};
 use crate::models::user::{CreateUser, UpdateUser, User};
 
 /// Service for user-related database operations

@@ -1,7 +1,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::lib::error::{AppError, AppResult};
+use crate::core::error::{AppError, AppResult};
 use crate::models::{Follow, FollowCounts, User};
 
 pub struct FollowService;

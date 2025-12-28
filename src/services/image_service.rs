@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use std::io::Cursor;
 use uuid::Uuid;
 
-use crate::lib::error::{AppError, AppResult};
-use crate::lib::storage::StorageClient;
+use crate::core::error::{AppError, AppResult};
+use crate::core::storage::StorageClient;
 use crate::models::RecipeImage;
 
 /// Maximum number of images per recipe

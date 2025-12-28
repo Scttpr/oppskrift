@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::middleware::AuthUser;
-use crate::lib::error::AppResult;
-use crate::lib::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::error::AppResult;
+use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::user::{UpdateUser, User, UserProfile};
 use crate::models::{RecipeBookSummary, RecipeSummary};
 use crate::services::{BookService, FollowService, RecipeService, SavedRecipeService, UserService};

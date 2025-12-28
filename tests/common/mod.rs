@@ -1,23 +1,25 @@
 //! Shared test utilities for integration tests
 //!
-//! These tests run against a real database. Ensure DATABASE_URL is set.
+//! Uses axum-test to test against the app directly without HTTP server.
 
+use axum_test::TestServer;
 use chrono::{Duration, Utc};
-use serde_json::{json, Value};
+use oppskrift::{test_app_router, AppState};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
 
-/// Test context with database connection
+/// Test context with database connection and test server
 pub struct TestContext {
     pub db: PgPool,
-    pub base_url: String,
+    pub server: TestServer,
     created_users: Vec<Uuid>,
 }
 
 impl TestContext {
-    /// Create a new test context
+    /// Create a new test context with embedded test server
     pub async fn new() -> Self {
         dotenvy::dotenv().ok();
 
@@ -28,12 +30,16 @@ impl TestContext {
             .await
             .expect("Failed to connect to test database");
 
-        let base_url =
-            std::env::var("TEST_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        // Create app state and router (using test_app_router for mock ConnectInfo)
+        let state = AppState { db: db.clone() };
+        let app = test_app_router(state);
+
+        // Create test server
+        let server = TestServer::new(app).expect("Failed to create test server");
 
         Self {
             db,
-            base_url,
+            server,
             created_users: Vec::new(),
         }
     }
@@ -45,7 +51,7 @@ impl TestContext {
 
     /// Generate a unique test username
     pub fn unique_username() -> String {
-        let id = Uuid::new_v4().to_string().replace("-", "");
+        let id = Uuid::new_v4().to_string().replace('-', "");
         format!("test_{}", &id[..12])
     }
 
@@ -67,7 +73,7 @@ impl TestContext {
             .expect("Failed to hash password")
             .to_string();
 
-        let ap_id = format!("{}/users/{}", self.base_url, username);
+        let ap_id = format!("http://localhost/users/{}", username);
 
         let user_id: Uuid = sqlx::query_scalar(
             r#"
@@ -218,46 +224,20 @@ impl TestContext {
                 .await;
         }
     }
-}
 
-impl Drop for TestContext {
-    fn drop(&mut self) {
-        // Note: async cleanup in Drop is tricky
-        // Tests should call cleanup() explicitly
-    }
-}
-
-/// HTTP client for API testing
-pub struct ApiClient {
-    client: reqwest::Client,
-    base_url: String,
-}
-
-impl ApiClient {
-    pub fn new(base_url: &str) -> Self {
-        Self {
-            client: reqwest::Client::builder()
-                .cookie_store(true)
-                .build()
-                .expect("Failed to create HTTP client"),
-            base_url: base_url.to_string(),
-        }
-    }
+    // ==========================================================================
+    // HTTP Request Helpers
+    // ==========================================================================
 
     /// POST JSON to endpoint
     pub async fn post(&self, path: &str, body: Value) -> ApiResponse {
-        let url = format!("{}{}", self.base_url, path);
-        let response = self
-            .client
-            .post(&url)
-            .json(&body)
-            .send()
-            .await
-            .expect("Request failed");
+        let response = self.server.post(path).json(&body).await;
 
-        let status = response.status().as_u16();
+        let status = response.status_code().as_u16();
         let session_cookie = extract_session_cookie(&response);
-        let body = response.json().await.unwrap_or(json!({}));
+        let text = response.text();
+        let body = serde_json::from_str::<Value>(&text)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
 
         ApiResponse {
             status,
@@ -268,49 +248,61 @@ impl ApiClient {
 
     /// GET endpoint
     pub async fn get(&self, path: &str) -> ApiResponse {
-        let url = format!("{}{}", self.base_url, path);
-        let response = self.client.get(&url).send().await.expect("Request failed");
+        let response = self.server.get(path).await;
+
+        let status = response.status_code().as_u16();
+        // Try to parse as JSON, fall back to empty object
+        let text = response.text();
+        let body = serde_json::from_str::<Value>(&text)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
 
         ApiResponse {
-            status: response.status().as_u16(),
-            body: response.json().await.unwrap_or(json!({})),
+            status,
+            body,
             session_cookie: None,
         }
     }
 
     /// GET with session cookie
     pub async fn get_with_session(&self, path: &str, session: &str) -> ApiResponse {
-        let url = format!("{}{}", self.base_url, path);
         let response = self
-            .client
-            .get(&url)
-            .header("Cookie", format!("oppskrift_session={}", session))
-            .send()
-            .await
-            .expect("Request failed");
+            .server
+            .get(path)
+            .add_cookie(cookie::Cookie::new(
+                "oppskrift_session",
+                session.to_string(),
+            ))
+            .await;
+
+        let status = response.status_code().as_u16();
+        let text = response.text();
+        let body = serde_json::from_str::<Value>(&text)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
 
         ApiResponse {
-            status: response.status().as_u16(),
-            body: response.json().await.unwrap_or(json!({})),
+            status,
+            body,
             session_cookie: None,
         }
     }
 
     /// POST JSON with session cookie
     pub async fn post_with_session(&self, path: &str, body: Value, session: &str) -> ApiResponse {
-        let url = format!("{}{}", self.base_url, path);
         let response = self
-            .client
-            .post(&url)
-            .header("Cookie", format!("oppskrift_session={}", session))
+            .server
+            .post(path)
+            .add_cookie(cookie::Cookie::new(
+                "oppskrift_session",
+                session.to_string(),
+            ))
             .json(&body)
-            .send()
-            .await
-            .expect("Request failed");
+            .await;
 
-        let status = response.status().as_u16();
+        let status = response.status_code().as_u16();
         let session_cookie = extract_session_cookie(&response);
-        let body = response.json().await.unwrap_or(json!({}));
+        let text = response.text();
+        let body = serde_json::from_str::<Value>(&text)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
 
         ApiResponse {
             status,
@@ -320,12 +312,17 @@ impl ApiClient {
     }
 }
 
+impl Drop for TestContext {
+    fn drop(&mut self) {
+        // Note: async cleanup in Drop is tricky
+        // Tests should call cleanup() explicitly
+    }
+}
+
 /// Extract session cookie value from Set-Cookie header
-fn extract_session_cookie(response: &reqwest::Response) -> Option<String> {
+fn extract_session_cookie(response: &axum_test::TestResponse) -> Option<String> {
     response
-        .headers()
-        .get_all("set-cookie")
-        .iter()
+        .iter_headers_by_name("set-cookie")
         .find_map(|value| {
             let cookie_str = value.to_str().ok()?;
             if cookie_str.starts_with("oppskrift_session=") {

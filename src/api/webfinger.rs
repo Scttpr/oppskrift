@@ -11,7 +11,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::lib::activitypub::WebFingerResource;
+use crate::core::activitypub::WebFingerResource;
 use crate::services::UserService;
 use crate::AppState;
 

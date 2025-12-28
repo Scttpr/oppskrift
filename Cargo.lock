@@ -3328,6 +3328,7 @@ dependencies = [
  "base64",
  "bcrypt",
  "chrono",
+ "cookie",
  "dotenvy",
  "hex",
  "image",

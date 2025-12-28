@@ -1,8 +1,8 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::lib::error::AppResult;
-use crate::lib::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::error::AppResult;
+use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{Activity, ActivityType, ActivityWithActor, CreateActivity, TargetType};
 
 pub struct ActivityService;

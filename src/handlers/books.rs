@@ -8,8 +8,8 @@ use axum::{
 use uuid::Uuid;
 
 use crate::api::middleware::OptionalAuthUser;
-use crate::lib::error::AppResult;
-use crate::lib::pagination::{PaginationMeta, PaginationParams};
+use crate::core::error::AppResult;
+use crate::core::pagination::{PaginationMeta, PaginationParams};
 use crate::models::{RecipeBook, RecipeBookSummary, RecipeSummary, User};
 use crate::services::{BookService, UserService};
 use crate::AppState;
@@ -53,7 +53,7 @@ async fn list_books_page(
     };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
 
@@ -69,7 +69,7 @@ async fn new_book_page() -> AppResult<Html<String>> {
     let template = NewBookTemplate { book: None };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
 
@@ -106,7 +106,7 @@ async fn view_book_page(
     };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
 
@@ -127,6 +127,6 @@ async fn edit_book_page(
     let template = EditBookTemplate { book: Some(book) };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }

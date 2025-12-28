@@ -16,8 +16,8 @@ use validator::Validate;
 use crate::api::middleware::{
     clear_session_cookie, create_session_cookie, AuthUser, SESSION_EXPIRY_DAYS,
 };
-use crate::lib::config::SmtpConfig;
-use crate::lib::error::AppError;
+use crate::core::config::SmtpConfig;
+use crate::core::error::AppError;
 use crate::models::{
     Complete2FALoginRequest, EmailConfirmationResponse, ForgotPasswordRequest,
     ForgotPasswordResponse, LoginRequest, LoginResponse, LogoutResponse, RegisterRequest,

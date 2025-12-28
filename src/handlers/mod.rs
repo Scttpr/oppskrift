@@ -10,8 +10,8 @@ pub mod users;
 use askama::Template;
 use axum::{extract::State, response::Html, routing::get, Router};
 
-use crate::lib::error::{AppError, AppResult};
-use crate::lib::pagination::PaginationParams;
+use crate::core::error::{AppError, AppResult};
+use crate::core::pagination::PaginationParams;
 use crate::models::RecipeSummary;
 use crate::services::RecipeService;
 use crate::AppState;
