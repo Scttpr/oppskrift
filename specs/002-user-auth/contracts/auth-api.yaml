@@ -1,0 +1,770 @@
+openapi: 3.1.0
+info:
+  title: Oppskrift Authentication API
+  description: User authentication, session management, and account operations
+  version: 1.0.0
+  contact:
+    name: Oppskrift Team
+
+servers:
+  - url: /api
+    description: API base path
+
+tags:
+  - name: auth
+    description: Public authentication endpoints
+  - name: account
+    description: Protected account management endpoints
+  - name: 2fa
+    description: Two-factor authentication endpoints
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      operationId: register
+      summary: Register new user account
+      description: |
+        Create a new user account. Sends confirmation email to provided address.
+        - Username: a-z, 0-9, _ only, 3-30 characters, stored lowercase
+        - Password: min 10 chars, 1 uppercase, 1 lowercase, 1 number
+        - Password checked against HIBP breach database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created, confirmation email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Rate limit exceeded
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Authenticate user
+      description: |
+        Authenticate with email and password. If 2FA is enabled, returns
+        requires_2fa=true and a partial session token. Call again with
+        totp_code to complete authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+          headers:
+            Set-Cookie:
+              description: Session cookie (HttpOnly, Secure, SameSite=Strict)
+              schema:
+                type: string
+        '401':
+          description: Invalid credentials (generic message)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Account locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountLockedError'
+        '429':
+          description: Rate limit exceeded
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Terminate current session
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Logged out successfully
+        '401':
+          description: Not authenticated
+
+  /auth/forgot-password:
+    post:
+      tags: [auth]
+      operationId: forgotPassword
+      summary: Request password reset
+      description: |
+        Request password reset email. Always returns success message
+        regardless of whether email exists (prevents enumeration).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: If email is registered, reset link will be sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '429':
+          description: Rate limit exceeded
+
+  /auth/reset-password:
+    post:
+      tags: [auth]
+      operationId: resetPassword
+      summary: Set new password using reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid or expired token
+        '429':
+          description: Rate limit exceeded
+
+  /auth/confirm-email/{token}:
+    get:
+      tags: [auth]
+      operationId: confirmEmail
+      summary: Confirm email address
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid or expired token
+
+  /auth/resend-confirmation:
+    post:
+      tags: [auth]
+      operationId: resendConfirmation
+      summary: Resend confirmation email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendConfirmationRequest'
+      responses:
+        '200':
+          description: If email exists and unconfirmed, new link sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '429':
+          description: Rate limit exceeded
+
+  /account/profile:
+    get:
+      tags: [account]
+      operationId: getProfile
+      summary: Get current user profile
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Not authenticated
+
+    patch:
+      tags: [account]
+      operationId: updateProfile
+      summary: Update user profile
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Validation error
+        '401':
+          description: Not authenticated
+
+  /account/change-password:
+    post:
+      tags: [account]
+      operationId: changePassword
+      summary: Change password
+      description: Changes password and invalidates all other sessions
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed, other sessions invalidated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Current password incorrect or new password invalid
+        '401':
+          description: Not authenticated
+
+  /account/change-email:
+    post:
+      tags: [account]
+      operationId: changeEmail
+      summary: Request email change
+      description: Sends confirmation to new email address
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequest'
+      responses:
+        '200':
+          description: Confirmation sent to new email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Password incorrect or email invalid
+        '401':
+          description: Not authenticated
+
+  /account/sessions:
+    get:
+      tags: [account]
+      operationId: listSessions
+      summary: List active sessions
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: List of active sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionList'
+        '401':
+          description: Not authenticated
+
+  /account/sessions/{id}:
+    delete:
+      tags: [account]
+      operationId: revokeSession
+      summary: Revoke a session
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session revoked
+        '401':
+          description: Not authenticated
+        '404':
+          description: Session not found
+
+  /account/2fa/setup:
+    post:
+      tags: [2fa]
+      operationId: setup2FA
+      summary: Start 2FA setup
+      description: Returns QR code and secret for authenticator app
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 2FA setup initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorSetupResponse'
+        '400':
+          description: 2FA already enabled
+        '401':
+          description: Not authenticated
+
+  /account/2fa/enable:
+    post:
+      tags: [2fa]
+      operationId: enable2FA
+      summary: Enable 2FA
+      description: Verify TOTP code to activate 2FA
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnableTwoFactorRequest'
+      responses:
+        '200':
+          description: 2FA enabled, returns recovery codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryCodesResponse'
+        '400':
+          description: Invalid TOTP code
+        '401':
+          description: Not authenticated
+
+  /account/2fa/disable:
+    post:
+      tags: [2fa]
+      operationId: disable2FA
+      summary: Disable 2FA
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisableTwoFactorRequest'
+      responses:
+        '200':
+          description: 2FA disabled
+        '400':
+          description: Invalid password or TOTP code
+        '401':
+          description: Not authenticated
+
+  /account/2fa/recovery-codes:
+    get:
+      tags: [2fa]
+      operationId: getRecoveryCodes
+      summary: View remaining recovery codes count
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Recovery codes status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryCodesStatus'
+        '401':
+          description: Not authenticated
+
+    post:
+      tags: [2fa]
+      operationId: regenerateRecoveryCodes
+      summary: Regenerate recovery codes
+      description: Invalidates old codes and generates new ones
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegenerateRecoveryCodesRequest'
+      responses:
+        '200':
+          description: New recovery codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryCodesResponse'
+        '400':
+          description: Invalid password
+        '401':
+          description: Not authenticated
+
+  /account/delete:
+    post:
+      tags: [account]
+      operationId: requestAccountDeletion
+      summary: Request account deletion
+      description: Starts 7-day grace period before permanent deletion
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '200':
+          description: Deletion scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionScheduledResponse'
+        '400':
+          description: Invalid password
+        '401':
+          description: Not authenticated
+
+  /account/cancel-deletion:
+    post:
+      tags: [account]
+      operationId: cancelAccountDeletion
+      summary: Cancel pending account deletion
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Deletion cancelled
+        '400':
+          description: No pending deletion
+        '401':
+          description: Not authenticated
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, username, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        username:
+          type: string
+          pattern: '^[a-z0-9_]+$'
+          minLength: 3
+          maxLength: 30
+        password:
+          type: string
+          minLength: 10
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    RegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        user_id:
+          type: string
+          format: uuid
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        totp_code:
+          type: string
+          pattern: '^[0-9]{6}$'
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserProfile'
+        session_token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        requires_2fa:
+          type: boolean
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        email_verified:
+          type: boolean
+        display_name:
+          type: string
+        bio:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+        totp_enabled:
+          type: boolean
+        deletion_requested_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        bio:
+          type: string
+          maxLength: 500
+        avatar_url:
+          type: string
+          format: uri
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, new_password]
+      properties:
+        token:
+          type: string
+        new_password:
+          type: string
+          minLength: 10
+
+    ResendConfirmationRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ChangePasswordRequest:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password:
+          type: string
+        new_password:
+          type: string
+          minLength: 10
+
+    ChangeEmailRequest:
+      type: object
+      required: [password, new_email]
+      properties:
+        password:
+          type: string
+        new_email:
+          type: string
+          format: email
+
+    SessionList:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionInfo'
+
+    SessionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        device_info:
+          type: string
+        ip_address:
+          type: string
+        last_activity:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        is_current:
+          type: boolean
+
+    TwoFactorSetupResponse:
+      type: object
+      properties:
+        secret:
+          type: string
+          description: Base32 encoded TOTP secret
+        qr_code:
+          type: string
+          description: Base64 encoded PNG QR code
+        otpauth_url:
+          type: string
+          format: uri
+
+    EnableTwoFactorRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+
+    DisableTwoFactorRequest:
+      type: object
+      required: [password, code]
+      properties:
+        password:
+          type: string
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+
+    RecoveryCodesResponse:
+      type: object
+      properties:
+        codes:
+          type: array
+          items:
+            type: string
+          description: One-time use codes (show once, then discard)
+        message:
+          type: string
+
+    RecoveryCodesStatus:
+      type: object
+      properties:
+        remaining_count:
+          type: integer
+        total_count:
+          type: integer
+
+    RegenerateRecoveryCodesRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+
+    DeleteAccountRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+        delete_recipes:
+          type: boolean
+          description: True to delete recipes, false to anonymize
+
+    DeletionScheduledResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        deletion_date:
+          type: string
+          format: date-time
+          description: Date when account will be permanently deleted
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+        fields:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    AccountLockedError:
+      type: object
+      properties:
+        error:
+          type: string
+        locked_until:
+          type: string
+          format: date-time

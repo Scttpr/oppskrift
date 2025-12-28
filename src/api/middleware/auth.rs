@@ -1,119 +1,115 @@
+//! Authentication middleware
+//!
+//! Supports both session cookie authentication (for browsers) and
+//! Bearer token authentication (for API clients).
+
 use axum::{
     extract::FromRequestParts,
-    http::{header::AUTHORIZATION, request::Parts, StatusCode},
+    http::{header::COOKIE, request::Parts, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
-use jsonwebtoken::{decode, DecodingKey, Validation};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use uuid::Uuid;
 
-use crate::lib::audit::AuditEvent;
+use crate::services::SessionService;
 
-/// JWT claims structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Claims {
-    /// Subject (user ID)
-    pub sub: Uuid,
-    /// Username
-    pub username: String,
-    /// Expiration time (Unix timestamp)
-    pub exp: i64,
-    /// Issued at (Unix timestamp)
-    pub iat: i64,
-}
+/// Session cookie name
+pub const SESSION_COOKIE_NAME: &str = "oppskrift_session";
 
-/// Authenticated user extracted from JWT
+/// Session token length in hex chars (64 chars = 32 bytes)
+pub const SESSION_TOKEN_LENGTH: usize = 64;
+
+/// Session expiry in days
+pub const SESSION_EXPIRY_DAYS: u32 = 30;
+
+/// Authenticated user extracted from session
 #[derive(Debug, Clone)]
 pub struct AuthUser {
     pub id: Uuid,
-    #[allow(dead_code)]
-    pub username: String,
-}
-
-impl From<Claims> for AuthUser {
-    fn from(claims: Claims) -> Self {
-        Self {
-            id: claims.sub,
-            username: claims.username,
-        }
-    }
+    pub session_id: Uuid,
 }
 
 /// Auth error response
 #[derive(Debug, Serialize)]
 struct AuthError {
     error: String,
-    message: String,
+    code: String,
+}
+
+impl AuthError {
+    fn unauthorized(message: &str, code: &str) -> Response {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(Self {
+                error: message.to_string(),
+                code: code.to_string(),
+            }),
+        )
+            .into_response()
+    }
+}
+
+/// Extract session token from cookie header
+fn extract_session_token(cookie_header: &str) -> Option<&str> {
+    for cookie in cookie_header.split(';') {
+        let cookie = cookie.trim();
+        if let Some(token) = cookie.strip_prefix(&format!("{}=", SESSION_COOKIE_NAME)) {
+            // Validate token format (hex string of correct length)
+            if token.len() == SESSION_TOKEN_LENGTH && token.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Some(token);
+            }
+        }
+    }
+    None
+}
+
+/// Extract session token from Authorization: Bearer header (for API clients)
+fn extract_bearer_token(auth_header: &str) -> Option<&str> {
+    let token = auth_header.strip_prefix("Bearer ")?;
+    // Validate token format
+    if token.len() == SESSION_TOKEN_LENGTH && token.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Some(token);
+    }
+    None
 }
 
 /// Extract authenticated user from request
-/// Returns 401 Unauthorized if no valid token is present
-impl<S> FromRequestParts<S> for AuthUser
-where
-    S: Send + Sync,
-{
+/// Supports both session cookie and Bearer token authentication
+impl FromRequestParts<crate::AppState> for AuthUser {
     type Rejection = Response;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        // Get the Authorization header
-        let auth_header = parts
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
+        // Try to get token from cookie first, then Authorization header
+        let token = parts
             .headers
-            .get(AUTHORIZATION)
-            .and_then(|value| value.to_str().ok())
-            .ok_or_else(|| {
-                (
-                    StatusCode::UNAUTHORIZED,
-                    Json(AuthError {
-                        error: "unauthorized".to_string(),
-                        message: "Missing authorization header".to_string(),
-                    }),
-                )
-                    .into_response()
-            })?;
+            .get(COOKIE)
+            .and_then(|v| v.to_str().ok())
+            .and_then(extract_session_token)
+            .or_else(|| {
+                parts
+                    .headers
+                    .get(axum::http::header::AUTHORIZATION)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(extract_bearer_token)
+            })
+            .ok_or_else(|| AuthError::unauthorized("Authentication required", "AUTH_REQUIRED"))?;
 
-        // Extract Bearer token
-        let token = auth_header.strip_prefix("Bearer ").ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(AuthError {
-                    error: "unauthorized".to_string(),
-                    message: "Invalid authorization header format".to_string(),
-                }),
-            )
-                .into_response()
+        // Validate session
+        let session_service = SessionService::new(state.db.clone(), SESSION_EXPIRY_DAYS);
+
+        let (session_id, user_id) = session_service.validate(token).await.map_err(|e| {
+            tracing::debug!("Session validation failed: {:?}", e);
+            AuthError::unauthorized("Invalid or expired session", "INVALID_SESSION")
         })?;
 
-        // Get JWT secret from environment - MUST be set, no fallback
-        let secret =
-            std::env::var("JWT_SECRET").expect("JWT_SECRET environment variable must be set");
-
-        // Decode and validate JWT
-        let token_data = decode::<Claims>(
-            token,
-            &DecodingKey::from_secret(secret.as_bytes()),
-            &Validation::default(),
-        )
-        .map_err(|e| {
-            tracing::debug!("JWT validation failed: {:?}", e);
-
-            // Audit invalid token attempt
-            AuditEvent::new("auth.token.invalid")
-                .with_metadata("reason", &e.to_string())
-                .warn()
-                .log();
-
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(AuthError {
-                    error: "unauthorized".to_string(),
-                    message: "Invalid or expired token".to_string(),
-                }),
-            )
-                .into_response()
-        })?;
-
-        Ok(AuthUser::from(token_data.claims))
+        Ok(AuthUser {
+            id: user_id,
+            session_id,
+        })
     }
 }
 
@@ -121,16 +117,33 @@ where
 #[derive(Debug, Clone)]
 pub struct OptionalAuthUser(pub Option<AuthUser>);
 
-impl<S> FromRequestParts<S> for OptionalAuthUser
-where
-    S: Send + Sync,
-{
+impl FromRequestParts<crate::AppState> for OptionalAuthUser {
     type Rejection = std::convert::Infallible;
 
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &crate::AppState,
+    ) -> Result<Self, Self::Rejection> {
         let auth_user = AuthUser::from_request_parts(parts, state).await.ok();
         Ok(OptionalAuthUser(auth_user))
     }
+}
+
+/// Helper to create a session cookie header value
+pub fn create_session_cookie(token: &str, max_age_days: u32) -> String {
+    let max_age_seconds = max_age_days as i64 * 24 * 60 * 60;
+    format!(
+        "{}={}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={}",
+        SESSION_COOKIE_NAME, token, max_age_seconds
+    )
+}
+
+/// Helper to create a cookie that clears the session
+pub fn clear_session_cookie() -> String {
+    format!(
+        "{}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0",
+        SESSION_COOKIE_NAME
+    )
 }
 
 #[cfg(test)]
@@ -138,16 +151,51 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_auth_user_from_claims() {
-        let claims = Claims {
-            sub: Uuid::new_v4(),
-            username: "testuser".to_string(),
-            exp: 0,
-            iat: 0,
-        };
+    fn test_extract_session_token_valid() {
+        let cookie = format!("{}={}; other=value", SESSION_COOKIE_NAME, "a".repeat(64));
+        let token = extract_session_token(&cookie);
+        assert_eq!(token, Some("a".repeat(64).as_str()));
+    }
 
-        let auth_user: AuthUser = claims.clone().into();
-        assert_eq!(auth_user.id, claims.sub);
-        assert_eq!(auth_user.username, claims.username);
+    #[test]
+    fn test_extract_session_token_invalid_length() {
+        let cookie = format!("{}=tooshort", SESSION_COOKIE_NAME);
+        let token = extract_session_token(&cookie);
+        assert!(token.is_none());
+    }
+
+    #[test]
+    fn test_extract_session_token_missing() {
+        let cookie = "other=value; another=thing";
+        let token = extract_session_token(cookie);
+        assert!(token.is_none());
+    }
+
+    #[test]
+    fn test_extract_bearer_token_valid() {
+        let header = format!("Bearer {}", "b".repeat(64));
+        let token = extract_bearer_token(&header);
+        assert_eq!(token, Some("b".repeat(64).as_str()));
+    }
+
+    #[test]
+    fn test_extract_bearer_token_invalid() {
+        let token = extract_bearer_token("Bearer invalid");
+        assert!(token.is_none());
+    }
+
+    #[test]
+    fn test_create_session_cookie() {
+        let cookie = create_session_cookie("test_token", 30);
+        assert!(cookie.contains("oppskrift_session=test_token"));
+        assert!(cookie.contains("HttpOnly"));
+        assert!(cookie.contains("Secure"));
+        assert!(cookie.contains("SameSite=Strict"));
+    }
+
+    #[test]
+    fn test_clear_session_cookie() {
+        let cookie = clear_session_cookie();
+        assert!(cookie.contains("Max-Age=0"));
     }
 }

@@ -8,8 +8,8 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::api::middleware::AuthUser;
-use crate::lib::error::AppResult;
-use crate::lib::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::error::AppResult;
+use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{Activity, ActivityWithActor, Follow, RecipeSummary, SavedRecipe};
 use crate::services::{ActivityService, FollowService, SavedRecipeService};
 use crate::AppState;
@@ -125,7 +125,7 @@ async fn get_saved_recipes(
 ) -> AppResult<Json<PaginatedResponse<RecipeSummary>>> {
     // Users can only view their own saved recipes
     if auth.id != user_id {
-        return Err(crate::lib::error::AppError::Forbidden(
+        return Err(crate::core::error::AppError::Forbidden(
             "Cannot view other users' saved recipes".to_string(),
         ));
     }

@@ -5,8 +5,11 @@
 use axum::{routing::get, Json, Router};
 use utoipa::OpenApi;
 
-use crate::lib::error::ErrorResponse;
-use crate::lib::pagination::PaginationMeta;
+use crate::core::error::ErrorResponse;
+use crate::core::pagination::PaginationMeta;
+use crate::models::{
+    LoginRequest, LoginResponse, LogoutResponse, RegisterRequest, RegisterResponse, UserProfile,
+};
 use crate::AppState;
 
 /// OpenAPI documentation
@@ -23,6 +26,8 @@ use crate::AppState;
         (url = "/api/v1", description = "API v1")
     ),
     tags(
+        (name = "auth", description = "Authentication endpoints (register, login, logout, password reset)"),
+        (name = "account", description = "Account management (profile, security, sessions, 2FA, deletion)"),
         (name = "recipes", description = "Recipe management endpoints"),
         (name = "books", description = "Recipe book management endpoints"),
         (name = "users", description = "User profile endpoints"),
@@ -31,8 +36,16 @@ use crate::AppState;
     ),
     components(
         schemas(
+            // Common
             ErrorResponse,
             PaginationMeta,
+            // Auth
+            RegisterRequest,
+            RegisterResponse,
+            LoginRequest,
+            LoginResponse,
+            LogoutResponse,
+            UserProfile,
         )
     )
 )]

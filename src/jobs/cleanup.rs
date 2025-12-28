@@ -1,163 +1,295 @@
-//! Data cleanup jobs
+//! Background cleanup jobs
 //!
-//! Handles periodic cleanup of old data according to retention policies.
+//! Scheduled jobs for:
+//! - Expired session cleanup
+//! - Expired token cleanup (password reset, email confirmation)
+//! - Account deletion execution after grace period
+//!
+//! These jobs should be run periodically (e.g., daily via cron or tokio-cron).
+//! The CleanupService is designed to be called by an external scheduler,
+//! not directly from the web application.
 
+#![allow(dead_code)] // Module is called by external scheduler, not from app
+
+use chrono::{Duration, Utc};
 use sqlx::PgPool;
-use std::sync::Arc;
-use tokio::time::{interval, Duration};
+use thiserror::Error;
+use uuid::Uuid;
 
-use crate::lib::audit::AuditEvent;
+use crate::core::audit::AuditEvent;
 
-/// Configuration for data retention periods
-#[derive(Debug, Clone)]
-pub struct RetentionConfig {
-    /// Days to keep audit logs
-    pub audit_log_days: i64,
-    /// Days to keep expired sessions
-    pub session_days: i64,
-    /// Days to keep deleted content references
-    pub deleted_content_days: i64,
+/// Cleanup job errors
+#[derive(Debug, Error)]
+pub enum CleanupError {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
 }
 
-impl Default for RetentionConfig {
-    fn default() -> Self {
-        Self {
-            audit_log_days: 90,
-            session_days: 30,
-            deleted_content_days: 30,
-        }
-    }
+/// Cleanup job results
+#[derive(Debug, Default)]
+pub struct CleanupResult {
+    pub sessions_removed: u64,
+    pub password_reset_tokens_removed: u64,
+    pub email_confirmation_tokens_removed: u64,
+    pub two_factor_pending_tokens_removed: u64,
+    pub accounts_deleted: u64,
 }
 
-/// Worker that runs periodic cleanup tasks
-pub struct CleanupWorker {
-    pool: Arc<PgPool>,
-    config: RetentionConfig,
+/// Cleanup service for background maintenance tasks
+pub struct CleanupService {
+    pool: PgPool,
 }
 
-impl CleanupWorker {
-    /// Create a new cleanup worker
-    pub fn new(pool: Arc<PgPool>) -> Self {
-        Self {
-            pool,
-            config: RetentionConfig::default(),
-        }
+impl CleanupService {
+    /// Create a new cleanup service
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
 
-    /// Create with custom retention config
-    pub fn with_config(pool: Arc<PgPool>, config: RetentionConfig) -> Self {
-        Self { pool, config }
-    }
+    /// Run all cleanup tasks (T078, T082)
+    ///
+    /// This should be called periodically (e.g., daily).
+    /// Returns a summary of cleaned up items.
+    pub async fn run_all(&self) -> Result<CleanupResult, CleanupError> {
+        let mut result = CleanupResult::default();
 
-    /// Run the cleanup worker with periodic execution
-    pub async fn run(self) {
-        tracing::info!("Cleanup worker started");
+        // Clean up expired sessions
+        result.sessions_removed = self.cleanup_expired_sessions().await?;
 
-        // Run cleanup every hour
-        let mut interval = interval(Duration::from_secs(3600));
+        // Clean up expired password reset tokens
+        result.password_reset_tokens_removed = self.cleanup_expired_password_reset_tokens().await?;
 
-        loop {
-            interval.tick().await;
-            self.run_cleanup().await;
-        }
-    }
+        // Clean up expired email confirmation tokens
+        result.email_confirmation_tokens_removed =
+            self.cleanup_expired_email_confirmation_tokens().await?;
 
-    /// Run all cleanup tasks
-    pub async fn run_cleanup(&self) {
-        tracing::info!("Starting scheduled cleanup");
+        // Clean up expired 2FA pending tokens
+        result.two_factor_pending_tokens_removed =
+            self.cleanup_expired_2fa_pending_tokens().await?;
 
-        let mut total_deleted = 0u64;
+        // Execute pending account deletions
+        result.accounts_deleted = self.execute_pending_deletions().await?;
 
-        // Cleanup audit logs
-        match self.cleanup_audit_logs().await {
-            Ok(count) => {
-                total_deleted += count;
-                if count > 0 {
-                    tracing::info!(count, "Cleaned up old audit logs");
-                }
-            }
-            Err(e) => {
-                tracing::error!(error = %e, "Failed to cleanup audit logs");
-            }
-        }
-
-        // Cleanup expired sessions
-        match self.cleanup_expired_sessions().await {
-            Ok(count) => {
-                total_deleted += count;
-                if count > 0 {
-                    tracing::info!(count, "Cleaned up expired sessions");
-                }
-            }
-            Err(e) => {
-                tracing::error!(error = %e, "Failed to cleanup sessions");
-            }
-        }
-
-        // Cleanup orphaned federation deliveries
-        match self.cleanup_failed_deliveries().await {
-            Ok(count) => {
-                total_deleted += count;
-                if count > 0 {
-                    tracing::info!(count, "Cleaned up failed deliveries");
-                }
-            }
-            Err(e) => {
-                tracing::error!(error = %e, "Failed to cleanup deliveries");
-            }
-        }
-
-        // Log completion
-        AuditEvent::new("system.cleanup.completed")
-            .with_metadata("total_deleted", &total_deleted.to_string())
-            .log();
-
-        tracing::info!(total_deleted, "Cleanup completed");
-    }
-
-    /// Delete audit logs older than retention period
-    async fn cleanup_audit_logs(&self) -> Result<u64, sqlx::Error> {
-        let query = format!(
-            "DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '{} days'",
-            self.config.audit_log_days
+        tracing::info!(
+            sessions = result.sessions_removed,
+            password_tokens = result.password_reset_tokens_removed,
+            email_tokens = result.email_confirmation_tokens_removed,
+            two_factor_tokens = result.two_factor_pending_tokens_removed,
+            accounts = result.accounts_deleted,
+            "Cleanup job completed"
         );
 
-        match sqlx::query(&query).execute(self.pool.as_ref()).await {
-            Ok(r) => Ok(r.rows_affected()),
-            Err(sqlx::Error::Database(ref e)) if e.message().contains("does not exist") => {
-                // Table doesn't exist yet, skip
-                Ok(0)
+        Ok(result)
+    }
+
+    /// Clean up expired sessions (T082)
+    ///
+    /// Removes sessions that have passed their expires_at timestamp.
+    pub async fn cleanup_expired_sessions(&self) -> Result<u64, CleanupError> {
+        let result = sqlx::query("DELETE FROM sessions WHERE expires_at < NOW()")
+            .execute(&self.pool)
+            .await?;
+
+        let removed = result.rows_affected();
+        if removed > 0 {
+            tracing::info!(count = removed, "Cleaned up expired sessions");
+        }
+
+        Ok(removed)
+    }
+
+    /// Clean up expired password reset tokens
+    ///
+    /// Removes tokens that have expired or been used more than 24 hours ago.
+    pub async fn cleanup_expired_password_reset_tokens(&self) -> Result<u64, CleanupError> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM password_reset_tokens
+            WHERE expires_at < NOW()
+               OR (used_at IS NOT NULL AND used_at < NOW() - INTERVAL '24 hours')
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        let removed = result.rows_affected();
+        if removed > 0 {
+            tracing::info!(count = removed, "Cleaned up password reset tokens");
+        }
+
+        Ok(removed)
+    }
+
+    /// Clean up expired email confirmation tokens
+    ///
+    /// Removes tokens that have expired.
+    pub async fn cleanup_expired_email_confirmation_tokens(&self) -> Result<u64, CleanupError> {
+        let result = sqlx::query("DELETE FROM email_confirmation_tokens WHERE expires_at < NOW()")
+            .execute(&self.pool)
+            .await?;
+
+        let removed = result.rows_affected();
+        if removed > 0 {
+            tracing::info!(count = removed, "Cleaned up email confirmation tokens");
+        }
+
+        Ok(removed)
+    }
+
+    /// Clean up expired 2FA pending tokens
+    ///
+    /// Removes tokens that have expired (5-minute lifetime).
+    pub async fn cleanup_expired_2fa_pending_tokens(&self) -> Result<u64, CleanupError> {
+        let result = sqlx::query("DELETE FROM two_factor_pending_tokens WHERE expires_at < NOW()")
+            .execute(&self.pool)
+            .await?;
+
+        let removed = result.rows_affected();
+        if removed > 0 {
+            tracing::info!(count = removed, "Cleaned up 2FA pending tokens");
+        }
+
+        Ok(removed)
+    }
+
+    /// Execute pending account deletions after grace period (T075)
+    ///
+    /// Finds accounts with deletion_requested_at older than 7 days
+    /// and executes the deletion.
+    pub async fn execute_pending_deletions(&self) -> Result<u64, CleanupError> {
+        // Find accounts ready for deletion (grace period passed)
+        let grace_period_days = 7i64;
+        let cutoff = Utc::now() - Duration::days(grace_period_days);
+
+        let accounts: Vec<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT id
+            FROM users
+            WHERE deletion_requested_at IS NOT NULL
+              AND deletion_requested_at < $1
+            "#,
+        )
+        .bind(cutoff)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut deleted = 0u64;
+        for user_id in accounts {
+            match self.execute_deletion(user_id).await {
+                Ok(()) => {
+                    deleted += 1;
+                    tracing::info!(user_id = %user_id, "Account deleted after grace period");
+                }
+                Err(e) => {
+                    tracing::error!(user_id = %user_id, error = %e, "Failed to delete account");
+                }
             }
-            Err(e) => Err(e),
         }
+
+        Ok(deleted)
     }
 
-    /// Delete expired sessions
-    async fn cleanup_expired_sessions(&self) -> Result<u64, sqlx::Error> {
-        let query = format!(
-            "DELETE FROM sessions WHERE expires_at < NOW() OR created_at < NOW() - INTERVAL '{} days'",
-            self.config.session_days
-        );
+    /// Execute a single account deletion (T075)
+    ///
+    /// Hard deletes all user data. Recipes are anonymized (author_id set to NULL).
+    /// This is GDPR compliant - all PII is removed.
+    pub async fn execute_deletion(&self, user_id: Uuid) -> Result<(), CleanupError> {
+        // Log the deletion event before we delete the user
+        AuditEvent::new("auth.account.delete.execute")
+            .with_user(user_id)
+            .warn()
+            .persist(&self.pool)
+            .await;
 
-        match sqlx::query(&query).execute(self.pool.as_ref()).await {
-            Ok(r) => Ok(r.rows_affected()),
-            Err(sqlx::Error::Database(ref e)) if e.message().contains("does not exist") => Ok(0),
-            Err(e) => Err(e),
-        }
-    }
+        // Start transaction for atomic deletion
+        let mut tx = self.pool.begin().await?;
 
-    /// Delete old failed federation deliveries
-    async fn cleanup_failed_deliveries(&self) -> Result<u64, sqlx::Error> {
-        let query = format!(
-            "DELETE FROM federation_deliveries WHERE status = 'failed' AND created_at < NOW() - INTERVAL '{} days'",
-            self.config.deleted_content_days
-        );
+        // 1. Delete sessions
+        sqlx::query("DELETE FROM sessions WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
 
-        match sqlx::query(&query).execute(self.pool.as_ref()).await {
-            Ok(r) => Ok(r.rows_affected()),
-            Err(sqlx::Error::Database(ref e)) if e.message().contains("does not exist") => Ok(0),
-            Err(e) => Err(e),
-        }
+        // 2. Delete email confirmation tokens
+        sqlx::query("DELETE FROM email_confirmation_tokens WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 3. Delete password reset tokens
+        sqlx::query("DELETE FROM password_reset_tokens WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 4. Delete 2FA pending tokens
+        sqlx::query("DELETE FROM two_factor_pending_tokens WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 5. Delete recovery codes
+        sqlx::query("DELETE FROM recovery_codes WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 6. Delete follows (both directions)
+        sqlx::query("DELETE FROM follows WHERE follower_id = $1 OR following_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 7. Delete saved recipes
+        sqlx::query("DELETE FROM saved_recipes WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 8. Delete recipe book entries and books
+        sqlx::query(
+            r#"
+            DELETE FROM book_recipe_entries
+            WHERE book_id IN (SELECT id FROM recipe_books WHERE user_id = $1)
+            "#,
+        )
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query("DELETE FROM recipe_books WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 9. Delete activities
+        sqlx::query("DELETE FROM activities WHERE actor_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 10. Anonymize recipes (set author_id to NULL, preserving content)
+        sqlx::query("UPDATE recipes SET author_id = NULL WHERE author_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 11. Delete security events (optional - could keep for audit)
+        // For GDPR compliance, we delete them
+        sqlx::query("DELETE FROM security_events WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // 12. Finally, delete the user
+        sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+
+        tx.commit().await?;
+
+        Ok(())
     }
 }
 
@@ -166,30 +298,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_default_retention_config() {
-        let config = RetentionConfig::default();
-        assert_eq!(config.audit_log_days, 90);
-        assert_eq!(config.session_days, 30);
-        assert_eq!(config.deleted_content_days, 30);
+    fn test_cleanup_result_default() {
+        let result = CleanupResult::default();
+
+        assert_eq!(result.sessions_removed, 0);
+        assert_eq!(result.password_reset_tokens_removed, 0);
+        assert_eq!(result.email_confirmation_tokens_removed, 0);
+        assert_eq!(result.two_factor_pending_tokens_removed, 0);
+        assert_eq!(result.accounts_deleted, 0);
     }
 
     #[test]
-    fn test_custom_retention_config() {
-        let config = RetentionConfig {
-            audit_log_days: 180,
-            session_days: 7,
-            deleted_content_days: 14,
-        };
-        assert_eq!(config.audit_log_days, 180);
-        assert_eq!(config.session_days, 7);
-        assert_eq!(config.deleted_content_days, 14);
-    }
+    fn test_grace_period_calculation() {
+        let grace_period_days = 7i64;
+        let now = Utc::now();
+        let cutoff = now - Duration::days(grace_period_days);
 
-    #[test]
-    fn test_retention_config_clone() {
-        let config = RetentionConfig::default();
-        let cloned = config.clone();
-        assert_eq!(config.audit_log_days, cloned.audit_log_days);
-        assert_eq!(config.session_days, cloned.session_days);
+        // Accounts requested before cutoff should be deleted
+        let old_request = now - Duration::days(8);
+        assert!(old_request < cutoff);
+
+        // Accounts requested after cutoff should NOT be deleted
+        let recent_request = now - Duration::days(3);
+        assert!(recent_request > cutoff);
     }
 }

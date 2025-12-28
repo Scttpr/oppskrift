@@ -22,15 +22,6 @@ pub struct CreateInstructionStep {
     pub duration_min: Option<i32>,
 }
 
-/// Update an instruction step
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateInstructionStep {
-    pub step_number: Option<i32>,
-    pub description: Option<String>,
-    pub image_url: Option<String>,
-    pub duration_min: Option<i32>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

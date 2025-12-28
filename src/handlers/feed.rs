@@ -7,8 +7,8 @@ use axum::{
 };
 
 use crate::api::middleware::AuthUser;
-use crate::lib::error::AppResult;
-use crate::lib::pagination::{PaginationMeta, PaginationParams};
+use crate::core::error::AppResult;
+use crate::core::pagination::{PaginationMeta, PaginationParams};
 use crate::models::ActivityWithActor;
 use crate::services::ActivityService;
 use crate::AppState;
@@ -40,6 +40,6 @@ async fn feed_page(
     };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }

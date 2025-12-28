@@ -1,7 +1,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::lib::error::{AppError, AppResult};
+use crate::core::error::{AppError, AppResult};
 use crate::models::{Follow, FollowCounts, User};
 
 pub struct FollowService;
@@ -90,19 +90,20 @@ impl FollowService {
 
     /// Get followers of a user
     pub async fn get_followers(pool: &PgPool, user_id: Uuid) -> AppResult<Vec<User>> {
-        let users = sqlx::query_as!(
-            User,
+        let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT u.id, u.username, u.display_name, u.bio, u.avatar_url,
-                   u.measurement_pref as "measurement_pref: _",
+            SELECT u.id, u.username, u.email, u.email_verified, u.password_hash,
+                   u.display_name, u.bio, u.avatar_url, u.measurement_pref,
+                   u.totp_secret_encrypted, u.totp_enabled,
+                   u.failed_login_attempts, u.locked_until, u.deletion_requested_at,
                    u.created_at, u.updated_at, u.ap_id, u.federation_enabled
             FROM users u
             INNER JOIN follows f ON f.follower_id = u.id
             WHERE f.following_id = $1
             ORDER BY f.created_at DESC
             "#,
-            user_id
         )
+        .bind(user_id)
         .fetch_all(pool)
         .await?;
 
@@ -111,19 +112,20 @@ impl FollowService {
 
     /// Get users that a user is following
     pub async fn get_following(pool: &PgPool, user_id: Uuid) -> AppResult<Vec<User>> {
-        let users = sqlx::query_as!(
-            User,
+        let users = sqlx::query_as::<_, User>(
             r#"
-            SELECT u.id, u.username, u.display_name, u.bio, u.avatar_url,
-                   u.measurement_pref as "measurement_pref: _",
+            SELECT u.id, u.username, u.email, u.email_verified, u.password_hash,
+                   u.display_name, u.bio, u.avatar_url, u.measurement_pref,
+                   u.totp_secret_encrypted, u.totp_enabled,
+                   u.failed_login_attempts, u.locked_until, u.deletion_requested_at,
                    u.created_at, u.updated_at, u.ap_id, u.federation_enabled
             FROM users u
             INNER JOIN follows f ON f.following_id = u.id
             WHERE f.follower_id = $1
             ORDER BY f.created_at DESC
             "#,
-            user_id
         )
+        .bind(user_id)
         .fetch_all(pool)
         .await?;
 

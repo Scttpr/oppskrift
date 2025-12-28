@@ -1,5 +1,6 @@
 // API module - REST endpoints, ActivityPub handlers
 
+pub mod account;
 pub mod activitypub;
 pub mod auth;
 pub mod books;
@@ -20,6 +21,7 @@ use crate::AppState;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .nest("/auth", auth::routes())
+        .nest("/account", account::routes())
         .nest("/users", users::routes())
         .nest("/recipes", recipes::routes())
         .nest("/books", books::routes())

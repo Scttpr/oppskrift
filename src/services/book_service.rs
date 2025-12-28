@@ -1,8 +1,8 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::lib::error::{AppError, AppResult};
-use crate::lib::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::error::{AppError, AppResult};
+use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{
     AddRecipeToBook, BookRecipeEntry, CreateRecipeBook, RecipeBook, RecipeBookSummary,
     RecipeSummary, UpdateRecipeBook, Visibility,

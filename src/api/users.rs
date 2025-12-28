@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     routing::{get, patch},
     Json, Router,
 };
@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::middleware::AuthUser;
-use crate::lib::error::AppResult;
-use crate::lib::pagination::PaginationParams;
+use crate::core::error::AppResult;
+use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::user::{UpdateUser, User, UserProfile};
 use crate::models::{RecipeBookSummary, RecipeSummary};
 use crate::services::{BookService, FollowService, RecipeService, SavedRecipeService, UserService};
@@ -21,6 +21,9 @@ pub fn routes() -> Router<AppState> {
         .route("/me/export", get(export_user_data))
         .route("/me/federation", patch(toggle_federation))
         .route("/{id}", get(get_user_by_id))
+        .route("/{id}/followers", get(get_user_followers))
+        .route("/{id}/following", get(get_user_following))
+        .route("/{id}/books", get(get_user_books))
 }
 
 /// GET /api/v1/users/{id}
@@ -125,4 +128,48 @@ async fn toggle_federation(
     Ok(Json(FederationStatus {
         federation_enabled: user.federation_enabled,
     }))
+}
+
+/// GET /api/v1/users/{id}/followers
+/// Get list of users following this user
+async fn get_user_followers(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Vec<UserProfile>>> {
+    // Verify user exists
+    let _ = UserService::get_by_id(&state.db, id).await?;
+
+    let followers = FollowService::get_followers(&state.db, id).await?;
+    let profiles: Vec<UserProfile> = followers.into_iter().map(UserProfile::from).collect();
+
+    Ok(Json(profiles))
+}
+
+/// GET /api/v1/users/{id}/following
+/// Get list of users this user is following
+async fn get_user_following(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Vec<UserProfile>>> {
+    // Verify user exists
+    let _ = UserService::get_by_id(&state.db, id).await?;
+
+    let following = FollowService::get_following(&state.db, id).await?;
+    let profiles: Vec<UserProfile> = following.into_iter().map(UserProfile::from).collect();
+
+    Ok(Json(profiles))
+}
+
+/// GET /api/v1/users/{id}/books
+/// Get user's recipe books with pagination
+async fn get_user_books(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<PaginationParams>,
+) -> AppResult<Json<PaginatedResponse<RecipeBookSummary>>> {
+    // Verify user exists
+    let _ = UserService::get_by_id(&state.db, id).await?;
+
+    let books = BookService::list_by_owner_paginated(&state.db, id, &params).await?;
+    Ok(Json(books))
 }

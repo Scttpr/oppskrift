@@ -30,16 +30,6 @@ pub struct CreateIngredient {
     pub notes: Option<String>,
 }
 
-/// Update an ingredient
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateIngredient {
-    pub position: Option<i32>,
-    pub quantity: Option<Decimal>,
-    pub unit: Option<String>,
-    pub name: Option<String>,
-    pub notes: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -12,12 +12,6 @@ pub struct SavedRecipe {
     pub saved_at: DateTime<Utc>,
 }
 
-/// Input for saving a recipe
-#[derive(Debug, Clone, Deserialize)]
-pub struct SaveRecipeInput {
-    pub recipe_id: Uuid,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -22,6 +22,11 @@ services:
       BASE_URL: ${BASE_URL:-http://localhost:3000}
       INSTANCE_DOMAIN: ${INSTANCE_DOMAIN:-localhost:3000}
       INSTANCE_NAME: ${INSTANCE_NAME:-Oppskrift Dev}
+      # Email (Mailpit for dev)
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      EMAIL_FROM_ADDRESS: noreply@localhost
+      EMAIL_FROM_NAME: Oppskrift Dev
     depends_on:
       db:
         condition: service_healthy
@@ -123,6 +128,26 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+
+  # Email testing - catches all outgoing emails
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:1025:1025"   # SMTP
+      - "127.0.0.1:8025:8025"   # Web UI
+    networks:
+      - backend
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8025/api/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 networks:
   frontend:

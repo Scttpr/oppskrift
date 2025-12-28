@@ -1,10 +1,10 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::lib::audit::AuditEvent;
-use crate::lib::crypto::generate_rsa_keypair;
-use crate::lib::error::{AppError, AppResult};
-use crate::models::user::{CreateUser, MeasurementPref, UpdateUser, User};
+use crate::core::audit::AuditEvent;
+use crate::core::crypto::generate_rsa_keypair;
+use crate::core::error::{AppError, AppResult};
+use crate::models::user::{CreateUser, UpdateUser, User};
 
 /// Service for user-related database operations
 pub struct UserService;
@@ -12,18 +12,19 @@ pub struct UserService;
 impl UserService {
     /// Get a user by their ID
     pub async fn get_by_id(pool: &PgPool, id: Uuid) -> AppResult<User> {
-        sqlx::query_as!(
-            User,
+        sqlx::query_as::<_, User>(
             r#"
             SELECT
-                id, username, display_name, bio, avatar_url,
-                measurement_pref as "measurement_pref: MeasurementPref",
+                id, username, email, email_verified, password_hash,
+                display_name, bio, avatar_url, measurement_pref,
+                totp_secret_encrypted, totp_enabled,
+                failed_login_attempts, locked_until, deletion_requested_at,
                 created_at, updated_at, ap_id, federation_enabled
             FROM users
             WHERE id = $1
             "#,
-            id
         )
+        .bind(id)
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("User {} not found", id)))
@@ -31,21 +32,42 @@ impl UserService {
 
     /// Get a user by their username
     pub async fn get_by_username(pool: &PgPool, username: &str) -> AppResult<User> {
-        sqlx::query_as!(
-            User,
+        sqlx::query_as::<_, User>(
             r#"
             SELECT
-                id, username, display_name, bio, avatar_url,
-                measurement_pref as "measurement_pref: MeasurementPref",
+                id, username, email, email_verified, password_hash,
+                display_name, bio, avatar_url, measurement_pref,
+                totp_secret_encrypted, totp_enabled,
+                failed_login_attempts, locked_until, deletion_requested_at,
                 created_at, updated_at, ap_id, federation_enabled
             FROM users
             WHERE username = $1
             "#,
-            username
         )
+        .bind(username)
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("User @{} not found", username)))
+    }
+
+    /// Get a user by their email
+    pub async fn get_by_email(pool: &PgPool, email: &str) -> AppResult<User> {
+        sqlx::query_as::<_, User>(
+            r#"
+            SELECT
+                id, username, email, email_verified, password_hash,
+                display_name, bio, avatar_url, measurement_pref,
+                totp_secret_encrypted, totp_enabled,
+                failed_login_attempts, locked_until, deletion_requested_at,
+                created_at, updated_at, ap_id, federation_enabled
+            FROM users
+            WHERE email = $1
+            "#,
+        )
+        .bind(email)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))
     }
 
     /// Create a new user with RSA keypair for ActivityPub federation
@@ -55,24 +77,27 @@ impl UserService {
         // Generate RSA keypair for ActivityPub HTTP Signatures
         let keypair = generate_rsa_keypair()?;
 
-        // Create user
-        let user = sqlx::query_as!(
-            User,
+        // Create user with auth fields
+        let user = sqlx::query_as::<_, User>(
             r#"
-            INSERT INTO users (username, display_name, bio, avatar_url, measurement_pref, ap_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO users (username, email, password_hash, display_name, bio, avatar_url, measurement_pref, ap_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING
-                id, username, display_name, bio, avatar_url,
-                measurement_pref as "measurement_pref: MeasurementPref",
+                id, username, email, email_verified, password_hash,
+                display_name, bio, avatar_url, measurement_pref,
+                totp_secret_encrypted, totp_enabled,
+                failed_login_attempts, locked_until, deletion_requested_at,
                 created_at, updated_at, ap_id, federation_enabled
             "#,
-            input.username,
-            input.display_name,
-            input.bio,
-            input.avatar_url,
-            measurement_pref as MeasurementPref,
-            input.ap_id
         )
+        .bind(&input.username)
+        .bind(&input.email)
+        .bind(&input.password_hash)
+        .bind(&input.display_name)
+        .bind(&input.bio)
+        .bind(&input.avatar_url)
+        .bind(measurement_pref)
+        .bind(&input.ap_id)
         .fetch_one(pool)
         .await
         .map_err(|e| match e {
@@ -80,6 +105,9 @@ impl UserService {
                 if db_err.constraint() == Some("users_username_key") =>
             {
                 AppError::Conflict(format!("Username '{}' is already taken", input.username))
+            }
+            sqlx::Error::Database(ref db_err) if db_err.constraint() == Some("users_email_key") => {
+                AppError::Conflict("Email already registered".to_string())
             }
             sqlx::Error::Database(ref db_err) if db_err.constraint() == Some("users_ap_id_key") => {
                 AppError::Conflict("ActivityPub ID already exists".to_string())
@@ -111,8 +139,7 @@ impl UserService {
 
     /// Update a user's profile
     pub async fn update(pool: &PgPool, id: Uuid, input: UpdateUser) -> AppResult<User> {
-        let user = sqlx::query_as!(
-            User,
+        let user = sqlx::query_as::<_, User>(
             r#"
             UPDATE users
             SET
@@ -123,16 +150,18 @@ impl UserService {
                 updated_at = NOW()
             WHERE id = $1
             RETURNING
-                id, username, display_name, bio, avatar_url,
-                measurement_pref as "measurement_pref: MeasurementPref",
+                id, username, email, email_verified, password_hash,
+                display_name, bio, avatar_url, measurement_pref,
+                totp_secret_encrypted, totp_enabled,
+                failed_login_attempts, locked_until, deletion_requested_at,
                 created_at, updated_at, ap_id, federation_enabled
             "#,
-            id,
-            input.display_name,
-            input.bio,
-            input.avatar_url,
-            input.measurement_pref as Option<MeasurementPref>
         )
+        .bind(id)
+        .bind(&input.display_name)
+        .bind(&input.bio)
+        .bind(&input.avatar_url)
+        .bind(input.measurement_pref)
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("User {} not found", id)))?;
@@ -158,23 +187,21 @@ impl UserService {
         Ok(!exists.unwrap_or(false))
     }
 
+    /// Check if an email is available
+    pub async fn email_available(pool: &PgPool, email: &str) -> AppResult<bool> {
+        let exists: Option<bool> =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)")
+                .bind(email)
+                .fetch_one(pool)
+                .await?;
+
+        Ok(!exists.unwrap_or(false))
+    }
+
     /// Get the public key PEM for a user (for ActivityPub Actor profile)
     pub async fn get_public_key(pool: &PgPool, user_id: Uuid) -> AppResult<String> {
         let key = sqlx::query_scalar!(
             "SELECT public_key_pem FROM user_keys WHERE user_id = $1",
-            user_id
-        )
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("Keys not found for user {}", user_id)))?;
-
-        Ok(key)
-    }
-
-    /// Get the private key PEM for a user (for signing HTTP requests)
-    pub async fn get_private_key(pool: &PgPool, user_id: Uuid) -> AppResult<String> {
-        let key = sqlx::query_scalar!(
-            "SELECT private_key_pem FROM user_keys WHERE user_id = $1",
             user_id
         )
         .fetch_optional(pool)
@@ -191,20 +218,21 @@ impl UserService {
         user_id: Uuid,
         enabled: bool,
     ) -> AppResult<User> {
-        let user = sqlx::query_as!(
-            User,
+        let user = sqlx::query_as::<_, User>(
             r#"
             UPDATE users
             SET federation_enabled = $2, updated_at = NOW()
             WHERE id = $1
             RETURNING
-                id, username, display_name, bio, avatar_url,
-                measurement_pref as "measurement_pref: MeasurementPref",
+                id, username, email, email_verified, password_hash,
+                display_name, bio, avatar_url, measurement_pref,
+                totp_secret_encrypted, totp_enabled,
+                failed_login_attempts, locked_until, deletion_requested_at,
                 created_at, updated_at, ap_id, federation_enabled
             "#,
-            user_id,
-            enabled
         )
+        .bind(user_id)
+        .bind(enabled)
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("User {} not found", user_id)))?;
@@ -217,24 +245,19 @@ impl UserService {
 
         Ok(user)
     }
-
-    /// Build a Delete activity for when a user disables federation
-    /// Caller should deliver this to known followers
-    pub fn build_delete_activity(user_id: Uuid) -> crate::lib::activitypub::Activity {
-        let base_url =
-            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-        crate::lib::activitypub::Activity::delete_actor(&base_url, user_id)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::user::MeasurementPref;
 
     #[test]
     fn test_create_user_input() {
         let input = CreateUser {
             username: "chef".to_string(),
+            email: "chef@example.com".to_string(),
+            password_hash: "hashed_password".to_string(),
             display_name: "Chef Marie".to_string(),
             bio: Some("I love cooking".to_string()),
             avatar_url: None,
@@ -243,6 +266,7 @@ mod tests {
         };
 
         assert_eq!(input.username, "chef");
+        assert_eq!(input.email, "chef@example.com");
         assert_eq!(input.measurement_pref, Some(MeasurementPref::Metric));
     }
 }

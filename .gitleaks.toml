@@ -1,27 +1,50 @@
-# Gitleaks configuration for Oppskrift
-title = "Oppskrift Gitleaks Configuration"
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
 
+title = "Oppskrift Gitleaks Config"
+
+[extend]
+useDefault = true
+
+# Allowlist for false positives
 [allowlist]
-description = "Allowed patterns"
-paths = [
-    ".env.example",
-    "docker-compose.yml",
+description = "Allowlisted patterns and paths"
+
+# Placeholder/example values in documentation
+regexes = [
+    # Placeholder passwords in docs
+    '''your-smtp-password''',
+    '''your-256-bit-secret-here''',
+    # Template variables
+    '''\$\{DB_PASSWORD\}''',
+    '''\$\{.*_SECRET\}''',
+    # Test credentials (explicitly fake)
+    '''test:test@''',
+    # Fake argon2 hashes in tests
+    '''fakesalt''',
+    '''fakehash''',
+    # Example/truncated JWTs in docs
+    '''eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9\.\.\.''',
+    # Test assertions checking key format (not actual keys)
+    '''starts_with\("-----BEGIN''',
 ]
 
-[[rules]]
-id = "jwt-secret"
-description = "JWT Secret"
-regex = '''JWT_SECRET\s*=\s*["']?[^"'\s]{33,}["']?'''
-keywords = ["jwt_secret", "JWT_SECRET"]
-
-[[rules]]
-id = "database-url"
-description = "Database URL with credentials"
-regex = '''postgres://[^:]+:[^@]+@'''
-keywords = ["DATABASE_URL", "postgres://"]
-
-[[rules]]
-id = "s3-secret"
-description = "S3 Secret Access Key"
-regex = '''S3_SECRET_ACCESS_KEY\s*=\s*["']?[^"'\s]+["']?'''
-keywords = ["S3_SECRET", "secret_access_key"]
+paths = [
+    # Documentation with example configs
+    '''DEPLOYMENT\.md''',
+    '''quickstart\.md''',
+    '''testing\.md''',
+    # Scripts that generate secrets (contain templates, not real secrets)
+    '''scripts/generate-secrets\.sh''',
+    # Test files with fake hashes
+    '''tests/timing_test\.rs''',
+    '''tests/enumeration_test\.rs''',
+    # Example env file
+    '''\.env\.example''',
+    # Crypto module tests (assertions checking key format)
+    '''src/lib/crypto\.rs''',
+    # OSK templates with example tokens
+    '''\.osk/domaines/.*\.md''',
+    # CI workflows with test-only keys
+    '''\.github/workflows/.*\.yml''',
+]

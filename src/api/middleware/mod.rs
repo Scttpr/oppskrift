@@ -1,6 +1,7 @@
-// Middleware module - auth, rate limiting
+// Middleware module - auth
 
 pub mod auth;
-pub mod rate_limit;
 
-pub use auth::{AuthUser, Claims, OptionalAuthUser};
+pub use auth::{
+    clear_session_cookie, create_session_cookie, AuthUser, OptionalAuthUser, SESSION_EXPIRY_DAYS,
+};

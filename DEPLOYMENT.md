@@ -23,6 +23,7 @@ Copy `.env.example` to `.env` and configure:
 # Required
 DATABASE_URL=postgres://oppskrift:oppskrift@localhost:5432/oppskrift
 JWT_SECRET=your-secret-minimum-32-characters
+TOTP_ENCRYPTION_KEY=64-hex-chars-for-2fa  # openssl rand -hex 32
 S3_BUCKET=oppskrift
 
 # Optional (have defaults)
@@ -35,6 +36,16 @@ HOST=0.0.0.0
 PORT=3000
 BASE_URL=http://localhost:3000
 RUST_LOG=info,oppskrift=debug
+
+# Authentication
+SESSION_EXPIRY_DAYS=7
+LOCKOUT_DURATION_MINUTES=15
+
+# Email (required for registration confirmation)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=noreply@example.com
+SMTP_PASSWORD=your-smtp-password
 
 # Federation
 INSTANCE_DOMAIN=localhost:3000
@@ -156,8 +167,11 @@ sudo systemctl start oppskrift
 ## Health Checks
 
 ```bash
-# Check app responds
-curl http://localhost:3000/recipes
+# Check app health
+curl http://localhost:3000/health
+
+# Check API responds
+curl http://localhost:3000/api/v1/recipes
 
 # Check database
 podman exec oppskrift_db_1 pg_isready -U oppskrift
@@ -173,6 +187,7 @@ podman logs oppskrift_app_1
 
 # Common issues:
 # - JWT_SECRET too short (needs 32+ chars)
+# - TOTP_ENCRYPTION_KEY invalid (needs 64 hex chars)
 # - Database not ready (wait for healthy status)
 # - Port already in use
 ```

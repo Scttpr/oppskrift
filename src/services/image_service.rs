@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use std::io::Cursor;
 use uuid::Uuid;
 
-use crate::lib::error::{AppError, AppResult};
-use crate::lib::storage::StorageClient;
+use crate::core::error::{AppError, AppResult};
+use crate::core::storage::StorageClient;
 use crate::models::RecipeImage;
 
 /// Maximum number of images per recipe
@@ -12,9 +12,6 @@ pub const MAX_IMAGES_PER_RECIPE: usize = 10;
 
 /// Maximum image dimension (width or height)
 pub const MAX_IMAGE_DIMENSION: u32 = 2048;
-
-/// Thumbnail dimension
-pub const THUMBNAIL_SIZE: u32 = 300;
 
 /// Allowed image MIME types
 pub const ALLOWED_MIME_TYPES: [&str; 4] = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -92,21 +89,6 @@ impl ImageService {
             .map_err(|e| AppError::Internal(format!("Failed to encode image: {}", e)))?;
 
         Ok((output, "image/webp".to_string()))
-    }
-
-    /// Create a thumbnail from an image
-    pub fn create_thumbnail(data: &[u8]) -> AppResult<Vec<u8>> {
-        let img = image::load_from_memory(data)
-            .map_err(|e| AppError::Validation(format!("Invalid image: {}", e)))?;
-
-        let thumbnail = img.thumbnail(THUMBNAIL_SIZE, THUMBNAIL_SIZE);
-
-        let mut output = Vec::new();
-        thumbnail
-            .write_to(&mut Cursor::new(&mut output), ImageFormat::WebP)
-            .map_err(|e| AppError::Internal(format!("Failed to create thumbnail: {}", e)))?;
-
-        Ok(output)
     }
 
     /// Upload an image for a recipe

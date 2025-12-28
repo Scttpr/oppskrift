@@ -13,12 +13,6 @@ pub struct Follow {
     pub ap_id: String,
 }
 
-/// Input for creating a follow relationship
-#[derive(Debug, Clone, Deserialize)]
-pub struct CreateFollow {
-    pub following_id: Uuid,
-}
-
 /// Follow counts for a user profile
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct FollowCounts {

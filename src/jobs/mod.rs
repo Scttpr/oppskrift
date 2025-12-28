@@ -1,41 +1,10 @@
-//! Background job infrastructure
+//! Background jobs module
 //!
-//! Provides async job queue for federation delivery and other background tasks.
+//! Contains scheduled tasks for maintenance and cleanup operations.
+//! These are designed to be called by an external scheduler (cron, tokio-cron).
 
-#![allow(dead_code)]
+mod cleanup;
 
-pub mod cleanup;
-pub mod federation;
-
-use sqlx::PgPool;
-use std::sync::Arc;
-use tokio::sync::mpsc;
-
-use federation::{FederationJob, FederationWorker};
-
-/// Job queue for background processing
-#[derive(Clone)]
-pub struct JobQueue {
-    federation_tx: mpsc::Sender<FederationJob>,
-}
-
-impl JobQueue {
-    /// Create a new job queue and spawn worker tasks
-    pub fn new(pool: Arc<PgPool>) -> Self {
-        let (federation_tx, federation_rx) = mpsc::channel(100);
-
-        // Spawn federation worker
-        let worker = FederationWorker::new(pool);
-        tokio::spawn(worker.run(federation_rx));
-
-        Self { federation_tx }
-    }
-
-    /// Queue a federation delivery job
-    pub async fn queue_federation(
-        &self,
-        job: FederationJob,
-    ) -> Result<(), mpsc::error::SendError<FederationJob>> {
-        self.federation_tx.send(job).await
-    }
-}
+// Re-export for external scheduler use
+#[allow(unused_imports)]
+pub use cleanup::{CleanupError, CleanupResult, CleanupService};

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pre-commit hook for Oppskrift
-# Runs formatting and linting checks before allowing commits
+# Runs formatting, linting, and secret scanning before allowing commits
 
 set -e
 
@@ -11,6 +11,20 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo "Running pre-commit checks..."
+
+# Gitleaks secret scanning (on staged files only)
+if command -v gitleaks &> /dev/null; then
+    echo "Running gitleaks..."
+    if gitleaks protect --staged --config .gitleaks.toml; then
+        echo -e "${GREEN}Gitleaks OK${NC}"
+    else
+        echo -e "${RED}Gitleaks found potential secrets in staged files${NC}"
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}Warning: gitleaks not installed, skipping secret scan${NC}"
+    echo "Install with: brew install gitleaks (macOS) or download from GitHub"
+fi
 
 # Check if docker or podman is available for database
 if ! command -v docker &> /dev/null && ! command -v podman &> /dev/null; then

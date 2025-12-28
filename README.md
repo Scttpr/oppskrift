@@ -4,6 +4,7 @@ A federated recipe sharing platform built with Rust and ActivityPub.
 
 ## Features
 
+- **User Authentication**: Secure registration, login, and session management with email verification
 - **Recipe Management**: Create, edit, and organize recipes with ingredients, instructions, and images
 - **Recipe Books**: Organize recipes into collections
 - **Social Features**: Follow users, save recipes, share with activity feed
@@ -88,7 +89,8 @@ make clean       # Clean build artifacts
 ```
 src/
 ├── api/          # REST/JSON API endpoints
-│   ├── auth.rs       # Authentication (JWT)
+│   ├── auth.rs       # Authentication (register, login, logout)
+│   ├── account.rs    # Account management (profile)
 │   ├── recipes.rs    # Recipe CRUD
 │   ├── books.rs      # Recipe book management
 │   ├── social.rs     # Follow, save, share
@@ -98,6 +100,10 @@ src/
 │   └── oembed.rs     # oEmbed provider
 ├── handlers/     # HTML page handlers
 ├── services/     # Business logic layer
+│   ├── auth_service.rs    # Registration, login, sessions
+│   ├── password_service.rs # Argon2id hashing, validation
+│   ├── session_service.rs  # Session management
+│   └── email_service.rs    # Email notifications
 ├── models/       # Database models
 ├── jobs/         # Background job processing
 └── lib/          # Shared utilities
@@ -116,7 +122,17 @@ migrations/       # SQLx database migrations
 
 ### REST API (`/api/v1`)
 
-- `POST /auth/login` - Authenticate and get JWT token
+#### Authentication
+- `POST /auth/register` - Register new account (requires email confirmation)
+- `GET /auth/confirm-email/{token}` - Confirm email address
+- `POST /auth/resend-confirmation` - Resend confirmation email
+- `POST /auth/login` - Login and receive session cookie
+- `POST /auth/logout` - Terminate session
+
+#### Account
+- `GET /account/profile` - Get authenticated user's profile
+
+#### Content
 - `GET/POST/PUT/DELETE /recipes` - Recipe CRUD
 - `GET/POST/PUT/DELETE /books` - Recipe book CRUD
 - `POST /users/{id}/follow` - Follow a user
@@ -145,7 +161,15 @@ See `.env.example` for all options. Required:
 ```bash
 DATABASE_URL=postgres://user:pass@localhost:5432/oppskrift
 JWT_SECRET=your-secret-min-32-chars
+TOTP_ENCRYPTION_KEY=your-64-hex-chars  # For 2FA (openssl rand -hex 32)
 S3_BUCKET=oppskrift
+```
+
+Optional auth settings:
+```bash
+SESSION_EXPIRY_DAYS=7
+LOCKOUT_DURATION_MINUTES=15
+SMTP_HOST=smtp.example.com  # Required for email confirmation
 ```
 
 ## Testing

@@ -8,9 +8,9 @@ use axum::{
 use uuid::Uuid;
 
 use crate::api::middleware::OptionalAuthUser;
-use crate::lib::error::AppResult;
-use crate::lib::pagination::{PaginationMeta, PaginationParams};
-use crate::lib::schema_org::SchemaOrgRecipe;
+use crate::core::error::AppResult;
+use crate::core::pagination::{PaginationMeta, PaginationParams};
+use crate::core::schema_org::SchemaOrgRecipe;
 use crate::models::{
     Ingredient, InstructionStep, Recipe, RecipeBookSummary, RecipeImage, RecipeSummary, User,
 };
@@ -56,7 +56,7 @@ async fn list_recipes_page(
     };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
 
@@ -72,7 +72,7 @@ async fn new_recipe_page() -> AppResult<Html<String>> {
     let template = NewRecipeTemplate { recipe: None };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
 
@@ -147,7 +147,7 @@ async fn view_recipe_page(
     };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
 
@@ -170,6 +170,6 @@ async fn edit_recipe_page(
     };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }

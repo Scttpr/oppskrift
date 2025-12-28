@@ -8,8 +8,8 @@ use axum::{
 use uuid::Uuid;
 
 use crate::api::middleware::{AuthUser, OptionalAuthUser};
-use crate::lib::error::AppResult;
-use crate::lib::pagination::{PaginationMeta, PaginationParams};
+use crate::core::error::AppResult;
+use crate::core::pagination::{PaginationMeta, PaginationParams};
 use crate::models::{FollowCounts, RecipeSummary, UserProfile};
 use crate::services::{FollowService, RecipeService, SavedRecipeService, UserService};
 use crate::AppState;
@@ -63,7 +63,7 @@ async fn user_profile_page(
     };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }
 
@@ -84,7 +84,7 @@ async fn saved_recipes_page(
 ) -> AppResult<Html<String>> {
     // Only allow viewing own saved recipes
     if auth.id != id {
-        return Err(crate::lib::error::AppError::Forbidden(
+        return Err(crate::core::error::AppError::Forbidden(
             "You can only view your own saved recipes".to_string(),
         ));
     }
@@ -97,6 +97,6 @@ async fn saved_recipes_page(
     };
 
     Ok(Html(template.render().map_err(|e| {
-        crate::lib::error::AppError::Internal(format!("Template error: {}", e))
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
 }

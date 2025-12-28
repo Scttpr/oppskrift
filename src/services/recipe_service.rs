@@ -1,9 +1,9 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::lib::audit::AuditEvent;
-use crate::lib::error::{AppError, AppResult};
-use crate::lib::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::audit::AuditEvent;
+use crate::core::error::{AppError, AppResult};
+use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{
     CreateIngredient, CreateInstructionStep, CreateRecipe, Difficulty, Ingredient, InstructionStep,
     Recipe, RecipeSummary, UpdateRecipe, Visibility,
