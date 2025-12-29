@@ -234,7 +234,15 @@ impl UpdateProfileForm {
     fn sanitize(&mut self) {
         self.display_name = sanitize_text(&self.display_name);
         self.bio = self.bio.as_ref().map(|b| sanitize_text(b));
-        // avatar_url is validated as URL, which inherently prevents script injection
+        // Convert empty avatar_url to None (empty string fails URL validation)
+        self.avatar_url = self.avatar_url.as_ref().and_then(|url| {
+            let trimmed = url.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
     }
 
     /// Convert to UpdateUser model
