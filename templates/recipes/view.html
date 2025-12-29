@@ -36,11 +36,11 @@
                 {# Save Button #}
                 {% if is_saved %}
                 <button
-                    hx-delete="/api/v1/recipes/{{ recipe.id }}/save"
-                    hx-swap="outerHTML"
-                    hx-target="this"
-                    class="px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900 border border-primary-300 dark:border-primary-600 rounded-md hover:bg-primary-100 dark:hover:bg-primary-800"
+                    type="button"
+                    onclick="unsaveRecipe(this, '{{ recipe.id }}')"
+                    class="save-btn px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900 border border-primary-300 dark:border-primary-600 rounded-md hover:bg-primary-100 dark:hover:bg-primary-800 cursor-pointer"
                     title="Unsave recipe"
+                    data-saved="true"
                 >
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -48,11 +48,11 @@
                 </button>
                 {% else %}
                 <button
-                    hx-post="/api/v1/recipes/{{ recipe.id }}/save"
-                    hx-swap="outerHTML"
-                    hx-target="this"
-                    class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                    type="button"
+                    onclick="saveRecipe(this, '{{ recipe.id }}')"
+                    class="save-btn px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                     title="Save recipe"
+                    data-saved="false"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -62,13 +62,16 @@
 
                 {# Share Button #}
                 <button
-                    hx-post="/api/v1/recipes/{{ recipe.id }}/share"
-                    hx-swap="none"
-                    class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                    type="button"
+                    onclick="shareRecipe(this)"
+                    class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                     title="Share recipe"
                 >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <svg class="share-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    <svg class="check-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
                 </button>
 
@@ -87,16 +90,26 @@
                         <div class="py-1" role="menu">
                             {% if !user_books.is_empty() %}
                             {% for book in user_books %}
+                            {% if recipe_in_book_ids.contains(&book.id) %}
                             <button
-                                hx-post="/api/v1/books/{{ book.id }}/recipes"
-                                hx-vals='{"recipe_id": "{{ recipe.id }}"}'
-                                hx-swap="none"
-                                hx-on::after-request="if(event.detail.successful) this.closest('details').removeAttribute('open')"
-                                class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                type="button"
+                                onclick="event.stopPropagation(); removeFromBook(this, '{{ book.id }}', '{{ recipe.id }}')"
+                                class="block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
+                                role="menuitem"
+                                title="Click to remove from book"
+                            >
+                                ✓ {{ book.title }}
+                            </button>
+                            {% else %}
+                            <button
+                                type="button"
+                                onclick="event.stopPropagation(); addToBook(this, '{{ book.id }}', '{{ recipe.id }}')"
+                                class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                                 role="menuitem"
                             >
                                 {{ book.title }}
                             </button>
+                            {% endif %}
                             {% endfor %}
                             <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                             {% else %}
@@ -229,4 +242,119 @@
     </section>
     {% endif %}
 </article>
+
+<script>
+async function shareRecipe(btn) {
+    const url = window.location.href;
+    try {
+        await navigator.clipboard.writeText(url);
+        // Show checkmark
+        const shareIcon = btn.querySelector('.share-icon');
+        const checkIcon = btn.querySelector('.check-icon');
+        shareIcon.classList.add('hidden');
+        checkIcon.classList.remove('hidden');
+        btn.classList.add('text-green-600', 'dark:text-green-400');
+        btn.title = 'Copied!';
+        // Reset after 2 seconds
+        setTimeout(() => {
+            shareIcon.classList.remove('hidden');
+            checkIcon.classList.add('hidden');
+            btn.classList.remove('text-green-600', 'dark:text-green-400');
+            btn.title = 'Share recipe';
+        }, 2000);
+    } catch (e) {
+        console.error('Failed to copy URL:', e);
+    }
+}
+
+async function saveRecipe(btn, recipeId) {
+    btn.disabled = true;
+    try {
+        const response = await fetch(`/api/v1/recipes/${recipeId}/save`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        if (response.ok) {
+            // Switch to saved state
+            btn.className = 'save-btn px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900 border border-primary-300 dark:border-primary-600 rounded-md hover:bg-primary-100 dark:hover:bg-primary-800 cursor-pointer';
+            btn.title = 'Unsave recipe';
+            btn.dataset.saved = 'true';
+            btn.innerHTML = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>';
+            btn.onclick = function() { unsaveRecipe(btn, recipeId); };
+        }
+    } catch (e) {
+        console.error('Failed to save recipe:', e);
+    }
+    btn.disabled = false;
+}
+
+async function unsaveRecipe(btn, recipeId) {
+    btn.disabled = true;
+    try {
+        const response = await fetch(`/api/v1/recipes/${recipeId}/save`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        if (response.ok) {
+            // Switch to unsaved state
+            btn.className = 'save-btn px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer';
+            btn.title = 'Save recipe';
+            btn.dataset.saved = 'false';
+            btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>';
+            btn.onclick = function() { saveRecipe(btn, recipeId); };
+        }
+    } catch (e) {
+        console.error('Failed to unsave recipe:', e);
+    }
+    btn.disabled = false;
+}
+
+async function addToBook(btn, bookId, recipeId) {
+    btn.disabled = true;
+    const title = btn.innerHTML.trim();
+    try {
+        const response = await fetch(`/api/v1/books/${bookId}/recipes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipe_id: recipeId }),
+            credentials: 'include'
+        });
+        if (response.ok) {
+            btn.style.color = '#16a34a';
+            btn.innerHTML = '✓ ' + title;
+            btn.className = 'block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer';
+            btn.title = 'Click to remove from book';
+            btn.onclick = function(e) { e.stopPropagation(); removeFromBook(btn, bookId, recipeId, title); };
+            btn.disabled = false;
+        } else {
+            btn.disabled = false;
+        }
+    } catch (e) {
+        btn.disabled = false;
+    }
+}
+
+async function removeFromBook(btn, bookId, recipeId, title) {
+    btn.disabled = true;
+    if (!title) title = btn.innerHTML.replace('✓ ', '').trim();
+    try {
+        const response = await fetch(`/api/v1/books/${bookId}/recipes/${recipeId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        if (response.ok) {
+            btn.style.color = '';
+            btn.innerHTML = title;
+            btn.className = 'block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer';
+            btn.title = '';
+            btn.onclick = function(e) { e.stopPropagation(); addToBook(btn, bookId, recipeId); };
+            btn.disabled = false;
+        } else {
+            btn.disabled = false;
+        }
+    } catch (e) {
+        btn.disabled = false;
+    }
+}
+</script>
 {% endblock %}

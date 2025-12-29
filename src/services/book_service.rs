@@ -300,6 +300,28 @@ impl BookService {
         Ok(())
     }
 
+    /// Get book IDs that contain a specific recipe (for a specific owner)
+    pub async fn get_book_ids_containing_recipe(
+        pool: &PgPool,
+        owner_id: Uuid,
+        recipe_id: Uuid,
+    ) -> AppResult<Vec<Uuid>> {
+        let book_ids = sqlx::query_scalar!(
+            r#"
+            SELECT b.id
+            FROM recipe_books b
+            INNER JOIN book_recipe_entries e ON e.book_id = b.id
+            WHERE b.owner_id = $1 AND e.recipe_id = $2
+            "#,
+            owner_id,
+            recipe_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(book_ids)
+    }
+
     /// Get recipes in a book (all recipes, for owner)
     pub async fn get_recipes_in_book(
         pool: &PgPool,
