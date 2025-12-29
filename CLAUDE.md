@@ -7,6 +7,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-25
 - PostgreSQL 15+ (sessions, tokens, security_events tables) (002-user-auth)
 - Rust 1.75+ + Axum 0.8, SQLx 0.8, tokio, activitypub_federation 0.6 (003-test-coverage)
 - PostgreSQL 15+ (via SQLx) (003-test-coverage)
+- Rust 1.75+ + Axum 0.8, Askama (templates), SQLx (database), validator (input validation) (004-user-profile-settings)
+- PostgreSQL 15+ (existing schema) (004-user-profile-settings)
 
 - **Language**: Rust 1.75+
 - **Framework**: Axum 0.8
@@ -53,10 +55,10 @@ cargo run                # Run dev server
 - Use `thiserror` for library errors, `anyhow` for application errors
 
 ## Recent Changes
+- 004-user-profile-settings: Added Rust 1.75+ + Axum 0.8, Askama (templates), SQLx (database), validator (input validation)
 - 003-test-coverage: Added Rust 1.75+ + Axum 0.8, SQLx 0.8, tokio, activitypub_federation 0.6
 - 002-user-auth: Added Rust 1.75+ + Axum 0.8, SQLx 0.8, argon2, totp-rs, lettre, tower_governor
 
-- 001-recipe-sharing: Initial feature - recipes, books, sharing, ActivityPub federation
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

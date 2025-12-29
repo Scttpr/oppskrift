@@ -1,8 +1,45 @@
 use askama::Template;
-use axum::{response::Html, routing::get, Router};
+use axum::{
+    extract::{Path, State},
+    response::Html,
+    routing::get,
+    Router,
+};
 
+use crate::core::config::SmtpConfig;
 use crate::core::error::{AppError, AppResult};
+use crate::services::{AuthService, EmailService, PasswordService};
 use crate::AppState;
+
+// Session expiry in days
+const SESSION_EXPIRY_DAYS: u32 = 30;
+
+/// Create an AuthService instance from AppState
+fn create_auth_service(state: &AppState) -> AuthService {
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+
+    let is_production = std::env::var("APP_ENV")
+        .map(|v| v == "production")
+        .unwrap_or(false);
+
+    let password_service = PasswordService::new(
+        std::env::var("HIBP_ENABLED")
+            .map(|v| v == "true")
+            .unwrap_or(false), // Disable HIBP check for email confirmation
+    );
+
+    let smtp_config = SmtpConfig::from_env(is_production);
+    let email_service = EmailService::new(smtp_config, base_url.clone());
+
+    AuthService::new(
+        state.db.clone(),
+        password_service,
+        email_service,
+        base_url,
+        SESSION_EXPIRY_DAYS,
+    )
+}
 
 /// Auth page routes
 pub fn routes() -> Router<AppState> {
@@ -11,6 +48,7 @@ pub fn routes() -> Router<AppState> {
         .route("/register", get(register_page))
         .route("/forgot-password", get(forgot_password_page))
         .route("/reset-password", get(reset_password_page))
+        .route("/confirm-email/{token}", get(confirm_email_page))
 }
 
 /// Login page template
@@ -32,6 +70,14 @@ struct ForgotPasswordTemplate;
 #[derive(Template)]
 #[template(path = "auth/reset_password.html")]
 struct ResetPasswordTemplate;
+
+/// Email confirmed page template
+#[derive(Template)]
+#[template(path = "auth/email_confirmed.html")]
+struct EmailConfirmedTemplate {
+    success: bool,
+    error_message: String,
+}
 
 /// Login page handler
 async fn login_page() -> AppResult<Html<String>> {
@@ -60,6 +106,49 @@ async fn forgot_password_page() -> AppResult<Html<String>> {
 /// Reset password page handler
 async fn reset_password_page() -> AppResult<Html<String>> {
     let template = ResetPasswordTemplate;
+    Ok(Html(template.render().map_err(|e| {
+        AppError::Internal(format!("Template error: {}", e))
+    })?))
+}
+
+/// Email confirmation page handler
+///
+/// Confirms the email using the token and displays success/error page.
+async fn confirm_email_page(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> AppResult<Html<String>> {
+    // Create auth service and attempt confirmation
+    let auth_service = create_auth_service(&state);
+
+    let (success, error_message) = match auth_service
+        .confirm_email(&token, &crate::core::RequestContext::default())
+        .await
+    {
+        Ok(_) => (true, String::new()),
+        Err(e) => {
+            let msg = match e {
+                crate::services::AuthError::InvalidToken => {
+                    "This confirmation link is invalid or has expired. Please request a new one."
+                        .to_string()
+                }
+                crate::services::AuthError::AlreadyVerified => {
+                    "Your email has already been verified. You can log in now.".to_string()
+                }
+                crate::services::AuthError::UserNotFound => {
+                    "This confirmation link is invalid. Please register again.".to_string()
+                }
+                _ => "An error occurred while confirming your email. Please try again.".to_string(),
+            };
+            (false, msg)
+        }
+    };
+
+    let template = EmailConfirmedTemplate {
+        success,
+        error_message,
+    };
+
     Ok(Html(template.render().map_err(|e| {
         AppError::Internal(format!("Template error: {}", e))
     })?))

@@ -37,6 +37,17 @@ pub enum MeasurementPref {
     Imperial,
 }
 
+/// What happens to user's content on account deletion
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "deletion_content_choice", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum DeletionContentChoice {
+    /// Keep recipes/books with "Deleted User" attribution
+    Anonymize,
+    /// Remove all user's content (recipes, books, comments)
+    DeleteAll,
+}
+
 /// User entity - represents both local and federated users
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
@@ -63,6 +74,7 @@ pub struct User {
     #[serde(skip_serializing)]
     pub locked_until: Option<DateTime<Utc>>,
     pub deletion_requested_at: Option<DateTime<Utc>>,
+    pub deletion_content_choice: Option<DeletionContentChoice>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub ap_id: String,
@@ -147,6 +159,7 @@ mod tests {
             _failed_login_attempts: 0,
             locked_until: None,
             deletion_requested_at: None,
+            deletion_content_choice: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
             ap_id: "https://example.com/users/chef".to_string(),

@@ -12,6 +12,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 
+use crate::api::middleware::security_headers;
 use crate::core::request_id::request_id_middleware;
 
 pub mod api;
@@ -25,6 +26,8 @@ pub mod services;
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
+    /// Secret key for CSRF token generation/validation
+    pub csrf_secret: Vec<u8>,
 }
 
 /// Create the application router (exposed for testing)
@@ -65,6 +68,7 @@ fn create_router(state: AppState) -> Router {
         .merge(handlers::routes())
         // Static file serving
         .nest_service("/static", ServeDir::new("static"))
+        .layer(middleware::from_fn(security_headers))
         .layer(middleware::from_fn(request_id_middleware))
         .layer(TraceLayer::new_for_http())
         .layer(cors)

@@ -209,7 +209,7 @@ impl RecipeService {
                 r.prep_time_min, r.cook_time_min,
                 r.difficulty as "difficulty: Difficulty",
                 r.created_at,
-                ri.url as primary_image_url
+                ri.url as "primary_image_url?"
             FROM recipes r
             LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
             WHERE r.author_id = $1
@@ -255,7 +255,7 @@ impl RecipeService {
                 r.prep_time_min, r.cook_time_min,
                 r.difficulty as "difficulty: Difficulty",
                 r.created_at,
-                ri.url as primary_image_url
+                ri.url as "primary_image_url?"
             FROM recipes r
             LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
             WHERE r.visibility = 'public'

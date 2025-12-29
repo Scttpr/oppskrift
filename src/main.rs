@@ -59,15 +59,43 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Get CSRF secret from environment (required for security)
+    let csrf_secret = std::env::var("CSRF_SECRET")
+        .map(|s| s.into_bytes())
+        .unwrap_or_else(|_| {
+            tracing::warn!("CSRF_SECRET not set, generating random secret (not suitable for production clusters)");
+            use rand::RngCore;
+            let mut secret = vec![0u8; 32];
+            rand::thread_rng().fill_bytes(&mut secret);
+            secret
+        });
+
+    if csrf_secret.len() < 32 {
+        tracing::error!("CSRF_SECRET must be at least 32 bytes");
+        return Err(anyhow::anyhow!("CSRF_SECRET too short"));
+    }
+
     // Create application state
-    let state = AppState { db };
+    let state = AppState { db, csrf_secret };
 
     // Build the router
     let app = app_router(state);
 
-    // Get host and port from environment
-    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-    let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    // Get host and port from environment (LISTEN_* to avoid conflict with system HOST)
+    let host = std::env::var("LISTEN_HOST")
+        .or_else(|_| {
+            std::env::var("HOST").map(|h| {
+                if h.contains('.') || h == "localhost" {
+                    h
+                } else {
+                    "0.0.0.0".to_string()
+                }
+            })
+        })
+        .unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = std::env::var("LISTEN_PORT")
+        .or_else(|_| std::env::var("PORT"))
+        .unwrap_or_else(|_| "3000".to_string());
     let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
     tracing::info!("Listening on http://{}", addr);
 

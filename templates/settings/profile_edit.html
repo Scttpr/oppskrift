@@ -1,0 +1,180 @@
+{% extends "settings/_layout.html" %}
+
+{% block settings_content %}
+<section aria-labelledby="profile-edit-heading">
+    <div class="flex items-center justify-between mb-6">
+        <h2 id="profile-edit-heading" class="text-lg font-medium text-gray-900 dark:text-white">
+            Edit Profile
+        </h2>
+        <a
+            href="/settings/profile"
+            class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        >
+            Cancel
+        </a>
+    </div>
+
+    {# Validation errors (T029) #}
+    {% if !errors.is_empty() %}
+    <div role="alert" class="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <div class="flex">
+            <svg class="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+                <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
+                    There were errors with your submission
+                </h3>
+                <ul class="mt-2 text-sm text-red-700 dark:text-red-300 list-disc list-inside">
+                    {% for error in errors %}
+                    <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/settings/profile/edit" class="space-y-6">
+        {# CSRF token (T028) #}
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
+
+        {# Display Name #}
+        <div>
+            <label for="display_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Display name <span class="text-red-500" aria-label="required">*</span>
+            </label>
+            <input
+                type="text"
+                id="display_name"
+                name="display_name"
+                value="{{ form.display_name }}"
+                required
+                minlength="1"
+                maxlength="100"
+                autocomplete="name"
+                aria-describedby="display_name_help"
+                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            />
+            <p id="display_name_help" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                1-100 characters. This is how your name appears to others.
+            </p>
+        </div>
+
+        {# Bio #}
+        <div>
+            <label for="bio" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Bio
+            </label>
+            <textarea
+                id="bio"
+                name="bio"
+                rows="4"
+                maxlength="500"
+                aria-describedby="bio_help"
+                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            >{{ form.bio }}</textarea>
+            <p id="bio_help" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Up to 500 characters. Tell others about yourself.
+            </p>
+        </div>
+
+        {# Avatar URL #}
+        <div>
+            <label for="avatar_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Avatar URL
+            </label>
+            <div class="mt-1 flex items-center space-x-4">
+                {# Preview #}
+                {% if !form.avatar_url.is_empty() %}
+                <img
+                    src="{{ form.avatar_url }}"
+                    alt="Avatar preview"
+                    class="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                />
+                {% else %}
+                <div class="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
+                    <span class="text-lg font-medium text-primary-600 dark:text-primary-400">
+                        {{ form.display_name.chars().next().unwrap_or('?') }}
+                    </span>
+                </div>
+                {% endif %}
+                <input
+                    type="url"
+                    id="avatar_url"
+                    name="avatar_url"
+                    value="{{ form.avatar_url }}"
+                    placeholder="https://example.com/avatar.jpg"
+                    aria-describedby="avatar_url_help"
+                    class="flex-1 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                />
+            </div>
+            <p id="avatar_url_help" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Link to an image. Leave empty to use your initials.
+            </p>
+        </div>
+
+        {# Measurement Preference #}
+        <fieldset>
+            <legend class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Measurement system
+            </legend>
+            <p id="measurement_pref_help" class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                Choose how recipe quantities are displayed.
+            </p>
+            <div class="mt-2 space-y-2" role="radiogroup" aria-describedby="measurement_pref_help">
+                <div class="flex items-center">
+                    <input
+                        type="radio"
+                        id="measurement_metric"
+                        name="measurement_pref"
+                        value="metric"
+                        {% match form.measurement_pref %}
+                        {% when MeasurementPref::Metric %}
+                        checked
+                        {% when MeasurementPref::Imperial %}
+                        {% endmatch %}
+                        class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <label for="measurement_metric" class="ml-3 text-sm text-gray-700 dark:text-gray-300">
+                        Metric (grams, liters, Celsius)
+                    </label>
+                </div>
+                <div class="flex items-center">
+                    <input
+                        type="radio"
+                        id="measurement_imperial"
+                        name="measurement_pref"
+                        value="imperial"
+                        {% match form.measurement_pref %}
+                        {% when MeasurementPref::Imperial %}
+                        checked
+                        {% when MeasurementPref::Metric %}
+                        {% endmatch %}
+                        class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <label for="measurement_imperial" class="ml-3 text-sm text-gray-700 dark:text-gray-300">
+                        Imperial (ounces, cups, Fahrenheit)
+                    </label>
+                </div>
+            </div>
+        </fieldset>
+
+        {# Form actions #}
+        <div class="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <a
+                href="/settings/profile"
+                class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-gray-800"
+            >
+                Save Changes
+            </button>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -1,8 +1,12 @@
 //! Shared test utilities for integration tests
 //!
 //! Uses axum-test to test against the app directly without HTTP server.
+//!
+//! Note: Many helpers appear "unused" per-file but are used across different test files.
+//! Rust compiles each test file independently, causing false positive warnings.
 
-pub mod assertions;
+#![allow(dead_code)]
+
 pub mod fixtures;
 pub mod security;
 
@@ -36,8 +40,14 @@ impl TestContext {
             .await
             .expect("Failed to connect to test database");
 
+        // Generate CSRF secret for testing (32 bytes)
+        let csrf_secret = b"test_csrf_secret_32_bytes_long!!".to_vec();
+
         // Create app state and router (using test_app_router for mock ConnectInfo)
-        let state = AppState { db: db.clone() };
+        let state = AppState {
+            db: db.clone(),
+            csrf_secret,
+        };
         let app = test_app_router(state);
 
         // Create test server
@@ -566,6 +576,31 @@ impl TestContext {
         let response = self
             .server
             .post(path)
+            .add_cookie(cookie::Cookie::new(
+                "oppskrift_session",
+                session.to_string(),
+            ))
+            .json(&body)
+            .await;
+
+        let status = response.status_code().as_u16();
+        let session_cookie = extract_session_cookie(&response);
+        let text = response.text();
+        let body = serde_json::from_str::<Value>(&text)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+
+        ApiResponse {
+            status,
+            body,
+            session_cookie,
+        }
+    }
+
+    /// PATCH JSON with session cookie
+    pub async fn patch_with_session(&self, path: &str, body: Value, session: &str) -> ApiResponse {
+        let response = self
+            .server
+            .patch(path)
             .add_cookie(cookie::Cookie::new(
                 "oppskrift_session",
                 session.to_string(),

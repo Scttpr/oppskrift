@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                r.id, r.author_id, r.title, r.description,\n                r.prep_time_min, r.cook_time_min,\n                r.difficulty as \"difficulty: crate::models::Difficulty\",\n                r.created_at,\n                ri.url as primary_image_url\n            FROM recipes r\n            INNER JOIN book_recipe_entries e ON e.recipe_id = r.id\n            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true\n            WHERE e.book_id = $1\n            ORDER BY e.position\n            LIMIT $2 OFFSET $3\n            ",
+  "query": "\n            SELECT\n                r.id, r.author_id, r.title, r.description,\n                r.prep_time_min, r.cook_time_min,\n                r.difficulty as \"difficulty: crate::models::Difficulty\",\n                r.created_at,\n                ri.url as \"primary_image_url?\"\n            FROM recipes r\n            INNER JOIN book_recipe_entries e ON e.recipe_id = r.id\n            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true\n            WHERE e.book_id = $1 AND r.visibility = 'public'\n            ORDER BY e.position\n            LIMIT $2 OFFSET $3\n            ",
   "describe": {
     "columns": [
       {
@@ -56,7 +56,7 @@
       },
       {
         "ordinal": 8,
-        "name": "primary_image_url",
+        "name": "primary_image_url?",
         "type_info": "Varchar"
       }
     ],
@@ -79,5 +79,5 @@
       false
     ]
   },
-  "hash": "41566d66d53e2e75b861984093f85c4cd51c098504995539e3e02c00e669c674"
+  "hash": "93eaab762c0167b16b28065a5ab5b1e5c5f0d7e6f08b59deb939c9e0d172fbba"
 }

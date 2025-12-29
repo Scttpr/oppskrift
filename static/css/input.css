@@ -1,6 +1,23 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Source files for class detection */
+@source "../../templates/**/*.html";
+@source "../../src/**/*.rs";
+
+/* Custom theme - primary colors via CSS variables for instance theming */
+@theme {
+  --color-primary-50: var(--color-primary-50, #fef2f2);
+  --color-primary-100: var(--color-primary-100, #fee2e2);
+  --color-primary-200: var(--color-primary-200, #fecaca);
+  --color-primary-300: var(--color-primary-300, #fca5a5);
+  --color-primary-400: var(--color-primary-400, #f87171);
+  --color-primary-500: var(--color-primary-500, #ef4444);
+  --color-primary-600: var(--color-primary-600, #dc2626);
+  --color-primary-700: var(--color-primary-700, #b91c1c);
+  --color-primary-800: var(--color-primary-800, #991b1b);
+  --color-primary-900: var(--color-primary-900, #7f1d1d);
+  --color-primary-950: var(--color-primary-950, #450a0a);
+}
 
 /* Instance theming - default colors (can be overridden per-instance) */
 :root {
@@ -62,16 +79,39 @@
 }
 
 /* Focus indicators - AAA compliant (3:1 contrast) */
-@layer base {
-  *:focus-visible {
-    outline: 3px solid var(--color-primary-600);
-    outline-offset: 2px;
-  }
+*:focus-visible {
+  outline: 3px solid var(--color-primary-600);
+  outline-offset: 2px;
 }
 
 /* Skip link styles */
-@layer components {
-  .skip-link {
-    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-primary-700 focus:font-semibold focus:rounded focus:shadow-lg;
-  }
+.skip-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.skip-link:focus {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 50;
+  padding: 0.5rem 1rem;
+  background-color: white;
+  color: var(--color-primary-700);
+  font-weight: 600;
+  border-radius: 0.25rem;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  width: auto;
+  height: auto;
+  clip: auto;
+  overflow: visible;
+  margin: 0;
+  white-space: normal;
 }

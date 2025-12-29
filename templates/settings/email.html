@@ -1,0 +1,116 @@
+{% extends "settings/_layout.html" %}
+
+{% block settings_content %}
+<section aria-labelledby="email-heading">
+    <div class="flex items-center justify-between mb-6">
+        <h2 id="email-heading" class="text-lg font-medium text-gray-900 dark:text-white">
+            Change Email Address
+        </h2>
+        <a
+            href="/settings/account"
+            class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        >
+            Cancel
+        </a>
+    </div>
+
+    {# Validation errors #}
+    {% if !errors.is_empty() %}
+    <div role="alert" class="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <div class="flex">
+            <svg class="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+                <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
+                    There were errors with your submission
+                </h3>
+                <ul class="mt-2 text-sm text-red-700 dark:text-red-300 list-disc list-inside">
+                    {% for error in errors %}
+                    <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+        <div class="flex">
+            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+                <p class="text-sm text-blue-800 dark:text-blue-200">
+                    A confirmation email will be sent to your new address. Your email won't change until you click the confirmation link.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {# Current email #}
+    <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Current email address
+        </label>
+        <p class="text-sm text-gray-900 dark:text-white">
+            {{ current_email }}
+        </p>
+    </div>
+
+    <form method="POST" action="/settings/account/email" class="space-y-6">
+        {# CSRF token #}
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
+
+        {# New Email #}
+        <div>
+            <label for="new_email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                New email address <span class="text-red-500" aria-label="required">*</span>
+            </label>
+            <input
+                type="email"
+                id="new_email"
+                name="new_email"
+                required
+                autocomplete="email"
+                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            />
+        </div>
+
+        {# Password for verification #}
+        <div>
+            <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Current password <span class="text-red-500" aria-label="required">*</span>
+            </label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                required
+                autocomplete="current-password"
+                aria-describedby="password_help"
+                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            />
+            <p id="password_help" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                For security, please confirm your password to change your email.
+            </p>
+        </div>
+
+        {# Form actions #}
+        <div class="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <a
+                href="/settings/account"
+                class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-gray-800"
+            >
+                Send Confirmation Email
+            </button>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -5,24 +5,25 @@
 metadata:
   project: "Oppskrift"
   generated: "2025-12-26"
-  last_updated: "2025-12-26"
+  last_updated: "2025-12-29"
   baseline_score: 36
   current_score: 45
   target_score: 80
 
 summary:
-  total_risks: 5
+  total_risks: 19
   by_severity:
-    critique: 3
-    important: 2
-    moyen: 0
-    mineur: 0
+    critique: 5
+    important: 5
+    moyen: 4
+    mineur: 3
+    faible: 2
   by_status:
-    ouvert: 4
+    ouvert: 16
     en_cours: 0
     resolu: 1
     verifie: 0
-    accepte: 0
+    accepte: 2
 
 # Conformité des principes (0-100%)
 principles_compliance:
@@ -172,6 +173,476 @@ risks:
       echeance: "2026-01-02"
     assignee: null
     equipe: null
+
+  # ============================================================================
+  # Feature 004: User Profile & Settings
+  # ============================================================================
+
+  - id: "RISK-004-001"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "Account Takeover via Password Change"
+    description: "Attacker obtains session via credential stuffing or session theft, then changes password to lock out legitimate user."
+    categorie_stride: "S"
+    severite: "CRITIQUE"
+    priorite: "P0"
+    impact: 5
+    probabilite: 4
+    exposition: 5
+    score_initial: 100
+    score_residuel: 100
+    fichiers:
+      - "src/api/account.rs"
+      - "src/handlers/settings.rs"
+    asset_menace: "User accounts"
+    vecteur_attaque: "Credential stuffing → session → password change"
+    controles_existants:
+      - "Password required for password change (FR-014)"
+      - "Session invalidation on password change (FR-017)"
+    controles_requis:
+      - "Rate limiting on password change (5/hour)"
+      - "Email notification on password change"
+      - "HIBP integration for breach checking"
+      - "Re-authentication if session > 15 min old"
+    principe_viole: "II"
+    cwe: "CWE-307"
+    owasp: "A07:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-05"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-002"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "XSS via Profile Fields"
+    description: "Attacker injects XSS payload in bio or display_name field, stealing sessions of users who view the profile."
+    categorie_stride: "T"
+    severite: "CRITIQUE"
+    priorite: "P0"
+    impact: 5
+    probabilite: 3
+    exposition: 5
+    score_initial: 75
+    score_residuel: 75
+    fichiers:
+      - "templates/settings/profile.html"
+      - "templates/users/profile.html"
+    asset_menace: "User sessions, profile data"
+    vecteur_attaque: "XSS in bio → session theft"
+    controles_existants:
+      - "Askama auto-escapes by default"
+    controles_requis:
+      - "Verify Askama escaping in all contexts"
+      - "Content-Security-Policy header"
+      - "Input validation rejecting HTML/script tags"
+    principe_viole: "III"
+    cwe: "CWE-79"
+    owasp: "A03:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-05"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-003"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "2FA Bypass via Recovery Code Brute Force"
+    description: "Attacker brute forces recovery codes to bypass 2FA protection."
+    categorie_stride: "S"
+    severite: "MODERE"
+    priorite: "P1"
+    impact: 4
+    probabilite: 2
+    exposition: 4
+    score_initial: 32
+    score_residuel: 32
+    fichiers:
+      - "src/api/account.rs"
+      - "src/services/totp_service.rs"
+    asset_menace: "2FA protection"
+    vecteur_attaque: "Brute force recovery codes"
+    controles_existants:
+      - "10 single-use recovery codes"
+    controles_requis:
+      - "Rate limit recovery attempts (5, then lockout)"
+      - "Long recovery codes (12+ chars)"
+      - "Email notification on recovery code use"
+    principe_viole: "II"
+    cwe: "CWE-307"
+    owasp: "A07:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-12"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-004"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "TOTP Secret Exposure"
+    description: "TOTP secret accidentally logged or returned in API response."
+    categorie_stride: "I"
+    severite: "MODERE"
+    priorite: "P1"
+    impact: 5
+    probabilite: 2
+    exposition: 4
+    score_initial: 40
+    score_residuel: 40
+    fichiers:
+      - "src/models/user.rs"
+      - "src/services/totp_service.rs"
+    asset_menace: "2FA protection"
+    vecteur_attaque: "Log file exposure or API leak"
+    controles_existants:
+      - "totp_secret_encrypted stored"
+      - "Field prefixed with _"
+    controles_requis:
+      - "#[serde(skip)] on totp_secret"
+      - "Audit log statements for sensitive data"
+      - "Secret scanning in CI/CD"
+    principe_viole: "V"
+    cwe: "CWE-532"
+    owasp: "A09:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-12"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-005"
+    source: "/osk-analyze 004"
+    type: "systeme"
+    feature: "004-user-profile-settings"
+    titre: "Missing Audit Trail for Security Changes"
+    description: "Security-sensitive operations not logged, preventing incident response."
+    categorie_stride: "R"
+    severite: "IMPORTANT"
+    priorite: "P1"
+    impact: 3
+    probabilite: 5
+    exposition: 5
+    score_initial: 75
+    score_residuel: 75
+    fichiers:
+      - "src/api/account.rs"
+      - "src/services/user_service.rs"
+    asset_menace: "Security forensics"
+    vecteur_attaque: "N/A (non-conformité)"
+    controles_existants: []
+    controles_requis:
+      - "security_events table"
+      - "Log all security-sensitive operations"
+      - "Email notification for high-risk changes"
+    principe_viole: "VI"
+    cwe: "CWE-778"
+    owasp: "A09:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-12"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-006"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "Session Hijacking via Insecure Cookie"
+    description: "Session cookie stolen if not properly secured."
+    categorie_stride: "S"
+    severite: "IMPORTANT"
+    priorite: "P2"
+    impact: 5
+    probabilite: 2
+    exposition: 5
+    score_initial: 50
+    score_residuel: 50
+    fichiers:
+      - "src/api/middleware/auth.rs"
+    asset_menace: "Session tokens"
+    vecteur_attaque: "Cookie theft via network or XSS"
+    controles_existants:
+      - "HttpOnly flag"
+    controles_requis:
+      - "Verify Secure flag"
+      - "Add SameSite=Lax or Strict"
+    principe_viole: "II"
+    cwe: "CWE-614"
+    owasp: "A07:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-19"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-007"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "Email Enumeration"
+    description: "Attacker can determine if email exists via response timing or message differences."
+    categorie_stride: "I"
+    severite: "MODERE"
+    priorite: "P2"
+    impact: 2
+    probabilite: 4
+    exposition: 5
+    score_initial: 40
+    score_residuel: 40
+    fichiers:
+      - "src/api/account.rs"
+    asset_menace: "User email addresses"
+    vecteur_attaque: "Timing attack on email change"
+    controles_existants: []
+    controles_requis:
+      - "Generic response messages"
+      - "Consistent response times"
+    principe_viole: "I"
+    cwe: "CWE-203"
+    owasp: "A01:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-19"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-008"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "CSRF on Settings Forms"
+    description: "Attacker tricks user into submitting settings form via malicious page."
+    categorie_stride: "T"
+    severite: "MODERE"
+    priorite: "P2"
+    impact: 4
+    probabilite: 2
+    exposition: 5
+    score_initial: 40
+    score_residuel: 40
+    fichiers:
+      - "src/handlers/settings.rs"
+      - "templates/settings/*.html"
+    asset_menace: "User settings"
+    vecteur_attaque: "Cross-site form submission"
+    controles_existants:
+      - "SameSite cookie (assumed)"
+    controles_requis:
+      - "CSRF tokens on all forms"
+      - "Verify SameSite cookie setting"
+    principe_viole: "III"
+    cwe: "CWE-352"
+    owasp: "A01:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-19"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-009"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "Session Exhaustion DoS"
+    description: "Attacker creates many sessions per user, exhausting resources."
+    categorie_stride: "D"
+    severite: "MODERE"
+    priorite: "P2"
+    impact: 2
+    probabilite: 3
+    exposition: 5
+    score_initial: 30
+    score_residuel: 30
+    fichiers:
+      - "src/api/auth.rs"
+      - "src/services/session_service.rs"
+    asset_menace: "Server resources"
+    vecteur_attaque: "Automated session creation"
+    controles_existants: []
+    controles_requis:
+      - "Limit sessions per user (10 max)"
+      - "Rate limiting on login"
+    principe_viole: "II"
+    cwe: "CWE-400"
+    owasp: "A05:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-19"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-010"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "IDOR on Session Revocation"
+    description: "User could revoke another user's session if authorization check missing."
+    categorie_stride: "E"
+    severite: "MINEUR"
+    priorite: "P3"
+    impact: 3
+    probabilite: 1
+    exposition: 5
+    score_initial: 15
+    score_residuel: 15
+    fichiers:
+      - "src/api/account.rs"
+    asset_menace: "Other users' sessions"
+    vecteur_attaque: "Direct session ID manipulation"
+    controles_existants:
+      - "UUID session IDs"
+    controles_requis:
+      - "Verify session.user_id == auth.user_id"
+      - "Integration test for this check"
+    principe_viole: "II"
+    cwe: "CWE-639"
+    owasp: "A01:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-26"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-011"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "Password Hash Exposure"
+    description: "Password hash accidentally returned in API response."
+    categorie_stride: "I"
+    severite: "MODERE"
+    priorite: "P3"
+    impact: 5
+    probabilite: 1
+    exposition: 5
+    score_initial: 25
+    score_residuel: 25
+    fichiers:
+      - "src/models/user.rs"
+    asset_menace: "Password hashes"
+    vecteur_attaque: "API response inspection"
+    controles_existants:
+      - "UserProfile DTO excludes password_hash"
+    controles_requis:
+      - "Verify #[serde(skip)] on password_hash"
+      - "Add test asserting hash not in response"
+    principe_viole: "I"
+    cwe: "CWE-200"
+    owasp: "A01:2021"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-26"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-012"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "Admin Impersonation via Display Name"
+    description: "User sets display_name to 'Admin' to mislead others."
+    categorie_stride: "E"
+    severite: "MINEUR"
+    priorite: "P3"
+    impact: 2
+    probabilite: 3
+    exposition: 3
+    score_initial: 18
+    score_residuel: 18
+    fichiers:
+      - "src/services/user_service.rs"
+    asset_menace: "User trust"
+    vecteur_attaque: "Social engineering via display name"
+    controles_existants: []
+    controles_requis:
+      - "Block reserved words in display_name"
+    principe_viole: "II"
+    cwe: "N/A"
+    owasp: "N/A"
+    statut: "OUVERT"
+    dates:
+      detection: "2025-12-29"
+      echeance: "2026-01-26"
+    assignee: null
+    equipe: null
+
+  - id: "RISK-004-013"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "Email Change Token Interception"
+    description: "Attacker intercepts email verification token."
+    categorie_stride: "S"
+    severite: "MINEUR"
+    priorite: "P4"
+    impact: 4
+    probabilite: 1
+    exposition: 3
+    score_initial: 12
+    score_residuel: 12
+    fichiers:
+      - "src/services/email_service.rs"
+    asset_menace: "Email change tokens"
+    vecteur_attaque: "Email account compromise"
+    controles_existants: []
+    controles_requis: []
+    principe_viole: "N/A"
+    cwe: "N/A"
+    owasp: "N/A"
+    statut: "ACCEPTE"
+    dates:
+      detection: "2025-12-29"
+    assignee: null
+    equipe: null
+    justification_acceptation: "Email security is user responsibility"
+
+  - id: "RISK-004-014"
+    source: "/osk-analyze 004"
+    type: "vulnerabilite"
+    feature: "004-user-profile-settings"
+    titre: "Session Info Leakage"
+    description: "IP/User-Agent visible to attacker with session access."
+    categorie_stride: "I"
+    severite: "FAIBLE"
+    priorite: "P4"
+    impact: 1
+    probabilite: 2
+    exposition: 3
+    score_initial: 6
+    score_residuel: 6
+    fichiers:
+      - "src/api/account.rs"
+    asset_menace: "Session metadata"
+    vecteur_attaque: "Session hijacking"
+    controles_existants: []
+    controles_requis: []
+    principe_viole: "N/A"
+    cwe: "N/A"
+    owasp: "N/A"
+    statut: "ACCEPTE"
+    dates:
+      detection: "2025-12-29"
+    assignee: null
+    equipe: null
+    justification_acceptation: "IP/User-Agent needed for session identification"
 
   # Risques Système
   - id: "RISK-SYS-001"
