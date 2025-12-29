@@ -33,7 +33,7 @@ pub fn routes() -> Router<AppState> {
 
 /// Simple user info for templates
 pub struct CurrentUser {
-    pub username: String,
+    pub id: uuid::Uuid,
     pub display_name: String,
 }
 
@@ -63,12 +63,12 @@ async fn home_page(
             .ok()
             .map(|u| {
                 let display_name = if u.display_name.is_empty() {
-                    u.username.clone()
+                    u.username
                 } else {
                     u.display_name
                 };
                 CurrentUser {
-                    username: u.username,
+                    id: u.id,
                     display_name,
                 }
             })
