@@ -98,7 +98,7 @@ impl EmailService {
 
     /// Send email confirmation link
     pub async fn send_confirmation(&self, to: &str, token: &str) -> Result<(), EmailError> {
-        let link = format!("{}/api/v1/auth/confirm-email/{}", self.base_url, token);
+        let link = format!("{}/confirm-email/{}", self.base_url, token);
 
         let subject = "Confirm your Oppskrift account";
         let body = format!(
