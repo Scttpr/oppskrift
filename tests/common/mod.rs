@@ -36,8 +36,14 @@ impl TestContext {
             .await
             .expect("Failed to connect to test database");
 
+        // Generate CSRF secret for testing (32 bytes)
+        let csrf_secret = b"test_csrf_secret_32_bytes_long!!".to_vec();
+
         // Create app state and router (using test_app_router for mock ConnectInfo)
-        let state = AppState { db: db.clone() };
+        let state = AppState {
+            db: db.clone(),
+            csrf_secret,
+        };
         let app = test_app_router(state);
 
         // Create test server

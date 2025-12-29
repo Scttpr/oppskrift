@@ -18,6 +18,7 @@ use validator::Validate;
 use crate::api::middleware::AuthUser;
 use crate::core::audit::AuditEvent;
 use crate::core::config::SmtpConfig;
+use crate::core::csrf::{generate_csrf_token, validate_csrf_token};
 use crate::core::error::{AppError, AppResult};
 use crate::core::helpers::mask_email;
 use crate::core::request_id::{RequestContext, RequestId};
@@ -320,7 +321,7 @@ async fn profile_edit_page(
     });
 
     // Generate CSRF token (T028)
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let template = ProfileEditTemplate {
         active_tab: "profile",
@@ -346,6 +347,9 @@ async fn profile_update(
     auth: AuthUser,
     Form(mut form): Form<UpdateProfileForm>,
 ) -> AppResult<Html<String>> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
@@ -387,7 +391,7 @@ async fn profile_update(
                 .to_string()
         });
 
-        let csrf_token = generate_csrf_placeholder(auth.session_id);
+        let csrf_token = generate_csrf(&state, auth.session_id);
 
         let template = ProfileEditTemplate {
             active_tab: "profile",
@@ -454,11 +458,20 @@ async fn profile_update(
     })?))
 }
 
-/// Generate a placeholder CSRF token
-/// In production, this would use the csrf module with a proper secret
-fn generate_csrf_placeholder(session_id: uuid::Uuid) -> String {
-    // Simple placeholder - in production use crate::core::csrf::generate_csrf_token
-    format!("csrf_{}", session_id)
+/// Generate a CSRF token for forms
+fn generate_csrf(state: &AppState, session_id: uuid::Uuid) -> String {
+    generate_csrf_token(session_id, &state.csrf_secret)
+        .map(|t| t.token)
+        .unwrap_or_else(|e| {
+            tracing::error!(error = %e, "Failed to generate CSRF token");
+            // Return empty string on error - form submission will fail validation
+            String::new()
+        })
+}
+
+/// Validate a CSRF token from form submission
+fn validate_csrf(state: &AppState, token: &str, session_id: uuid::Uuid) -> AppResult<()> {
+    validate_csrf_token(token, session_id, &state.csrf_secret)
 }
 
 // =============================================================================
@@ -517,6 +530,7 @@ struct AccountTemplate {
     flash_error: Option<String>,
     masked_email: String,
     email_verified: bool,
+    csrf_token: String,
 }
 
 /// Account settings page
@@ -544,6 +558,7 @@ async fn account_page(State(state): State<AppState>, auth: AuthUser) -> AppResul
         flash_error: None,
         masked_email,
         email_verified: user.email_verified,
+        csrf_token: generate_csrf(&state, auth.session_id),
     };
 
     Ok(Html(template.render().map_err(|e| {
@@ -588,7 +603,7 @@ async fn password_change_page(
     auth: AuthUser,
 ) -> AppResult<Html<String>> {
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -618,6 +633,9 @@ async fn password_change(
     auth: AuthUser,
     Form(form): Form<ChangePasswordForm>,
 ) -> AppResult<Html<String>> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
     let user = UserService::get_by_id(&state.db, auth.id).await?;
     let mut errors = vec![];
 
@@ -638,7 +656,7 @@ async fn password_change(
     }
 
     if !errors.is_empty() {
-        let csrf_token = generate_csrf_placeholder(auth.session_id);
+        let csrf_token = generate_csrf(&state, auth.session_id);
         let deletion_pending = user.deletion_requested_at.is_some();
         let deletion_date = user.deletion_requested_at.map(|dt| {
             (dt + chrono::Duration::days(30))
@@ -706,7 +724,7 @@ async fn password_change(
             })?))
         }
         Err(e) => {
-            let csrf_token = generate_csrf_placeholder(auth.session_id);
+            let csrf_token = generate_csrf(&state, auth.session_id);
             let deletion_pending = user.deletion_requested_at.is_some();
             let deletion_date = user.deletion_requested_at.map(|dt| {
                 (dt + chrono::Duration::days(30))
@@ -751,7 +769,7 @@ struct SessionsTemplate {
 /// Sessions page (GET)
 async fn sessions_page(State(state): State<AppState>, auth: AuthUser) -> AppResult<Html<String>> {
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     // Count active sessions
     let session_count: i64 = sqlx::query_scalar(
@@ -784,13 +802,24 @@ async fn sessions_page(State(state): State<AppState>, auth: AuthUser) -> AppResu
     })?))
 }
 
+/// Simple form with just CSRF token (for button-only forms)
+#[derive(Debug, Deserialize)]
+pub struct CsrfOnlyForm {
+    #[serde(rename = "_csrf")]
+    pub csrf_token: String,
+}
+
 /// Revoke other sessions handler (POST)
 async fn revoke_other_sessions(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
     auth: AuthUser,
+    Form(form): Form<CsrfOnlyForm>,
 ) -> AppResult<Redirect> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
 
     let session_service = SessionService::new(state.db.clone(), 30);
@@ -843,7 +872,7 @@ async fn twofa_setup_page(
     auth: AuthUser,
 ) -> AppResult<Html<String>> {
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -916,6 +945,9 @@ async fn twofa_enable(
     auth: AuthUser,
     Form(form): Form<TwoFaEnableForm>,
 ) -> AppResult<Html<String>> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
@@ -928,7 +960,7 @@ async fn twofa_enable(
 
     // Validate TOTP code format
     if form.totp_code.len() != 6 || !form.totp_code.chars().all(|c| c.is_ascii_digit()) {
-        let csrf_token = generate_csrf_placeholder(auth.session_id);
+        let csrf_token = generate_csrf(&state, auth.session_id);
         let totp_service = create_totp_service(&state)?;
         let empty_email = String::new();
         let email = user.email.as_ref().unwrap_or(&empty_email);
@@ -983,7 +1015,7 @@ async fn twofa_enable(
             let empty_email = String::new();
             let email = user.email.as_ref().unwrap_or(&empty_email);
             let setup = totp_service.setup_2fa(auth.id, email).await.ok();
-            let csrf_token = generate_csrf_placeholder(auth.session_id);
+            let csrf_token = generate_csrf(&state, auth.session_id);
 
             let template = TwoFaSetupTemplate {
                 active_tab: "security",
@@ -1039,7 +1071,7 @@ async fn twofa_recovery_page(
     auth: AuthUser,
 ) -> AppResult<Html<String>> {
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -1098,9 +1130,12 @@ async fn twofa_regenerate_codes(
     auth: AuthUser,
     Form(form): Form<TwoFaRegenerateForm>,
 ) -> AppResult<Html<String>> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -1208,7 +1243,7 @@ async fn twofa_disable_page(
     auth: AuthUser,
 ) -> AppResult<Html<String>> {
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -1246,9 +1281,12 @@ async fn twofa_disable(
     auth: AuthUser,
     Form(form): Form<TwoFaDisableForm>,
 ) -> Result<Response, AppError> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -1358,7 +1396,7 @@ async fn email_change_page(
     auth: AuthUser,
 ) -> AppResult<Html<String>> {
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -1391,9 +1429,12 @@ async fn email_change(
     auth: AuthUser,
     Form(form): Form<ChangeEmailForm>,
 ) -> AppResult<Html<String>> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -1497,7 +1538,7 @@ async fn delete_account_page(
     auth: AuthUser,
 ) -> AppResult<Html<String>> {
     let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf_placeholder(auth.session_id);
+    let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -1528,6 +1569,9 @@ async fn delete_account(
     auth: AuthUser,
     Form(form): Form<DeleteAccountForm>,
 ) -> AppResult<Html<String>> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
 
     let content_choice = match form.content_choice.as_str() {
@@ -1569,6 +1613,7 @@ async fn delete_account(
                 flash_error: None,
                 masked_email: mask_email(user.email.as_deref().unwrap_or("")),
                 email_verified: user.email_verified,
+                csrf_token: generate_csrf(&state, auth.session_id),
             };
 
             Ok(Html(template.render().map_err(|e| {
@@ -1576,7 +1621,7 @@ async fn delete_account(
             })?))
         }
         Err(e) => {
-            let csrf_token = generate_csrf_placeholder(auth.session_id);
+            let csrf_token = generate_csrf(&state, auth.session_id);
             let template = DeleteAccountTemplate {
                 active_tab: "account",
                 deletion_pending: false,
@@ -1599,7 +1644,11 @@ async fn cancel_deletion(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
     auth: AuthUser,
+    Form(form): Form<CsrfOnlyForm>,
 ) -> AppResult<Redirect> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
 
     let auth_service = create_auth_service(&state);
@@ -1711,5 +1760,87 @@ mod tests {
 
         assert_eq!(form.display_name, "Chef Marie");
         assert_eq!(form.bio, Some("I <3 cooking".to_string())); // <3 is not a tag
+    }
+
+    // =========================================================================
+    // 2FA Form Tests
+    // =========================================================================
+
+    #[test]
+    fn test_twofa_enable_form_valid_code() {
+        let form = TwoFaEnableForm {
+            csrf_token: "csrf_token".to_string(),
+            totp_code: "123456".to_string(),
+        };
+
+        // TOTP codes are 6 digits
+        assert_eq!(form.totp_code.len(), 6);
+        assert!(form.totp_code.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_twofa_disable_form_with_totp() {
+        let form = TwoFaDisableForm {
+            csrf_token: "csrf_token".to_string(),
+            password: "password123".to_string(),
+            code: "654321".to_string(),
+        };
+
+        // 6-digit TOTP code
+        assert_eq!(form.code.len(), 6);
+        assert!(form.code.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_twofa_disable_form_with_recovery_code() {
+        let form = TwoFaDisableForm {
+            csrf_token: "csrf_token".to_string(),
+            password: "password123".to_string(),
+            code: "ABCD-1234".to_string(),
+        };
+
+        // Recovery code format: XXXX-XXXX
+        assert_eq!(form.code.len(), 9);
+        assert_eq!(form.code.chars().nth(4), Some('-'));
+    }
+
+    #[test]
+    fn test_is_recovery_code_format() {
+        // Helper to check if code matches recovery format
+        fn is_recovery_code(code: &str) -> bool {
+            code.len() == 9 && code.chars().nth(4) == Some('-')
+        }
+
+        // Recovery codes
+        assert!(is_recovery_code("ABCD-1234"));
+        assert!(is_recovery_code("WXYZ-5678"));
+        assert!(is_recovery_code("1234-ABCD"));
+
+        // Not recovery codes
+        assert!(!is_recovery_code("123456"));
+        assert!(!is_recovery_code("ABCD1234")); // Missing dash
+        assert!(!is_recovery_code("ABC-1234")); // Too short before dash
+        assert!(!is_recovery_code("ABCDE-123")); // Wrong split
+    }
+
+    #[test]
+    fn test_twofa_regenerate_form() {
+        let form = TwoFaRegenerateForm {
+            csrf_token: "csrf_token".to_string(),
+            password: "secure_password".to_string(),
+        };
+
+        // Password is required
+        assert!(!form.password.is_empty());
+    }
+
+    #[test]
+    fn test_csrf_only_form() {
+        let form = CsrfOnlyForm {
+            csrf_token: "csrf_token_value".to_string(),
+        };
+
+        // Form should have a CSRF token
+        assert!(!form.csrf_token.is_empty());
     }
 }

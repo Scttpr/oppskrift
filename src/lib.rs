@@ -26,6 +26,8 @@ pub mod services;
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
+    /// Secret key for CSRF token generation/validation
+    pub csrf_secret: Vec<u8>,
 }
 
 /// Create the application router (exposed for testing)

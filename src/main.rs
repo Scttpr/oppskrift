@@ -59,8 +59,24 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Get CSRF secret from environment (required for security)
+    let csrf_secret = std::env::var("CSRF_SECRET")
+        .map(|s| s.into_bytes())
+        .unwrap_or_else(|_| {
+            tracing::warn!("CSRF_SECRET not set, generating random secret (not suitable for production clusters)");
+            use rand::RngCore;
+            let mut secret = vec![0u8; 32];
+            rand::thread_rng().fill_bytes(&mut secret);
+            secret
+        });
+
+    if csrf_secret.len() < 32 {
+        tracing::error!("CSRF_SECRET must be at least 32 bytes");
+        return Err(anyhow::anyhow!("CSRF_SECRET too short"));
+    }
+
     // Create application state
-    let state = AppState { db };
+    let state = AppState { db, csrf_secret };
 
     // Build the router
     let app = app_router(state);
