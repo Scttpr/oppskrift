@@ -5,6 +5,7 @@ pub mod books;
 pub mod feed;
 pub mod legal;
 pub mod recipes;
+pub mod settings;
 pub mod users;
 
 use askama::Template;
@@ -24,6 +25,7 @@ pub fn routes() -> Router<AppState> {
         .nest("/books", books::routes())
         .nest("/users", users::routes())
         .nest("/feed", feed::routes())
+        .nest("/settings", settings::routes())
         .merge(auth::routes())
         .merge(legal::routes())
 }
