@@ -348,9 +348,9 @@ dependencies = [
 
 [[package]]
 name = "askama"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21c01049339e624573a8027fe9392219f64d315a0ad24712b469611b3138f042"
+checksum = "bb7125972258312e79827b60c9eb93938334100245081cf701a2dee981b17427"
 dependencies = [
  "askama_macros",
  "itoa",
@@ -388,11 +388,11 @@ dependencies = [
 
 [[package]]
 name = "askama_derive"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e393a25182a000666df345c2bdaa9ab6b0c243974ec7d29e377d6feea651778d"
+checksum = "8ba5e7259a1580c61571e3116ebaaa01e3c001b2132b17c4cc5c70780ca3e994"
 dependencies = [
- "askama_parser 0.15.0",
+ "askama_parser 0.15.1",
  "basic-toml",
  "memchr",
  "proc-macro2",
@@ -411,11 +411,11 @@ checksum = "619743e34b5ba4e9703bba34deac3427c72507c7159f5fd030aea8cac0cfe341"
 
 [[package]]
 name = "askama_macros"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e8bb77385d2954705452516f99511835be34b4c4a15a70800623b91406b1db9"
+checksum = "236ce20b77cb13506eaf5024899f4af6e12e8825f390bd943c4c37fd8f322e46"
 dependencies = [
- "askama_derive 0.15.0",
+ "askama_derive 0.15.1",
 ]
 
 [[package]]
@@ -429,9 +429,9 @@ dependencies = [
 
 [[package]]
 name = "askama_parser"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb6401aa356822013db13e8f756011cd5042e7e61d37456bb8b7ef26feb8ebca"
+checksum = "f3c63392767bb2df6aa65a6e1e3b80fd89bb7af6d58359b924c0695620f1512e"
 dependencies = [
  "rustc-hash",
  "serde",
@@ -3396,7 +3396,7 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "argon2",
- "askama 0.15.0",
+ "askama 0.15.1",
  "askama_axum",
  "async-trait",
  "aws-config",
@@ -4492,9 +4492,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.147"
+version = "1.0.148"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6af14725505314343e673e9ecb7cd7e8a36aa9791eb936235a3567cc31447ae4"
+checksum = "3084b546a1dd6289475996f182a22aba973866ea8e8b02c51d9f46b1336a22da"
 dependencies = [
  "indexmap",
  "itoa",
@@ -6352,9 +6352,9 @@ checksum = "40990edd51aae2c2b6907af74ffb635029d5788228222c4bb811e9351c0caad3"
 
 [[package]]
 name = "zmij"
-version = "0.1.9"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0095ecd462946aa3927d9297b63ef82fb9a5316d7a37d134eeb36e58228615a"
+checksum = "0f4a4e8e9dc5c62d159f04fcdbe07f4c3fb710415aab4754bf11505501e3251d"
 
 [[package]]
 name = "zopfli"
