@@ -1,6 +1,11 @@
 //! Shared test utilities for integration tests
 //!
 //! Uses axum-test to test against the app directly without HTTP server.
+//!
+//! Note: Many helpers appear "unused" per-file but are used across different test files.
+//! Rust compiles each test file independently, causing false positive warnings.
+
+#![allow(dead_code)]
 
 pub mod fixtures;
 pub mod security;

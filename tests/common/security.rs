@@ -2,13 +2,13 @@
 //!
 //! Provides utilities for security-focused testing including:
 //! - Timing measurement helpers
-//! - User creation helpers for security tests
-//! - Rate limit testing utilities
+//! - Statistical analysis for timing attacks
 
 use std::time::{Duration, Instant};
 
 /// Measure the timing of an async operation
 /// Returns the elapsed time
+#[allow(dead_code)] // Used in security_timing_test.rs
 pub async fn measure_timing<F, Fut, T>(f: F) -> (T, Duration)
 where
     F: FnOnce() -> Fut,
@@ -61,17 +61,6 @@ pub fn timings_are_similar(times_a: &[Duration], times_b: &[Duration], threshold
     };
 
     diff_ms < threshold_ms as u128
-}
-
-/// Rate limit test result
-#[derive(Debug)]
-pub struct RateLimitTestResult {
-    /// Number of successful requests before rate limiting
-    pub successful_requests: u32,
-    /// Whether rate limiting was triggered
-    pub rate_limited: bool,
-    /// The HTTP status code of the rate-limited response
-    pub rate_limit_status: Option<u16>,
 }
 
 #[cfg(test)]
