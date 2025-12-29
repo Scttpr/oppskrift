@@ -2,7 +2,6 @@
 //!
 //! Uses axum-test to test against the app directly without HTTP server.
 
-pub mod assertions;
 pub mod fixtures;
 pub mod security;
 

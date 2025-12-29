@@ -56,24 +56,6 @@ pub fn create_test_recipe() -> Value {
     })
 }
 
-/// Create a test recipe with custom values
-pub fn create_test_recipe_with(title: &str, visibility: &str) -> Value {
-    let mut recipe = create_test_recipe();
-    recipe["title"] = json!(title);
-    recipe["visibility"] = json!(visibility);
-    recipe
-}
-
-/// Create a minimal test recipe (only required fields)
-pub fn create_minimal_recipe(title: &str) -> Value {
-    json!({
-        "title": title,
-        "visibility": "public",
-        "ingredients": [],
-        "instructions": []
-    })
-}
-
 /// Create test ingredients payload
 pub fn create_test_ingredients(count: usize) -> Vec<Value> {
     (1..=count)
@@ -85,31 +67,6 @@ pub fn create_test_ingredients(count: usize) -> Vec<Value> {
             })
         })
         .collect()
-}
-
-/// Create a test recipe book payload
-pub fn create_test_book() -> Value {
-    json!({
-        "name": "Test Recipe Book",
-        "description": "A test collection of recipes",
-        "visibility": "public"
-    })
-}
-
-/// Create a test book with custom values
-pub fn create_test_book_with(name: &str, visibility: &str) -> Value {
-    json!({
-        "name": name,
-        "description": format!("Description for {}", name),
-        "visibility": visibility
-    })
-}
-
-/// Create a test follow request
-pub fn create_follow_request(target_username: &str) -> Value {
-    json!({
-        "username": target_username
-    })
 }
 
 /// Create a mock ActivityPub actor
@@ -138,22 +95,6 @@ pub fn mock_follow_activity(actor_id: &str, target_id: &str) -> Value {
         "id": format!("{}/follows/{}", actor_id, Uuid::new_v4()),
         "actor": actor_id,
         "object": target_id
-    })
-}
-
-/// Create a mock ActivityPub Create activity for a recipe
-pub fn mock_create_recipe_activity(actor_id: &str, recipe_id: &str) -> Value {
-    json!({
-        "@context": "https://www.w3.org/ns/activitystreams",
-        "type": "Create",
-        "id": format!("{}/activities/{}", actor_id, Uuid::new_v4()),
-        "actor": actor_id,
-        "object": {
-            "type": "Recipe",
-            "id": recipe_id,
-            "name": "Remote Recipe",
-            "attributedTo": actor_id
-        }
     })
 }
 
