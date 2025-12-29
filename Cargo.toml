@@ -26,7 +26,7 @@ serde_json = "1"
 
 # Templating
 askama = "0.15"
-askama_axum = "0.4"
+askama_axum = "0.5"
 
 # Logging/Tracing
 tracing = "0.1"
