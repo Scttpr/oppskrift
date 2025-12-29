@@ -9,11 +9,8 @@
     </h1>
 
     <form
+        id="recipe-form"
         method="post"
-        action="{% if let Some(r) = recipe %}/recipes/{{ r.id }}{% else %}/recipes{% endif %}"
-        hx-post="{% if let Some(r) = recipe %}/api/v1/recipes/{{ r.id }}{% else %}/api/v1/recipes{% endif %}"
-        hx-target="#form-result"
-        hx-swap="innerHTML"
         class="space-y-8"
     >
         {# Basic Info #}
@@ -186,8 +183,10 @@
             </div>
         </section>
 
-        {# Form Result / Errors #}
-        <div id="form-result" aria-live="polite"></div>
+        {# Form Errors #}
+        <div id="form-errors" class="hidden p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p class="text-sm text-red-800 dark:text-red-200"></p>
+        </div>
 
         {# Submit #}
         <div class="flex items-center gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -206,4 +205,60 @@
         </div>
     </form>
 </div>
+
+<script>
+document.getElementById('recipe-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const errorDiv = document.getElementById('form-errors');
+    const errorText = errorDiv.querySelector('p');
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+    errorDiv.classList.add('hidden');
+
+    const formData = new FormData(form);
+    const isEdit = {% if let Some(_) = recipe %}true{% else %}false{% endif %};
+    const recipeId = {% if let Some(r) = recipe %}'{{ r.id }}'{% else %}null{% endif %};
+    const url = isEdit ? `/api/v1/recipes/${recipeId}` : '/api/v1/recipes';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    // Build JSON payload
+    const data = {
+        title: formData.get('title'),
+        description: formData.get('description') || null,
+        prep_time_min: formData.get('prep_time_min') ? parseInt(formData.get('prep_time_min')) : null,
+        cook_time_min: formData.get('cook_time_min') ? parseInt(formData.get('cook_time_min')) : null,
+        servings: formData.get('servings') || null,
+        difficulty: formData.get('difficulty') || null,
+        visibility: formData.get('visibility') || 'public'
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+            credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            window.location.href = `/recipes/${result.id}`;
+        } else {
+            errorText.textContent = result.error || 'Failed to save recipe';
+            errorDiv.classList.remove('hidden');
+            submitBtn.disabled = false;
+            submitBtn.textContent = isEdit ? 'Update Recipe' : 'Create Recipe';
+        }
+    } catch (err) {
+        errorText.textContent = 'Network error. Please try again.';
+        errorDiv.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = isEdit ? 'Update Recipe' : 'Create Recipe';
+    }
+});
+</script>
 {% endblock %}
