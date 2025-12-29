@@ -88,10 +88,12 @@
                             {% if !user_books.is_empty() %}
                             {% for book in user_books %}
                             <button
+                                type="button"
+                                onclick="event.stopPropagation()"
                                 hx-post="/api/v1/books/{{ book.id }}/recipes"
                                 hx-vals='{"recipe_id": "{{ recipe.id }}"}'
                                 hx-swap="none"
-                                hx-on::after-request="if(event.detail.successful) this.closest('details').removeAttribute('open')"
+                                hx-on::after-request="if(event.detail.successful) { this.textContent = '✓ Added!'; this.disabled = true; setTimeout(() => this.closest('details').removeAttribute('open'), 500); }"
                                 class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 role="menuitem"
                             >
