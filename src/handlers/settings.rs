@@ -3,9 +3,11 @@
 //! Provides HTML pages for user profile and account settings management.
 //! All routes require authentication via AuthUser middleware.
 
+use std::net::SocketAddr;
+
 use askama::Template;
 use axum::{
-    extract::State,
+    extract::{ConnectInfo, State},
     response::{Html, Redirect},
     routing::{get, post},
     Form, Router,
@@ -18,7 +20,7 @@ use crate::core::audit::AuditEvent;
 use crate::core::config::SmtpConfig;
 use crate::core::error::{AppError, AppResult};
 use crate::core::helpers::mask_email;
-use crate::core::request_id::RequestContext;
+use crate::core::request_id::{RequestContext, RequestId};
 use crate::models::{DeletionContentChoice, MeasurementPref, UpdateUser, User};
 use crate::services::{AuthService, EmailService, PasswordService, SessionService, UserService};
 use crate::AppState;
@@ -51,6 +53,18 @@ fn create_auth_service(state: &AppState) -> AuthService {
         base_url,
         SESSION_EXPIRY_DAYS,
     )
+}
+
+/// Create a RequestContext from request components
+fn create_request_context(
+    addr: SocketAddr,
+    request_id: Option<&RequestId>,
+    session_id: uuid::Uuid,
+) -> RequestContext {
+    RequestContext::new()
+        .with_ip(addr.ip())
+        .maybe_request_id(request_id.map(|r| r.0))
+        .with_session_id(session_id)
 }
 
 /// Create settings page routes
@@ -304,9 +318,12 @@ async fn profile_edit_page(
 /// Profile update handler (POST) (T026)
 async fn profile_update(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth: AuthUser,
     Form(mut form): Form<UpdateProfileForm>,
 ) -> AppResult<Html<String>> {
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
     // Sanitize input (T027)
@@ -380,12 +397,13 @@ async fn profile_update(
     // Log profile update (T031 - RISK-004-005)
     AuditEvent::new("settings.profile.update")
         .with_user(auth.id)
-        .with_session(auth.session_id)
+        .with_context(&ctx)
         .with_metadata(
             "fields_updated",
             "display_name,bio,avatar_url,measurement_pref",
         )
-        .log();
+        .persist(&state.db)
+        .await;
 
     // Redirect to profile page with success message (T030)
     // Note: In a real app, we'd use session-based flash messages
@@ -746,8 +764,12 @@ async fn sessions_page(State(state): State<AppState>, auth: AuthUser) -> AppResu
 /// Revoke other sessions handler (POST)
 async fn revoke_other_sessions(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth: AuthUser,
 ) -> AppResult<Redirect> {
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+
     let session_service = SessionService::new(state.db.clone(), 30);
     session_service
         .revoke_others_for_user(auth.id, auth.session_id)
@@ -757,8 +779,9 @@ async fn revoke_other_sessions(
     // Log session revocation (T066)
     AuditEvent::new("settings.sessions.revoke_others")
         .with_user(auth.id)
-        .with_session(auth.session_id)
-        .log();
+        .with_context(&ctx)
+        .persist(&state.db)
+        .await;
 
     Ok(Redirect::to("/settings/security/sessions"))
 }
@@ -827,9 +850,12 @@ async fn email_change_page(
 /// Email change handler (POST) (T035)
 async fn email_change(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth: AuthUser,
     Form(form): Form<ChangeEmailForm>,
 ) -> AppResult<Html<String>> {
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
     let user = UserService::get_by_id(&state.db, auth.id).await?;
     let csrf_token = generate_csrf_placeholder(auth.session_id);
 
@@ -871,7 +897,6 @@ async fn email_change(
 
     // Call auth service - use generic message to prevent enumeration (T036)
     let auth_service = create_auth_service(&state);
-    let ctx = RequestContext::new().with_session_id(auth.session_id);
     let _ = auth_service
         .change_email(auth.id, &form.new_email, &form.password, &ctx)
         .await;
@@ -879,8 +904,9 @@ async fn email_change(
     // Log email change request (T039)
     AuditEvent::new("settings.email.change_request")
         .with_user(auth.id)
-        .with_session(auth.session_id)
-        .log();
+        .with_context(&ctx)
+        .persist(&state.db)
+        .await;
 
     // Always show success to prevent email enumeration
     let template = EmailChangeTemplate {
@@ -961,9 +987,13 @@ async fn delete_account_page(
 /// Delete account handler (POST) (T070)
 async fn delete_account(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
     auth: AuthUser,
     Form(form): Form<DeleteAccountForm>,
 ) -> AppResult<Html<String>> {
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+
     let content_choice = match form.content_choice.as_str() {
         "delete_all" => DeletionContentChoice::DeleteAll,
         _ => DeletionContentChoice::Anonymize,
@@ -978,7 +1008,6 @@ async fn delete_account(
         .map_err(|e| AppError::Internal(format!("Failed to save content choice: {}", e)))?;
 
     let auth_service = create_auth_service(&state);
-    let ctx = RequestContext::new().with_session_id(auth.session_id);
     match auth_service
         .request_deletion(auth.id, &form.password, &ctx)
         .await
@@ -987,9 +1016,10 @@ async fn delete_account(
             // Log deletion request (T076)
             AuditEvent::new("settings.account.delete_request")
                 .with_user(auth.id)
-                .with_session(auth.session_id)
+                .with_context(&ctx)
                 .with_metadata("content_choice", &form.content_choice)
-                .log();
+                .persist(&state.db)
+                .await;
 
             // Redirect to account page with pending deletion banner
             let user = UserService::get_by_id(&state.db, auth.id).await?;
@@ -1028,16 +1058,23 @@ async fn delete_account(
 }
 
 /// Cancel deletion handler (POST) (T072)
-async fn cancel_deletion(State(state): State<AppState>, auth: AuthUser) -> AppResult<Redirect> {
+async fn cancel_deletion(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
+    auth: AuthUser,
+) -> AppResult<Redirect> {
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+
     let auth_service = create_auth_service(&state);
-    let ctx = RequestContext::new().with_session_id(auth.session_id);
     let _ = auth_service.cancel_deletion(auth.id, &ctx).await;
 
     // Log cancellation (T076)
     AuditEvent::new("settings.account.delete_cancel")
         .with_user(auth.id)
-        .with_session(auth.session_id)
-        .log();
+        .with_context(&ctx)
+        .persist(&state.db)
+        .await;
 
     Ok(Redirect::to("/settings/account"))
 }
