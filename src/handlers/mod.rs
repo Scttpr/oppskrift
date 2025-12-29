@@ -22,6 +22,7 @@ use crate::AppState;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(home_page))
+        .route("/partials/user-menu", get(user_menu_partial))
         .nest("/recipes", recipes::routes())
         .nest("/books", books::routes())
         .nest("/users", users::routes())
@@ -37,26 +38,18 @@ pub struct CurrentUser {
     pub display_name: String,
 }
 
-/// Home page template
+/// User menu partial template
 #[derive(Template)]
-#[template(path = "home.html")]
-struct HomeTemplate {
-    recent_recipes: Vec<RecipeSummary>,
+#[template(path = "partials/user_menu.html")]
+struct UserMenuTemplate {
     current_user: Option<CurrentUser>,
 }
 
-/// Home page handler
-async fn home_page(
+/// User menu partial handler - returns HTML fragment for HTMX
+async fn user_menu_partial(
     State(state): State<AppState>,
     auth: OptionalAuthUser,
 ) -> AppResult<Html<String>> {
-    let params = PaginationParams {
-        page: 1,
-        page_size: 6,
-    };
-    let recipes_page = RecipeService::list_public(&state.db, &params).await?;
-
-    // Get current user if authenticated
     let current_user = if let Some(auth_user) = auth.0 {
         UserService::get_by_id(&state.db, auth_user.id)
             .await
@@ -76,9 +69,30 @@ async fn home_page(
         None
     };
 
+    let template = UserMenuTemplate { current_user };
+
+    Ok(Html(template.render().map_err(|e| {
+        AppError::Internal(format!("Template error: {}", e))
+    })?))
+}
+
+/// Home page template
+#[derive(Template)]
+#[template(path = "home.html")]
+struct HomeTemplate {
+    recent_recipes: Vec<RecipeSummary>,
+}
+
+/// Home page handler
+async fn home_page(State(state): State<AppState>) -> AppResult<Html<String>> {
+    let params = PaginationParams {
+        page: 1,
+        page_size: 6,
+    };
+    let recipes_page = RecipeService::list_public(&state.db, &params).await?;
+
     let template = HomeTemplate {
         recent_recipes: recipes_page.data,
-        current_user,
     };
 
     Ok(Html(template.render().map_err(|e| {
