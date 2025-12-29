@@ -87,18 +87,24 @@
                         <div class="py-1" role="menu">
                             {% if !user_books.is_empty() %}
                             {% for book in user_books %}
+                            {% if recipe_in_book_ids.contains(&book.id) %}
+                            <span class="block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                                ✓ {{ book.title }}
+                            </span>
+                            {% else %}
                             <button
                                 type="button"
                                 onclick="event.stopPropagation()"
                                 hx-post="/api/v1/books/{{ book.id }}/recipes"
                                 hx-vals='{"recipe_id": "{{ recipe.id }}"}'
                                 hx-swap="none"
-                                hx-on::after-request="if(event.detail.successful) { this.textContent = '✓ Added!'; this.disabled = true; setTimeout(() => this.closest('details').removeAttribute('open'), 500); }"
+                                hx-on::after-request="if(event.detail.successful) { this.outerHTML = '<span class=\"block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400\">✓ {{ book.title }}</span>'; }"
                                 class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                                 role="menuitem"
                             >
                                 {{ book.title }}
                             </button>
+                            {% endif %}
                             {% endfor %}
                             <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                             {% else %}

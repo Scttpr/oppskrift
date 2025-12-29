@@ -90,6 +90,7 @@ struct RecipeViewTemplate {
     is_owner: bool,
     user: Option<User>,
     user_books: Vec<RecipeBookSummary>,
+    recipe_in_book_ids: Vec<Uuid>,
     is_saved: bool,
 }
 
@@ -121,15 +122,19 @@ async fn view_recipe_page(
     let is_owner = auth.0.as_ref().map(|u| u.id) == Some(recipe.author_id);
 
     // Fetch current user, their books, and saved status
-    let (user, user_books, is_saved) = if let Some(auth_user) = auth.0.as_ref() {
+    let (user, user_books, recipe_in_book_ids, is_saved) = if let Some(auth_user) = auth.0.as_ref()
+    {
         let user = UserService::get_by_id(&state.db, auth_user.id).await.ok();
         let books = BookService::list_by_owner(&state.db, auth_user.id)
             .await
             .unwrap_or_default();
+        let in_books = BookService::get_book_ids_containing_recipe(&state.db, auth_user.id, id)
+            .await
+            .unwrap_or_default();
         let is_saved = SavedRecipeService::is_saved(&state.db, auth_user.id, id).await?;
-        (user, books, is_saved)
+        (user, books, in_books, is_saved)
     } else {
-        (None, vec![], false)
+        (None, vec![], vec![], false)
     };
 
     let template = RecipeViewTemplate {
@@ -143,6 +148,7 @@ async fn view_recipe_page(
         is_owner,
         user,
         user_books,
+        recipe_in_book_ids,
         is_saved,
     };
 
@@ -279,6 +285,7 @@ mod tests {
             is_owner: false,
             user: None,
             user_books: vec![],
+            recipe_in_book_ids: vec![],
             is_saved: false,
         };
         let result = template.render();
@@ -377,6 +384,7 @@ mod tests {
             is_owner: true,
             user: None,
             user_books: vec![],
+            recipe_in_book_ids: vec![],
             is_saved: false,
         };
         assert!(owner_template.render().is_ok());
@@ -393,6 +401,7 @@ mod tests {
             is_owner: false,
             user: None,
             user_books: vec![],
+            recipe_in_book_ids: vec![],
             is_saved: false,
         };
         assert!(guest_template.render().is_ok());
