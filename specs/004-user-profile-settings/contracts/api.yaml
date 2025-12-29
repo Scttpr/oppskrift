@@ -1,0 +1,491 @@
+# OpenAPI 3.0 Contract: User Profile & Settings
+# Feature: 004-user-profile-settings
+
+openapi: 3.0.3
+info:
+  title: User Settings API
+  description: API endpoints for user profile and settings management
+  version: 1.0.0
+
+paths:
+  # ============================================================================
+  # Profile Endpoints (existing in /api/account, documented for reference)
+  # ============================================================================
+
+  /api/account/profile:
+    get:
+      summary: Get current user's profile
+      tags: [Profile]
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      summary: Update current user's profile
+      tags: [Profile]
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfile'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # Security Endpoints (existing)
+  # ============================================================================
+
+  /api/account/change-password:
+    post:
+      summary: Change user's password
+      tags: [Security]
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed, other sessions invalidated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangePasswordResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/account/change-email:
+    post:
+      summary: Request email change
+      tags: [Security]
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequest'
+      responses:
+        '200':
+          description: Verification email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeEmailResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/account/sessions:
+    get:
+      summary: List active sessions
+      tags: [Security]
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: List of active sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/account/sessions/{session_id}:
+    delete:
+      summary: Revoke a specific session
+      tags: [Security]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Session revoked
+        '400':
+          description: Cannot revoke current session
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Session not found
+
+  # ============================================================================
+  # 2FA Endpoints (existing)
+  # ============================================================================
+
+  /api/account/2fa/setup:
+    post:
+      summary: Initiate 2FA setup
+      tags: [2FA]
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 2FA setup data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorSetupResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: 2FA already enabled
+
+  /api/account/2fa/enable:
+    post:
+      summary: Enable 2FA with verification code
+      tags: [2FA]
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnableTwoFactorRequest'
+      responses:
+        '200':
+          description: 2FA enabled, recovery codes returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorEnabledResponse'
+        '400':
+          description: Invalid verification code
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/account/2fa/disable:
+    post:
+      summary: Disable 2FA
+      tags: [2FA]
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisableTwoFactorRequest'
+      responses:
+        '200':
+          description: 2FA disabled
+        '400':
+          description: Invalid password or code
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/account/2fa/status:
+    get:
+      summary: Get 2FA status
+      tags: [2FA]
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 2FA status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorStatusResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # Account Deletion Endpoints (existing + extended)
+  # ============================================================================
+
+  /api/account/delete:
+    post:
+      summary: Request account deletion
+      tags: [Account]
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '200':
+          description: Deletion scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionScheduledResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/account/cancel-deletion:
+    post:
+      summary: Cancel pending account deletion
+      tags: [Account]
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Deletion cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelDeletionResponse'
+        '400':
+          description: No deletion pending
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: oppskrift_session
+
+  schemas:
+    UserProfile:
+      type: object
+      required: [id, username, display_name, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        display_name:
+          type: string
+        bio:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        measurement_pref:
+          type: string
+          enum: [metric, imperial]
+        email_masked:
+          type: string
+          description: Partially masked email (e.g., jo***@example.com)
+        email_verified:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    UpdateProfile:
+      type: object
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        bio:
+          type: string
+          maxLength: 500
+          nullable: true
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        measurement_pref:
+          type: string
+          enum: [metric, imperial]
+
+    ChangePasswordRequest:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password:
+          type: string
+        new_password:
+          type: string
+          minLength: 8
+
+    ChangePasswordResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        sessions_invalidated:
+          type: integer
+          description: Number of other sessions invalidated
+
+    ChangeEmailRequest:
+      type: object
+      required: [new_email, current_password]
+      properties:
+        new_email:
+          type: string
+          format: email
+        current_password:
+          type: string
+
+    ChangeEmailResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    SessionListResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionInfo'
+        current_session_id:
+          type: string
+          format: uuid
+
+    SessionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_agent:
+          type: string
+          nullable: true
+        ip_address:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        last_activity:
+          type: string
+          format: date-time
+        is_current:
+          type: boolean
+
+    TwoFactorSetupResponse:
+      type: object
+      properties:
+        secret:
+          type: string
+        qr_code_uri:
+          type: string
+          format: uri
+
+    EnableTwoFactorRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+
+    TwoFactorEnabledResponse:
+      type: object
+      properties:
+        recovery_codes:
+          type: array
+          items:
+            type: string
+
+    DisableTwoFactorRequest:
+      type: object
+      required: [password, code]
+      properties:
+        password:
+          type: string
+        code:
+          type: string
+
+    TwoFactorStatusResponse:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        recovery_codes_remaining:
+          type: integer
+
+    DeleteAccountRequest:
+      type: object
+      required: [password, content_choice]
+      properties:
+        password:
+          type: string
+        content_choice:
+          type: string
+          enum: [anonymize, delete_all]
+          description: What to do with user's content
+
+    DeletionScheduledResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        scheduled_deletion_date:
+          type: string
+          format: date-time
+        content_choice:
+          type: string
+          enum: [anonymize, delete_all]
+
+    CancelDeletionResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              fields:
+                type: object
+                additionalProperties:
+                  type: string
