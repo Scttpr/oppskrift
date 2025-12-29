@@ -591,6 +591,31 @@ impl TestContext {
             session_cookie,
         }
     }
+
+    /// PATCH JSON with session cookie
+    pub async fn patch_with_session(&self, path: &str, body: Value, session: &str) -> ApiResponse {
+        let response = self
+            .server
+            .patch(path)
+            .add_cookie(cookie::Cookie::new(
+                "oppskrift_session",
+                session.to_string(),
+            ))
+            .json(&body)
+            .await;
+
+        let status = response.status_code().as_u16();
+        let session_cookie = extract_session_cookie(&response);
+        let text = response.text();
+        let body = serde_json::from_str::<Value>(&text)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+
+        ApiResponse {
+            status,
+            body,
+            session_cookie,
+        }
+    }
 }
 
 impl Drop for TestContext {

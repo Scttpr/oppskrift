@@ -96,7 +96,7 @@ impl FollowService {
                    u.display_name, u.bio, u.avatar_url, u.measurement_pref,
                    u.totp_secret_encrypted, u.totp_enabled,
                    u.failed_login_attempts, u.locked_until, u.deletion_requested_at,
-                   u.created_at, u.updated_at, u.ap_id, u.federation_enabled
+                   u.deletion_content_choice, u.created_at, u.updated_at, u.ap_id, u.federation_enabled
             FROM users u
             INNER JOIN follows f ON f.follower_id = u.id
             WHERE f.following_id = $1
@@ -118,7 +118,7 @@ impl FollowService {
                    u.display_name, u.bio, u.avatar_url, u.measurement_pref,
                    u.totp_secret_encrypted, u.totp_enabled,
                    u.failed_login_attempts, u.locked_until, u.deletion_requested_at,
-                   u.created_at, u.updated_at, u.ap_id, u.federation_enabled
+                   u.deletion_content_choice, u.created_at, u.updated_at, u.ap_id, u.federation_enabled
             FROM users u
             INNER JOIN follows f ON f.following_id = u.id
             WHERE f.follower_id = $1

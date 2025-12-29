@@ -317,7 +317,7 @@ impl BookService {
                 r.prep_time_min, r.cook_time_min,
                 r.difficulty as "difficulty: crate::models::Difficulty",
                 r.created_at,
-                ri.url as primary_image_url
+                ri.url as "primary_image_url?"
             FROM recipes r
             INNER JOIN book_recipe_entries e ON e.recipe_id = r.id
             LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
@@ -365,7 +365,7 @@ impl BookService {
                 r.prep_time_min, r.cook_time_min,
                 r.difficulty as "difficulty: crate::models::Difficulty",
                 r.created_at,
-                ri.url as primary_image_url
+                ri.url as "primary_image_url?"
             FROM recipes r
             INNER JOIN book_recipe_entries e ON e.recipe_id = r.id
             LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true

@@ -19,7 +19,7 @@ impl UserService {
                 display_name, bio, avatar_url, measurement_pref,
                 totp_secret_encrypted, totp_enabled,
                 failed_login_attempts, locked_until, deletion_requested_at,
-                created_at, updated_at, ap_id, federation_enabled
+                deletion_content_choice, created_at, updated_at, ap_id, federation_enabled
             FROM users
             WHERE id = $1
             "#,
@@ -39,7 +39,7 @@ impl UserService {
                 display_name, bio, avatar_url, measurement_pref,
                 totp_secret_encrypted, totp_enabled,
                 failed_login_attempts, locked_until, deletion_requested_at,
-                created_at, updated_at, ap_id, federation_enabled
+                deletion_content_choice, created_at, updated_at, ap_id, federation_enabled
             FROM users
             WHERE username = $1
             "#,
@@ -59,7 +59,7 @@ impl UserService {
                 display_name, bio, avatar_url, measurement_pref,
                 totp_secret_encrypted, totp_enabled,
                 failed_login_attempts, locked_until, deletion_requested_at,
-                created_at, updated_at, ap_id, federation_enabled
+                deletion_content_choice, created_at, updated_at, ap_id, federation_enabled
             FROM users
             WHERE email = $1
             "#,
@@ -87,7 +87,7 @@ impl UserService {
                 display_name, bio, avatar_url, measurement_pref,
                 totp_secret_encrypted, totp_enabled,
                 failed_login_attempts, locked_until, deletion_requested_at,
-                created_at, updated_at, ap_id, federation_enabled
+                deletion_content_choice, created_at, updated_at, ap_id, federation_enabled
             "#,
         )
         .bind(&input.username)
@@ -154,7 +154,7 @@ impl UserService {
                 display_name, bio, avatar_url, measurement_pref,
                 totp_secret_encrypted, totp_enabled,
                 failed_login_attempts, locked_until, deletion_requested_at,
-                created_at, updated_at, ap_id, federation_enabled
+                deletion_content_choice, created_at, updated_at, ap_id, federation_enabled
             "#,
         )
         .bind(id)
@@ -228,7 +228,7 @@ impl UserService {
                 display_name, bio, avatar_url, measurement_pref,
                 totp_secret_encrypted, totp_enabled,
                 failed_login_attempts, locked_until, deletion_requested_at,
-                created_at, updated_at, ap_id, federation_enabled
+                deletion_content_choice, created_at, updated_at, ap_id, federation_enabled
             "#,
         )
         .bind(user_id)
