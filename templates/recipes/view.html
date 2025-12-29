@@ -98,7 +98,7 @@
                                 hx-post="/api/v1/books/{{ book.id }}/recipes"
                                 hx-vals='{"recipe_id": "{{ recipe.id }}"}'
                                 hx-swap="none"
-                                hx-on::after-request="if(event.detail.successful) { this.outerHTML = '<span class=\"block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400\">✓ {{ book.title }}</span>'; }"
+                                hx-on::after-request="if(event.detail.successful) { this.className = 'block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400'; this.textContent = '✓ ' + this.textContent; this.disabled = true; }"
                                 class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                                 role="menuitem"
                             >
