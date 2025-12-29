@@ -44,4 +44,7 @@ pub use two_factor::{
     Complete2FALoginRequest, DisableTwoFactorRequest, EnableTwoFactorRequest,
     TwoFactorEnabledResponse, TwoFactorSetupResponse, TwoFactorStatusResponse,
 };
-pub use user::{CreateUser, User, UserProfile, RESERVED_USERNAMES};
+pub use user::{
+    CreateUser, DeletionContentChoice, MeasurementPref, UpdateUser, User, UserProfile,
+    RESERVED_USERNAMES,
+};
