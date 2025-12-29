@@ -72,6 +72,26 @@
 /* Skip link styles */
 @layer components {
   .skip-link {
-    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-primary-700 focus:font-semibold focus:rounded focus:shadow-lg;
+    @apply sr-only;
+  }
+
+  .skip-link:focus {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 50;
+    padding: 0.5rem 1rem;
+    background-color: white;
+    color: var(--color-primary-700);
+    font-weight: 600;
+    border-radius: 0.25rem;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    width: auto;
+    height: auto;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+    margin: 0;
+    overflow: visible;
   }
 }
