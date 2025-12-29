@@ -94,11 +94,7 @@
                             {% else %}
                             <button
                                 type="button"
-                                onclick="event.stopPropagation()"
-                                hx-post="/api/v1/books/{{ book.id }}/recipes"
-                                hx-vals='{"recipe_id": "{{ recipe.id }}"}'
-                                hx-swap="none"
-                                hx-on:htmx:after-request="if(event.detail.successful) { this.style.color = '#16a34a'; this.innerHTML = '✓ ' + this.innerHTML.trim(); this.disabled = true; this.style.cursor = 'default'; }"
+                                onclick="event.stopPropagation(); addToBook(this, '{{ book.id }}', '{{ recipe.id }}')"
                                 class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                                 role="menuitem"
                             >
@@ -237,4 +233,27 @@
     </section>
     {% endif %}
 </article>
+
+<script>
+async function addToBook(btn, bookId, recipeId) {
+    btn.disabled = true;
+    try {
+        const response = await fetch(`/api/v1/books/${bookId}/recipes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipe_id: recipeId }),
+            credentials: 'include'
+        });
+        if (response.ok) {
+            btn.style.color = '#16a34a';
+            btn.innerHTML = '✓ ' + btn.innerHTML.trim();
+            btn.style.cursor = 'default';
+        } else {
+            btn.disabled = false;
+        }
+    } catch (e) {
+        btn.disabled = false;
+    }
+}
+</script>
 {% endblock %}
