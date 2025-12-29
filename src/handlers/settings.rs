@@ -777,7 +777,7 @@ async fn revoke_other_sessions(
         .map_err(|e| AppError::Internal(format!("Session revocation failed: {}", e)))?;
 
     // Log session revocation (T066)
-    AuditEvent::new("settings.sessions.revoke_others")
+    AuditEvent::new("auth.session.revoke.all")
         .with_user(auth.id)
         .with_context(&ctx)
         .persist(&state.db)
@@ -902,7 +902,7 @@ async fn email_change(
         .await;
 
     // Log email change request (T039)
-    AuditEvent::new("settings.email.change_request")
+    AuditEvent::new("auth.email.change.request")
         .with_user(auth.id)
         .with_context(&ctx)
         .persist(&state.db)
@@ -1014,7 +1014,7 @@ async fn delete_account(
     {
         Ok(deletion_date) => {
             // Log deletion request (T076)
-            AuditEvent::new("settings.account.delete_request")
+            AuditEvent::new("auth.account.delete.request")
                 .with_user(auth.id)
                 .with_context(&ctx)
                 .with_metadata("content_choice", &form.content_choice)
@@ -1070,7 +1070,7 @@ async fn cancel_deletion(
     let _ = auth_service.cancel_deletion(auth.id, &ctx).await;
 
     // Log cancellation (T076)
-    AuditEvent::new("settings.account.delete_cancel")
+    AuditEvent::new("auth.account.delete.cancel")
         .with_user(auth.id)
         .with_context(&ctx)
         .persist(&state.db)
