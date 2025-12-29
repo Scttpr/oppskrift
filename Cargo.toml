@@ -84,7 +84,7 @@ rand = "0.8"
 
 # Authentication
 argon2 = "0.5"
-bcrypt = "0.16"
+bcrypt = "0.17"
 totp-rs = { version = "5", features = ["qr", "otpauth", "serde_support", "gen_secret"] }
 lettre = { version = "0.11", features = ["tokio1-native-tls"] }
 aes-gcm = "0.10"
