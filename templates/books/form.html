@@ -8,10 +8,14 @@
         {% if let Some(_) = book %}Edit Recipe Book{% else %}Create a New Recipe Book{% endif %}
     </h1>
 
+    <div id="form-errors" class="hidden mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <p class="text-sm text-red-800 dark:text-red-200"></p>
+    </div>
+
     <form
+        id="book-form"
         method="post"
         enctype="multipart/form-data"
-        action="{% if let Some(b) = book %}/books/{{ b.id }}{% else %}/books{% endif %}"
         class="space-y-6"
     >
         {# Title #}
@@ -122,4 +126,50 @@
         </div>
     </form>
 </div>
+
+<script>
+document.getElementById('book-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const errorDiv = document.getElementById('form-errors');
+    const errorText = errorDiv.querySelector('p');
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    // Disable button during submission
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+    errorDiv.classList.add('hidden');
+
+    const formData = new FormData(form);
+    const isEdit = {% if let Some(_) = book %}true{% else %}false{% endif %};
+    const bookId = {% if let Some(b) = book %}'{{ b.id }}'{% else %}null{% endif %};
+    const url = isEdit ? `/api/v1/books/${bookId}` : '/api/v1/books';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method: method,
+            body: formData,
+            credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            // Redirect to the book page
+            window.location.href = `/books/${result.id}`;
+        } else {
+            errorText.textContent = result.error || 'Failed to save book';
+            errorDiv.classList.remove('hidden');
+            submitBtn.disabled = false;
+            submitBtn.textContent = isEdit ? 'Update Book' : 'Create Book';
+        }
+    } catch (err) {
+        errorText.textContent = 'Network error. Please try again.';
+        errorDiv.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = isEdit ? 'Update Book' : 'Create Book';
+    }
+});
+</script>
 {% endblock %}
