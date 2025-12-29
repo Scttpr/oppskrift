@@ -88,9 +88,15 @@
                             {% if !user_books.is_empty() %}
                             {% for book in user_books %}
                             {% if recipe_in_book_ids.contains(&book.id) %}
-                            <span class="block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                            <button
+                                type="button"
+                                onclick="event.stopPropagation(); removeFromBook(this, '{{ book.id }}', '{{ recipe.id }}')"
+                                class="block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
+                                role="menuitem"
+                                title="Click to remove from book"
+                            >
                                 ✓ {{ book.title }}
-                            </span>
+                            </button>
                             {% else %}
                             <button
                                 type="button"
@@ -237,6 +243,7 @@
 <script>
 async function addToBook(btn, bookId, recipeId) {
     btn.disabled = true;
+    const title = btn.innerHTML.trim();
     try {
         const response = await fetch(`/api/v1/books/${bookId}/recipes`, {
             method: 'POST',
@@ -246,8 +253,34 @@ async function addToBook(btn, bookId, recipeId) {
         });
         if (response.ok) {
             btn.style.color = '#16a34a';
-            btn.innerHTML = '✓ ' + btn.innerHTML.trim();
-            btn.style.cursor = 'default';
+            btn.innerHTML = '✓ ' + title;
+            btn.className = 'block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer';
+            btn.title = 'Click to remove from book';
+            btn.onclick = function(e) { e.stopPropagation(); removeFromBook(btn, bookId, recipeId, title); };
+            btn.disabled = false;
+        } else {
+            btn.disabled = false;
+        }
+    } catch (e) {
+        btn.disabled = false;
+    }
+}
+
+async function removeFromBook(btn, bookId, recipeId, title) {
+    btn.disabled = true;
+    if (!title) title = btn.innerHTML.replace('✓ ', '').trim();
+    try {
+        const response = await fetch(`/api/v1/books/${bookId}/recipes/${recipeId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        if (response.ok) {
+            btn.style.color = '';
+            btn.innerHTML = title;
+            btn.className = 'block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer';
+            btn.title = '';
+            btn.onclick = function(e) { e.stopPropagation(); addToBook(btn, bookId, recipeId); };
+            btn.disabled = false;
         } else {
             btn.disabled = false;
         }
