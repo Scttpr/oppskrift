@@ -3,8 +3,11 @@
 ## Quick Start (Development)
 
 ```bash
-# Start all services with Docker/Podman
-make up
+# First-time setup
+make setup
+
+# Run with auto-reload
+make dev
 
 # App available at http://localhost:3000
 ```
@@ -54,20 +57,20 @@ INSTANCE_NAME=Oppskrift Dev
 
 ## Docker Compose
 
-The included `docker-compose.yml` is hardened but dev-friendly:
+The included `docker-compose.yml` provides the database service:
 
 ```bash
-# Start all services
-make up
+# Start database
+make db
 
-# Rebuild from scratch
-make rebuild
+# Run migrations
+make migrate
 
-# Stop everything
-make down
+# Stop and clean up
+make clean
 
 # View logs
-podman logs oppskrift_app_1
+podman logs oppskrift_db_1
 ```
 
 ### Services
