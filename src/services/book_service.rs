@@ -4,9 +4,10 @@ use uuid::Uuid;
 use crate::core::error::{AppError, AppResult};
 use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{
-    AddRecipeToBook, BookRecipeEntry, CreateRecipeBook, RecipeBook, RecipeBookSummary,
-    RecipeSummary, UpdateRecipeBook, Visibility,
+    AddRecipeToBook, BookRecipeEntry, CreateRecipeBook, PermissionLevel, RecipeBook,
+    RecipeBookSummary, RecipeSummary, ResourceType, UpdateRecipeBook, Visibility,
 };
+use crate::services::PermissionService;
 
 /// Service for recipe book operations
 pub struct BookService;
@@ -65,21 +66,44 @@ impl BookService {
         .ok_or_else(|| AppError::NotFound(format!("Recipe book {} not found", id)))
     }
 
-    /// Get a recipe book by ID with visibility check
-    /// Returns 404 for private books if viewer is not the owner
+    /// Get a recipe book by ID with permission check
+    /// Uses PermissionService to check access (owner, direct share, group, followers, public)
+    /// Returns 404 for unauthorized access to hide resource existence
     pub async fn get_by_id_authorized(
         pool: &PgPool,
         id: Uuid,
         viewer_id: Option<Uuid>,
     ) -> AppResult<RecipeBook> {
-        let book = Self::get_by_id(pool, id).await?;
+        // Use PermissionService to check view access
+        PermissionService::require_permission(
+            pool,
+            viewer_id,
+            ResourceType::Book,
+            id,
+            PermissionLevel::View,
+        )
+        .await?;
 
-        // Check visibility: private books only visible to owner
-        if book.visibility == Visibility::Private && viewer_id != Some(book.owner_id) {
-            return Err(AppError::NotFound(format!("Recipe book {} not found", id)));
-        }
+        // Permission check passed, fetch the full book
+        Self::get_by_id(pool, id).await
+    }
 
-        Ok(book)
+    /// Check if user has edit permission on a book
+    /// Returns 404 for unauthorized access
+    pub async fn require_edit_permission(
+        pool: &PgPool,
+        book_id: Uuid,
+        user_id: Uuid,
+    ) -> AppResult<()> {
+        PermissionService::require_permission(
+            pool,
+            Some(user_id),
+            ResourceType::Book,
+            book_id,
+            PermissionLevel::Edit,
+        )
+        .await?;
+        Ok(())
     }
 
     /// Update a recipe book
@@ -432,9 +456,10 @@ mod tests {
     // ==========================================================================
 
     #[test]
-    fn test_visibility_default_is_public() {
+    fn test_visibility_default_is_private() {
+        // Default is Private for privacy-first design (ABAC spec)
         let default = Visibility::default();
-        assert_eq!(default, Visibility::Public);
+        assert_eq!(default, Visibility::Private);
     }
 
     #[test]

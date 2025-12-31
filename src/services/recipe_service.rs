@@ -6,8 +6,9 @@ use crate::core::error::{AppError, AppResult};
 use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::{
     CreateIngredient, CreateInstructionStep, CreateRecipe, Difficulty, Ingredient, InstructionStep,
-    Recipe, RecipeSummary, UpdateRecipe, Visibility,
+    PermissionLevel, Recipe, RecipeSummary, ResourceType, UpdateRecipe, Visibility,
 };
+use crate::services::PermissionService;
 
 /// Maximum number of ingredients per recipe
 pub const MAX_INGREDIENTS: usize = 50;
@@ -111,21 +112,44 @@ impl RecipeService {
         .ok_or_else(|| AppError::NotFound(format!("Recipe {} not found", id)))
     }
 
-    /// Get a recipe by ID with visibility check
-    /// Returns 404 for private recipes if viewer is not the author
+    /// Get a recipe by ID with permission check
+    /// Uses PermissionService to check access (owner, direct share, group, followers, public)
+    /// Returns 404 for unauthorized access to hide resource existence
     pub async fn get_by_id_authorized(
         pool: &PgPool,
         id: Uuid,
         viewer_id: Option<Uuid>,
     ) -> AppResult<Recipe> {
-        let recipe = Self::get_by_id(pool, id).await?;
+        // Use PermissionService to check view access
+        PermissionService::require_permission(
+            pool,
+            viewer_id,
+            ResourceType::Recipe,
+            id,
+            PermissionLevel::View,
+        )
+        .await?;
 
-        // Check visibility: private recipes only visible to author
-        if recipe.visibility == Visibility::Private && viewer_id != Some(recipe.author_id) {
-            return Err(AppError::NotFound(format!("Recipe {} not found", id)));
-        }
+        // Permission check passed, fetch the full recipe
+        Self::get_by_id(pool, id).await
+    }
 
-        Ok(recipe)
+    /// Check if user has edit permission on a recipe
+    /// Returns 404 for unauthorized access
+    pub async fn require_edit_permission(
+        pool: &PgPool,
+        recipe_id: Uuid,
+        user_id: Uuid,
+    ) -> AppResult<()> {
+        PermissionService::require_permission(
+            pool,
+            Some(user_id),
+            ResourceType::Recipe,
+            recipe_id,
+            PermissionLevel::Edit,
+        )
+        .await?;
+        Ok(())
     }
 
     /// Update a recipe

@@ -9,9 +9,12 @@ use validator::Validate;
 #[sqlx(type_name = "visibility_type", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum Visibility {
-    #[default]
     Public,
+    #[default]
     Private,
+    #[sqlx(rename = "followers_only")]
+    #[serde(rename = "followers_only")]
+    FollowersOnly,
 }
 
 impl std::fmt::Display for Visibility {
@@ -19,6 +22,7 @@ impl std::fmt::Display for Visibility {
         match self {
             Visibility::Public => write!(f, "Public"),
             Visibility::Private => write!(f, "Private"),
+            Visibility::FollowersOnly => write!(f, "Followers Only"),
         }
     }
 }
@@ -119,13 +123,15 @@ mod tests {
 
     #[test]
     fn test_visibility_default() {
-        assert_eq!(Visibility::default(), Visibility::Public);
+        // Default is Private for privacy-first design (ABAC spec)
+        assert_eq!(Visibility::default(), Visibility::Private);
     }
 
     #[test]
     fn test_visibility_display() {
         assert_eq!(Visibility::Public.to_string(), "Public");
         assert_eq!(Visibility::Private.to_string(), "Private");
+        assert_eq!(Visibility::FollowersOnly.to_string(), "Followers Only");
     }
 
     #[test]
@@ -137,6 +143,10 @@ mod tests {
         let private = Visibility::Private;
         let json = serde_json::to_string(&private).unwrap();
         assert_eq!(json, "\"private\"");
+
+        let followers_only = Visibility::FollowersOnly;
+        let json = serde_json::to_string(&followers_only).unwrap();
+        assert_eq!(json, "\"followers_only\"");
     }
 
     #[test]
@@ -146,6 +156,9 @@ mod tests {
 
         let private: Visibility = serde_json::from_str("\"private\"").unwrap();
         assert_eq!(private, Visibility::Private);
+
+        let followers_only: Visibility = serde_json::from_str("\"followers_only\"").unwrap();
+        assert_eq!(followers_only, Visibility::FollowersOnly);
     }
 
     // ==========================================================================

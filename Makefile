@@ -1,18 +1,13 @@
-.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop up rebuild down lint fmt audit check migrate
+.PHONY: setup dev test lint fmt db migrate reset-db clean css css-watch
 
-# Detect compose command
 COMPOSE := $(shell command -v docker-compose 2>/dev/null || command -v podman-compose 2>/dev/null || echo "docker compose")
 export DATABASE_URL ?= postgres://oppskrift:oppskrift@localhost:5432/oppskrift
 
-# Default: just build
-all: build
+# First-time setup
+setup: db migrate
+	@echo "Ready! Run 'make dev' to start"
 
-build:
-	cargo build --release
-
-run: css
-	cargo run
-
+# Development
 dev: css
 	cargo watch -x run
 
@@ -27,50 +22,27 @@ db:
 	@$(COMPOSE) up -d db 2>/dev/null || true
 	@until $(COMPOSE) exec -T db pg_isready -U oppskrift >/dev/null 2>&1; do sleep 1; done
 
-db-stop:
-	@$(COMPOSE) stop db
-
 migrate: db
 	@sqlx migrate run
-
-# Docker
-up:
-	$(COMPOSE) build app
-	$(COMPOSE) up -d --force-recreate
-
-rebuild:
-	$(COMPOSE) build --no-cache app
-	$(COMPOSE) up -d --force-recreate
-
-down:
-	@$(COMPOSE) down
-
-# Quality
-lint: db migrate
-	cargo clippy --all-features -- -D warnings
-	cargo fmt -- --check
-
-check: db migrate
-	cargo check --all-features
-
-test: db migrate
-	cargo test --all-features
-
-fmt:
-	cargo fmt
-
-audit:
-	cargo audit
-
-clean:
-	cargo clean
-	rm -f static/css/main.css
-
-seed:
-	cargo run -- --seed
 
 reset-db: db
 	sqlx database drop -y || true
 	sqlx database create
 	sqlx migrate run
-	cargo run -- --seed
+
+# Quality
+test: db migrate
+	cargo test
+
+lint: db migrate
+	cargo clippy -- -D warnings
+	cargo fmt -- --check
+
+fmt:
+	cargo fmt
+
+# Cleanup
+clean:
+	cargo clean
+	rm -f static/css/main.css
+	$(COMPOSE) down -v

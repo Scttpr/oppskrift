@@ -11,10 +11,11 @@ use crate::core::error::{AppError, AppResult};
 use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::core::storage::StorageClient;
 use crate::models::{
-    AddRecipeToBook, BookRecipeEntry, CreateRecipeBook, RecipeBook, RecipeBookSummary,
-    RecipeSummary, UpdateRecipeBook,
+    AddContributionRequest, AddRecipeToBook, BookContribution, BookRecipeEntry, CreateRecipeBook,
+    GrantPermissionRequest, Permission, PermissionListResponse, RecipeBook, RecipeBookSummary,
+    RecipeSummary, ResourceType, UpdateRecipeBook,
 };
-use crate::services::BookService;
+use crate::services::{BookContributionService, BookService, PermissionService};
 use crate::AppState;
 
 /// Book API routes
@@ -27,6 +28,19 @@ pub fn routes() -> Router<AppState> {
             get(get_book_recipes).post(add_recipe_to_book),
         )
         .route("/{id}/recipes/{recipe_id}", delete(remove_recipe_from_book))
+        .route(
+            "/{id}/contributions",
+            get(list_contributions).post(add_contribution),
+        )
+        .route(
+            "/{id}/contributions/{recipe_id}",
+            delete(remove_contribution),
+        )
+        .route(
+            "/{id}/permissions",
+            get(list_permissions).post(grant_permission),
+        )
+        .route("/{id}/permissions/{perm_id}", delete(revoke_permission))
 }
 
 /// Book response with recipe count
@@ -159,13 +173,8 @@ async fn update_book(
     auth: AuthUser,
     Json(input): Json<UpdateRecipeBook>,
 ) -> AppResult<Json<RecipeBook>> {
-    // Check ownership
-    let existing = BookService::get_by_id(&state.db, id).await?;
-    if existing.owner_id != auth.id {
-        return Err(AppError::Forbidden(
-            "Not authorized to modify this book".to_string(),
-        ));
-    }
+    // Check edit permission (returns 404 if not authorized)
+    BookService::require_edit_permission(&state.db, id, auth.id).await?;
 
     let book = BookService::update(&state.db, id, input).await?;
     Ok(Json(book))
@@ -178,13 +187,8 @@ async fn delete_book(
     Path(id): Path<Uuid>,
     auth: AuthUser,
 ) -> AppResult<StatusCode> {
-    // Check ownership
-    let existing = BookService::get_by_id(&state.db, id).await?;
-    if existing.owner_id != auth.id {
-        return Err(AppError::Forbidden(
-            "Not authorized to modify this book".to_string(),
-        ));
-    }
+    // Check edit permission (returns 404 if not authorized)
+    BookService::require_edit_permission(&state.db, id, auth.id).await?;
 
     BookService::delete(&state.db, id).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -231,13 +235,8 @@ async fn add_recipe_to_book(
     auth: AuthUser,
     Json(input): Json<AddRecipeToBook>,
 ) -> AppResult<(StatusCode, Json<BookRecipeEntry>)> {
-    // Check ownership
-    let book = BookService::get_by_id(&state.db, id).await?;
-    if book.owner_id != auth.id {
-        return Err(AppError::Forbidden(
-            "Not authorized to modify this book".to_string(),
-        ));
-    }
+    // Check edit permission (returns 404 if not authorized)
+    BookService::require_edit_permission(&state.db, id, auth.id).await?;
 
     let entry = BookService::add_recipe(&state.db, id, input).await?;
     Ok((StatusCode::CREATED, Json(entry)))
@@ -250,16 +249,106 @@ async fn remove_recipe_from_book(
     Path((id, recipe_id)): Path<(Uuid, Uuid)>,
     auth: AuthUser,
 ) -> AppResult<StatusCode> {
-    // Check ownership
-    let book = BookService::get_by_id(&state.db, id).await?;
-    if book.owner_id != auth.id {
-        return Err(AppError::Forbidden(
-            "Not authorized to modify this book".to_string(),
-        ));
-    }
+    // Check edit permission (returns 404 if not authorized)
+    BookService::require_edit_permission(&state.db, id, auth.id).await?;
 
     BookService::remove_recipe(&state.db, id, recipe_id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// =============================================================================
+// Permission endpoints (T043-T045)
+// =============================================================================
+
+/// POST /api/v1/books/{id}/permissions
+/// Grant a permission on this book to a user, group, or instance
+async fn grant_permission(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    auth: AuthUser,
+    Json(request): Json<GrantPermissionRequest>,
+) -> AppResult<(StatusCode, Json<Permission>)> {
+    let permission =
+        PermissionService::grant_permission(&state.db, auth.id, ResourceType::Book, id, request)
+            .await?;
+
+    Ok((StatusCode::CREATED, Json(permission)))
+}
+
+/// DELETE /api/v1/books/{id}/permissions/{perm_id}
+/// Revoke a permission on this book
+async fn revoke_permission(
+    State(state): State<AppState>,
+    Path((id, perm_id)): Path<(Uuid, Uuid)>,
+    auth: AuthUser,
+) -> AppResult<StatusCode> {
+    PermissionService::revoke_permission(&state.db, auth.id, ResourceType::Book, id, perm_id)
+        .await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/v1/books/{id}/permissions
+/// List all permissions on this book (owner only)
+async fn list_permissions(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    auth: AuthUser,
+) -> AppResult<Json<PermissionListResponse>> {
+    let permissions =
+        PermissionService::list_permissions(&state.db, auth.id, ResourceType::Book, id).await?;
+
+    Ok(Json(PermissionListResponse {
+        permissions,
+        resource_type: "book".to_string(),
+        resource_id: id,
+    }))
+}
+
+// =============================================================================
+// Contribution endpoints (T079-T080)
+// =============================================================================
+
+/// POST /api/v1/books/{id}/contributions
+/// Add a recipe as a contribution to a book (contributor permission required)
+async fn add_contribution(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    auth: AuthUser,
+    Json(request): Json<AddContributionRequest>,
+) -> AppResult<(StatusCode, Json<BookContribution>)> {
+    let contribution =
+        BookContributionService::add_contribution(&state.db, id, auth.id, request).await?;
+
+    Ok((StatusCode::CREATED, Json(contribution)))
+}
+
+/// DELETE /api/v1/books/{id}/contributions/{recipe_id}
+/// Remove a contribution (contributor can remove own, owner can remove any)
+async fn remove_contribution(
+    State(state): State<AppState>,
+    Path((id, recipe_id)): Path<(Uuid, Uuid)>,
+    auth: AuthUser,
+) -> AppResult<StatusCode> {
+    BookContributionService::remove_contribution(&state.db, id, recipe_id, auth.id).await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/v1/books/{id}/contributions
+/// List all contributions for a book
+async fn list_contributions(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    auth: OptionalAuthUser,
+) -> AppResult<Json<Vec<crate::models::BookContributionWithDisplay>>> {
+    let viewer_id = auth.0.map(|u| u.id);
+
+    // Verify the user can access the book
+    let _ = BookService::get_by_id_authorized(&state.db, id, viewer_id).await?;
+
+    let contributions = BookContributionService::get_contributions(&state.db, id).await?;
+    Ok(Json(contributions))
 }
 
 #[cfg(test)]

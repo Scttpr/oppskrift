@@ -26,6 +26,7 @@ pub struct TestContext {
     created_users: Vec<Uuid>,
     created_recipes: Vec<Uuid>,
     created_books: Vec<Uuid>,
+    created_groups: Vec<Uuid>,
 }
 
 impl TestContext {
@@ -59,6 +60,7 @@ impl TestContext {
             created_users: Vec::new(),
             created_recipes: Vec::new(),
             created_books: Vec::new(),
+            created_groups: Vec::new(),
         }
     }
 
@@ -431,7 +433,53 @@ impl TestContext {
 
     /// Clean up all created test data
     pub async fn cleanup(&self) {
-        // Clean up books first (has FK to recipes)
+        // Clean up permissions first (references recipes, books, groups, users)
+        for recipe_id in &self.created_recipes {
+            let _ = sqlx::query(
+                "DELETE FROM permissions WHERE resource_type = 'recipe' AND resource_id = $1",
+            )
+            .bind(recipe_id)
+            .execute(&self.db)
+            .await;
+        }
+        for book_id in &self.created_books {
+            let _ = sqlx::query(
+                "DELETE FROM permissions WHERE resource_type = 'book' AND resource_id = $1",
+            )
+            .bind(book_id)
+            .execute(&self.db)
+            .await;
+        }
+        for group_id in &self.created_groups {
+            let _ = sqlx::query(
+                "DELETE FROM permissions WHERE subject_type = 'group' AND subject_id = $1",
+            )
+            .bind(group_id)
+            .execute(&self.db)
+            .await;
+        }
+        for user_id in &self.created_users {
+            let _ = sqlx::query(
+                "DELETE FROM permissions WHERE subject_type = 'user' AND subject_id = $1",
+            )
+            .bind(user_id)
+            .execute(&self.db)
+            .await;
+        }
+
+        // Clean up groups
+        for group_id in &self.created_groups {
+            let _ = sqlx::query("DELETE FROM group_members WHERE group_id = $1")
+                .bind(group_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM groups WHERE id = $1")
+                .bind(group_id)
+                .execute(&self.db)
+                .await;
+        }
+
+        // Clean up books (has FK to recipes)
         for book_id in &self.created_books {
             let _ = sqlx::query("DELETE FROM book_recipe_entries WHERE book_id = $1")
                 .bind(book_id)
@@ -483,12 +531,19 @@ impl TestContext {
                 "saved_recipes",
                 "follows",
                 "activities",
+                "group_members",
             ];
 
             for table in tables {
                 let query = format!("DELETE FROM {} WHERE user_id = $1", table);
                 let _ = sqlx::query(&query).bind(user_id).execute(&self.db).await;
             }
+
+            // Delete groups owned by user
+            let _ = sqlx::query("DELETE FROM groups WHERE owner_id = $1")
+                .bind(user_id)
+                .execute(&self.db)
+                .await;
 
             // Delete recipes owned by user (in case not tracked)
             let _ = sqlx::query("DELETE FROM recipes WHERE author_id = $1")
@@ -620,6 +675,31 @@ impl TestContext {
             session_cookie,
         }
     }
+
+    /// PUT JSON with session cookie
+    pub async fn put_with_session(&self, path: &str, body: Value, session: &str) -> ApiResponse {
+        let response = self
+            .server
+            .put(path)
+            .add_cookie(cookie::Cookie::new(
+                "oppskrift_session",
+                session.to_string(),
+            ))
+            .json(&body)
+            .await;
+
+        let status = response.status_code().as_u16();
+        let session_cookie = extract_session_cookie(&response);
+        let text = response.text();
+        let body = serde_json::from_str::<Value>(&text)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+
+        ApiResponse {
+            status,
+            body,
+            session_cookie,
+        }
+    }
 }
 
 impl Drop for TestContext {
@@ -683,4 +763,179 @@ pub fn generate_totp_code(secret_base32: &str) -> String {
 
     totp.generate_current()
         .expect("Failed to generate TOTP code")
+}
+
+// ==========================================================================
+// Permission Test Helpers (T100)
+// ==========================================================================
+
+impl TestContext {
+    /// Create a group owned by a user
+    pub async fn create_group(&mut self, owner_id: Uuid, name: &str) -> Uuid {
+        let group_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO groups (owner_id, name, description)
+            VALUES ($1, $2, $3)
+            RETURNING id
+            "#,
+        )
+        .bind(owner_id)
+        .bind(name)
+        .bind(format!("Test group: {}", name))
+        .fetch_one(&self.db)
+        .await
+        .expect("Failed to create test group");
+
+        // Track for cleanup
+        self.track_group(group_id);
+        group_id
+    }
+
+    /// Track a group for cleanup
+    pub fn track_group(&mut self, group_id: Uuid) {
+        if !self.created_groups.contains(&group_id) {
+            self.created_groups.push(group_id);
+        }
+    }
+
+    /// Add a user to a group
+    pub async fn add_group_member(&self, group_id: Uuid, user_id: Uuid) {
+        sqlx::query(
+            "INSERT INTO group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        )
+        .bind(group_id)
+        .bind(user_id)
+        .execute(&self.db)
+        .await
+        .expect("Failed to add group member");
+    }
+
+    /// Grant a permission on a resource
+    pub async fn grant_permission(
+        &self,
+        granter_id: Uuid,
+        resource_type: &str,
+        resource_id: Uuid,
+        subject_type: &str,
+        subject_id: Option<Uuid>,
+        subject_domain: Option<&str>,
+        level: &str,
+    ) -> Uuid {
+        let perm_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO permissions (
+                resource_type, resource_id, subject_type, subject_id,
+                subject_domain, permission_level, granted_by
+            )
+            VALUES ($1, $2, $3::subject_type, $4, $5, $6::permission_level, $7)
+            RETURNING id
+            "#,
+        )
+        .bind(resource_type)
+        .bind(resource_id)
+        .bind(subject_type)
+        .bind(subject_id)
+        .bind(subject_domain)
+        .bind(level)
+        .bind(granter_id)
+        .fetch_one(&self.db)
+        .await
+        .expect("Failed to grant permission");
+
+        perm_id
+    }
+
+    /// Grant permission to a user on a recipe
+    pub async fn grant_recipe_permission_to_user(
+        &self,
+        owner_id: Uuid,
+        recipe_id: Uuid,
+        user_id: Uuid,
+        level: &str,
+    ) -> Uuid {
+        self.grant_permission(
+            owner_id,
+            "recipe",
+            recipe_id,
+            "user",
+            Some(user_id),
+            None,
+            level,
+        )
+        .await
+    }
+
+    /// Grant permission to a group on a recipe
+    pub async fn grant_recipe_permission_to_group(
+        &self,
+        owner_id: Uuid,
+        recipe_id: Uuid,
+        group_id: Uuid,
+        level: &str,
+    ) -> Uuid {
+        self.grant_permission(
+            owner_id,
+            "recipe",
+            recipe_id,
+            "group",
+            Some(group_id),
+            None,
+            level,
+        )
+        .await
+    }
+
+    /// Grant permission to a user on a book
+    pub async fn grant_book_permission_to_user(
+        &self,
+        owner_id: Uuid,
+        book_id: Uuid,
+        user_id: Uuid,
+        level: &str,
+    ) -> Uuid {
+        self.grant_permission(
+            owner_id,
+            "book",
+            book_id,
+            "user",
+            Some(user_id),
+            None,
+            level,
+        )
+        .await
+    }
+
+    /// Check if a permission exists
+    pub async fn permission_exists(&self, permission_id: Uuid) -> bool {
+        let result: Option<i64> = sqlx::query_scalar("SELECT 1 FROM permissions WHERE id = $1")
+            .bind(permission_id)
+            .fetch_optional(&self.db)
+            .await
+            .expect("Failed to check permission");
+
+        result.is_some()
+    }
+
+    /// DELETE with session cookie
+    pub async fn delete_with_session(&self, path: &str, session: &str) -> ApiResponse {
+        let response = self
+            .server
+            .delete(path)
+            .add_cookie(cookie::Cookie::new(
+                "oppskrift_session",
+                session.to_string(),
+            ))
+            .await;
+
+        let status = response.status_code().as_u16();
+        let text = response.text();
+        let body = serde_json::from_str::<Value>(&text)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+
+        ApiResponse {
+            status,
+            body,
+            session_cookie: None,
+        }
+    }
 }

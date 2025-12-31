@@ -156,6 +156,7 @@
                             {% match r.visibility %}
                             {% when crate::models::Visibility::Public %}checked
                             {% when crate::models::Visibility::Private %}
+                            {% when crate::models::Visibility::FollowersOnly %}
                             {% endmatch %}
                         {% when None %}checked
                         {% endmatch %}
@@ -173,12 +174,31 @@
                             {% match r.visibility %}
                             {% when crate::models::Visibility::Public %}
                             {% when crate::models::Visibility::Private %}checked
+                            {% when crate::models::Visibility::FollowersOnly %}
                             {% endmatch %}
                         {% when None %}
                         {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
                     <span class="text-gray-700 dark:text-gray-300">Private</span>
+                </label>
+                <label class="flex items-center gap-2">
+                    <input
+                        type="radio"
+                        name="visibility"
+                        value="followers_only"
+                        {% match recipe %}
+                        {% when Some with (r) %}
+                            {% match r.visibility %}
+                            {% when crate::models::Visibility::Public %}
+                            {% when crate::models::Visibility::Private %}
+                            {% when crate::models::Visibility::FollowersOnly %}checked
+                            {% endmatch %}
+                        {% when None %}
+                        {% endmatch %}
+                        class="text-primary-600 focus:ring-primary-500"
+                    />
+                    <span class="text-gray-700 dark:text-gray-300">Followers Only</span>
                 </label>
             </div>
         </section>

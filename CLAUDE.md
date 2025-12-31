@@ -9,6 +9,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-25
 - PostgreSQL 15+ (via SQLx) (003-test-coverage)
 - Rust 1.75+ + Axum 0.8, Askama (templates), SQLx (database), validator (input validation) (004-user-profile-settings)
 - PostgreSQL 15+ (existing schema) (004-user-profile-settings)
+- Rust 2021 edition (1.75+) + Axum 0.8, SQLx 0.8, tokio 1.x, tower-http 0.6, validator 0.20, activitypub_federation 0.6 (005-abac-authorization)
+- PostgreSQL 15+ (via SQLx with offline mode) (005-abac-authorization)
 
 - **Language**: Rust 1.75+
 - **Framework**: Axum 0.8
@@ -55,9 +57,9 @@ cargo run                # Run dev server
 - Use `thiserror` for library errors, `anyhow` for application errors
 
 ## Recent Changes
+- 005-abac-authorization: Added Rust 2021 edition (1.75+) + Axum 0.8, SQLx 0.8, tokio 1.x, tower-http 0.6, validator 0.20, activitypub_federation 0.6
 - 004-user-profile-settings: Added Rust 1.75+ + Axum 0.8, Askama (templates), SQLx (database), validator (input validation)
 - 003-test-coverage: Added Rust 1.75+ + Axum 0.8, SQLx 0.8, tokio, activitypub_federation 0.6
-- 002-user-auth: Added Rust 1.75+ + Axum 0.8, SQLx 0.8, argon2, totp-rs, lettre, tower_governor
 
 
 <!-- MANUAL ADDITIONS START -->
