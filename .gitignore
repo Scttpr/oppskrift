@@ -40,8 +40,8 @@ coverage/
 *.profraw
 *.profdata
 
-# SQLx offline mode - DO NOT ignore, needed for Docker builds
-# .sqlx/
+# SQLx offline cache - regenerate with: cargo sqlx prepare
+.sqlx/
 
 # Build artifacts
 *.exe
