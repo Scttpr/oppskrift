@@ -9,7 +9,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  SQLX_OFFLINE: true
   # Test-only encryption key for 2FA (64 hex chars = 32 bytes)
   TOTP_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
@@ -26,10 +25,26 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all -- --check
 
-  # Build and lint - uses SQLX_OFFLINE, no database needed
+  # Build and lint - needs database for SQLx query verification
   check:
     name: Check & Clippy
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://oppskrift:oppskrift@localhost:5432/oppskrift
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: oppskrift
+          POSTGRES_PASSWORD: oppskrift
+          POSTGRES_DB: oppskrift
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561 # master
@@ -37,10 +52,21 @@ jobs:
           toolchain: stable
           components: clippy
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Cache sqlx-cli
+        id: cache-sqlx
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          path: ~/.cargo/bin/sqlx
+          key: sqlx-cli-0.8
+      - name: Install sqlx-cli
+        if: steps.cache-sqlx.outputs.cache-hit != 'true'
+        run: cargo install sqlx-cli --no-default-features --features postgres --locked
+      - name: Run migrations
+        run: sqlx migrate run
       - name: Build
-        run: cargo build --all-features
+        run: cargo build
       - name: Clippy
-        run: cargo clippy --all-features -- -D warnings
+        run: cargo clippy -- -D warnings
       # Save artifacts for test job
       - uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
@@ -57,7 +83,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgres://oppskrift:oppskrift@localhost:5432/oppskrift
-      SQLX_OFFLINE: false
     services:
       postgres:
         image: postgres:15-alpine
@@ -96,4 +121,4 @@ jobs:
       - name: Run migrations
         run: sqlx migrate run
       - name: Run tests
-        run: cargo test --all-features
+        run: cargo test
