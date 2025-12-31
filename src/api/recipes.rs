@@ -16,7 +16,8 @@ use crate::models::{
     CreateIngredient, CreateInstructionStep, CreateRecipe, Ingredient, InstructionStep, Recipe,
     RecipeImage, RecipeSummary, UpdateRecipe,
 };
-use crate::services::{ImageService, RecipeService, UserService};
+use crate::models::{GrantPermissionRequest, Permission, PermissionListResponse, ResourceType};
+use crate::services::{ImageService, PermissionService, RecipeService, UserService};
 use crate::AppState;
 
 /// Recipe API routes
@@ -30,6 +31,11 @@ pub fn routes() -> Router<AppState> {
         .route("/{id}/images", get(list_images).post(upload_image))
         .route("/{id}/images/{image_id}", delete(delete_image))
         .route("/{id}/images/{image_id}/primary", post(set_primary_image))
+        .route(
+            "/{id}/permissions",
+            get(list_permissions).post(grant_permission),
+        )
+        .route("/{id}/permissions/{perm_id}", delete(revoke_permission))
 }
 
 /// Request body for creating a recipe with ingredients and instructions
@@ -165,13 +171,8 @@ async fn update_recipe(
     auth: AuthUser,
     Json(input): Json<UpdateRecipeRequest>,
 ) -> AppResult<Json<RecipeResponse>> {
-    // Check ownership
-    let existing = RecipeService::get_by_id(&state.db, id).await?;
-    if existing.author_id != auth.id {
-        return Err(AppError::Forbidden(
-            "Not authorized to modify this recipe".to_string(),
-        ));
-    }
+    // Check edit permission (returns 404 if not authorized)
+    RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
 
     // Update recipe
     let recipe = RecipeService::update(&state.db, id, input.recipe).await?;
@@ -206,13 +207,8 @@ async fn delete_recipe(
     Path(id): Path<Uuid>,
     auth: AuthUser,
 ) -> AppResult<StatusCode> {
-    // Check ownership
-    let existing = RecipeService::get_by_id(&state.db, id).await?;
-    if existing.author_id != auth.id {
-        return Err(AppError::Forbidden(
-            "Not authorized to modify this recipe".to_string(),
-        ));
-    }
+    // Check edit permission (returns 404 if not authorized)
+    RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
 
     RecipeService::delete(&state.db, id, auth.id).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -236,13 +232,8 @@ async fn upload_image(
     auth: AuthUser,
     mut multipart: Multipart,
 ) -> AppResult<(StatusCode, Json<RecipeImage>)> {
-    // Check ownership
-    let existing = RecipeService::get_by_id(&state.db, id).await?;
-    if existing.author_id != auth.id {
-        return Err(AppError::Forbidden(
-            "Not authorized to modify this recipe".to_string(),
-        ));
-    }
+    // Check edit permission (returns 404 if not authorized)
+    RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
 
     // Create storage client
     let storage = StorageClient::from_env().await?;
@@ -318,13 +309,8 @@ async fn delete_image(
     Path((id, image_id)): Path<(Uuid, Uuid)>,
     auth: AuthUser,
 ) -> AppResult<StatusCode> {
-    // Check ownership
-    let recipe = RecipeService::get_by_id(&state.db, id).await?;
-    if recipe.author_id != auth.id {
-        return Err(AppError::Forbidden(
-            "Not authorized to modify this recipe".to_string(),
-        ));
-    }
+    // Check edit permission (returns 404 if not authorized)
+    RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
 
     // Delete the image
     let storage = StorageClient::from_env().await?;
@@ -340,17 +326,61 @@ async fn set_primary_image(
     Path((id, image_id)): Path<(Uuid, Uuid)>,
     auth: AuthUser,
 ) -> AppResult<Json<RecipeImage>> {
-    // Check ownership
-    let recipe = RecipeService::get_by_id(&state.db, id).await?;
-    if recipe.author_id != auth.id {
-        return Err(AppError::Forbidden(
-            "Not authorized to modify this recipe".to_string(),
-        ));
-    }
+    // Check edit permission (returns 404 if not authorized)
+    RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
 
     // Set as primary
     let image = ImageService::set_primary(&state.db, image_id).await?;
     Ok(Json(image))
+}
+
+// =============================================================================
+// Permission endpoints (T040-T042)
+// =============================================================================
+
+/// POST /api/v1/recipes/{id}/permissions
+/// Grant a permission on this recipe to a user, group, or instance
+async fn grant_permission(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    auth: AuthUser,
+    Json(request): Json<GrantPermissionRequest>,
+) -> AppResult<(StatusCode, Json<Permission>)> {
+    let permission =
+        PermissionService::grant_permission(&state.db, auth.id, ResourceType::Recipe, id, request)
+            .await?;
+
+    Ok((StatusCode::CREATED, Json(permission)))
+}
+
+/// DELETE /api/v1/recipes/{id}/permissions/{perm_id}
+/// Revoke a permission on this recipe
+async fn revoke_permission(
+    State(state): State<AppState>,
+    Path((id, perm_id)): Path<(Uuid, Uuid)>,
+    auth: AuthUser,
+) -> AppResult<StatusCode> {
+    PermissionService::revoke_permission(&state.db, auth.id, ResourceType::Recipe, id, perm_id)
+        .await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/v1/recipes/{id}/permissions
+/// List all permissions on this recipe (owner only)
+async fn list_permissions(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    auth: AuthUser,
+) -> AppResult<Json<PermissionListResponse>> {
+    let permissions =
+        PermissionService::list_permissions(&state.db, auth.id, ResourceType::Recipe, id).await?;
+
+    Ok(Json(PermissionListResponse {
+        permissions,
+        resource_type: "recipe".to_string(),
+        resource_id: id,
+    }))
 }
 
 #[cfg(test)]

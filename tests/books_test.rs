@@ -178,8 +178,8 @@ async fn test_delete_book_unauthorized() {
 
     assert_eq!(
         response.status_code().as_u16(),
-        403,
-        "Should not delete another user's book"
+        404,
+        "Should not delete another user's book (returns 404 to hide existence)"
     );
 
     ctx.cleanup().await;

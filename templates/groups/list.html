@@ -1,0 +1,137 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Groups - Oppskrift{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    {# Header #}
+    <div class="flex items-center justify-between mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+            Groups
+        </h1>
+
+        <a
+            href="/groups/new"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            New Group
+        </a>
+    </div>
+
+    {# Filter Tabs #}
+    <div class="mb-6 border-b border-gray-200 dark:border-gray-700">
+        <nav class="flex gap-4" aria-label="Filter groups">
+            <a
+                href="?filter=all"
+                class="py-2 px-1 border-b-2 {% if filter == crate::models::GroupFilter::All %}border-primary-500 text-primary-600 dark:text-primary-400{% else %}border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300{% endif %} font-medium text-sm"
+            >
+                All Groups
+            </a>
+            <a
+                href="?filter=owned"
+                class="py-2 px-1 border-b-2 {% if filter == crate::models::GroupFilter::Owned %}border-primary-500 text-primary-600 dark:text-primary-400{% else %}border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300{% endif %} font-medium text-sm"
+            >
+                My Groups
+            </a>
+            <a
+                href="?filter=member"
+                class="py-2 px-1 border-b-2 {% if filter == crate::models::GroupFilter::Member %}border-primary-500 text-primary-600 dark:text-primary-400{% else %}border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300{% endif %} font-medium text-sm"
+            >
+                Member Of
+            </a>
+        </nav>
+    </div>
+
+    {# Group List #}
+    <div class="space-y-4">
+        {% for group in groups %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-start justify-between">
+                <div class="flex-1 min-w-0">
+                    <a
+                        href="/groups/{{ group.id }}"
+                        class="text-lg font-semibold text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400"
+                    >
+                        {{ group.name }}
+                    </a>
+                    {% if let Some(desc) = group.description %}
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ desc }}</p>
+                    {% endif %}
+                    <div class="mt-2 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                        <span class="flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            {{ group.member_count }} member{% if group.member_count != 1 %}s{% endif %}
+                        </span>
+                        {% if group.is_owner %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
+                            Owner
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if group.is_owner %}
+                <a
+                    href="/groups/{{ group.id }}/edit"
+                    class="ml-4 p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                    title="Edit group"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {# Empty State #}
+    {% if groups.is_empty() %}
+    <div class="text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <h2 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No groups yet</h2>
+        <p class="mt-2 text-gray-500 dark:text-gray-400">Create a group to share recipes with multiple people at once.</p>
+        <a
+            href="/groups/new"
+            class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700"
+        >
+            Create Group
+        </a>
+    </div>
+    {% endif %}
+
+    {# Pagination #}
+    {% if total_pages > 1 %}
+    <nav class="mt-8 flex items-center justify-center gap-2" aria-label="Pagination">
+        {% if page > 1 %}
+        <a
+            href="?filter={{ filter }}&page={{ page - 1 }}"
+            class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+            Previous
+        </a>
+        {% endif %}
+
+        <span class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+            Page {{ page }} of {{ total_pages }}
+        </span>
+
+        {% if page < total_pages %}
+        <a
+            href="?filter={{ filter }}&page={{ page + 1 }}"
+            class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+            Next
+        </a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

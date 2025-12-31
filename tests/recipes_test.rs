@@ -255,8 +255,8 @@ async fn test_delete_recipe_unauthorized() {
 
     assert_eq!(
         response.status_code().as_u16(),
-        403,
-        "Should not delete another user's recipe"
+        404,
+        "Should not delete another user's recipe (returns 404 to hide existence)"
     );
 
     ctx.cleanup().await;

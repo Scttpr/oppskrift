@@ -32,7 +32,8 @@
             "kind": {
               "Enum": [
                 "public",
-                "private"
+                "private",
+                "followers_only"
               ]
             }
           }
@@ -96,7 +97,8 @@
             "kind": {
               "Enum": [
                 "public",
-                "private"
+                "private",
+                "followers_only"
               ]
             }
           }

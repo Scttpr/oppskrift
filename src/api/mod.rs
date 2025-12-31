@@ -5,6 +5,7 @@ pub mod activitypub;
 pub mod auth;
 pub mod books;
 pub mod feeds;
+pub mod groups;
 pub mod middleware;
 pub mod oembed;
 pub mod openapi;
@@ -25,6 +26,7 @@ pub fn routes() -> Router<AppState> {
         .nest("/users", users::routes())
         .nest("/recipes", recipes::routes())
         .nest("/books", books::routes())
+        .nest("/groups", groups::routes())
         .merge(social::routes())
 }
 

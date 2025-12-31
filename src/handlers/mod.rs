@@ -3,7 +3,9 @@
 pub mod auth;
 pub mod books;
 pub mod feed;
+pub mod groups;
 pub mod legal;
+pub mod permissions;
 pub mod recipes;
 pub mod settings;
 pub mod users;
@@ -26,10 +28,12 @@ pub fn routes() -> Router<AppState> {
         .nest("/recipes", recipes::routes())
         .nest("/books", books::routes())
         .nest("/users", users::routes())
+        .nest("/groups", groups::routes())
         .nest("/feed", feed::routes())
         .nest("/settings", settings::routes())
         .merge(auth::routes())
         .merge(legal::routes())
+        .merge(permissions::routes())
 }
 
 /// Simple user info for templates
