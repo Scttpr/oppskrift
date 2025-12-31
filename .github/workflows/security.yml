@@ -9,14 +9,27 @@ on:
     # Daily security scan at 6 AM UTC
     - cron: '0 6 * * *'
 
-env:
-  SQLX_OFFLINE: true
-
 jobs:
   # All security checks in one job to reduce overhead
   security:
     name: Security Checks
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://oppskrift:oppskrift@localhost:5432/oppskrift
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: oppskrift
+          POSTGRES_PASSWORD: oppskrift
+          POSTGRES_DB: oppskrift
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
@@ -53,10 +66,23 @@ jobs:
       - name: Dependency Audit
         run: cargo audit --deny warnings --deny unmaintained --deny yanked
 
+      # SQLx needs migrations for query verification
+      - name: Cache sqlx-cli
+        id: cache-sqlx
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        with:
+          path: ~/.cargo/bin/sqlx
+          key: sqlx-cli-0.8
+      - name: Install sqlx-cli
+        if: steps.cache-sqlx.outputs.cache-hit != 'true'
+        run: cargo install sqlx-cli --no-default-features --features postgres --locked
+      - name: Run migrations
+        run: sqlx migrate run
+
       # Security-focused clippy lints (warnings, not errors)
       - name: Security Lints
         run: |
-          cargo clippy --all-features -- \
+          cargo clippy -- \
             -W clippy::unwrap_used \
             -W clippy::expect_used \
             -D unsafe_code \
