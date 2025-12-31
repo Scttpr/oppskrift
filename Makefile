@@ -1,4 +1,4 @@
-.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop up rebuild down lint fmt audit check migrate
+.PHONY: all build run dev css css-watch test clean seed reset-db db db-stop up rebuild down lint fmt audit check migrate setup ci
 
 # Detect compose command
 COMPOSE := $(shell command -v docker-compose 2>/dev/null || command -v podman-compose 2>/dev/null || echo "docker compose")
@@ -6,6 +6,14 @@ export DATABASE_URL ?= postgres://oppskrift:oppskrift@localhost:5432/oppskrift
 
 # Default: just build
 all: build
+
+# First-time setup: start db, migrate, build
+setup: db migrate
+	@echo "Ready! Run 'make dev' to start development server"
+
+# CI pipeline: lint + test (assumes db is available)
+ci: lint test
+	@echo "CI checks passed"
 
 build:
 	cargo build --release
