@@ -83,14 +83,14 @@ impl BookContributionService {
             ));
         }
 
-        // Add the contribution
+        // Add the contribution with pending status
         let id = Uuid::new_v4();
         let contribution = sqlx::query_as!(
             BookContribution,
             r#"
-            INSERT INTO book_contributions (id, book_id, recipe_id, contributor_id)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, book_id, recipe_id, contributor_id, added_at
+            INSERT INTO book_contributions (id, book_id, recipe_id, contributor_id, status)
+            VALUES ($1, $2, $3, $4, 'pending')
+            RETURNING id, book_id, recipe_id, contributor_id, added_at, status, rejection_reason
             "#,
             id,
             book_id,
@@ -114,7 +114,7 @@ impl BookContributionService {
         let contribution = sqlx::query_as!(
             BookContribution,
             r#"
-            SELECT id, book_id, recipe_id, contributor_id, added_at
+            SELECT id, book_id, recipe_id, contributor_id, added_at, status, rejection_reason
             FROM book_contributions
             WHERE book_id = $1 AND recipe_id = $2
             "#,
@@ -154,6 +154,7 @@ impl BookContributionService {
             r#"
             SELECT
                 bc.id, bc.book_id, bc.recipe_id, bc.contributor_id, bc.added_at,
+                bc.status, bc.rejection_reason,
                 u.display_name as contributor_display_name
             FROM book_contributions bc
             JOIN users u ON u.id = bc.contributor_id
@@ -174,14 +175,185 @@ impl BookContributionService {
                 contributor_id: c.contributor_id,
                 contributor_display_name: c.contributor_display_name,
                 added_at: c.added_at,
+                status: c.status,
+                rejection_reason: c.rejection_reason,
             })
             .collect())
     }
 
-    /// Get contribution count for a book
+    /// Get pending contributions for a book (owner view)
+    pub async fn get_pending_contributions(
+        pool: &PgPool,
+        book_id: Uuid,
+    ) -> AppResult<Vec<BookContributionWithDisplay>> {
+        let contributions = sqlx::query!(
+            r#"
+            SELECT
+                bc.id, bc.book_id, bc.recipe_id, bc.contributor_id, bc.added_at,
+                bc.status, bc.rejection_reason,
+                u.display_name as contributor_display_name
+            FROM book_contributions bc
+            JOIN users u ON u.id = bc.contributor_id
+            WHERE bc.book_id = $1 AND bc.status = 'pending'
+            ORDER BY bc.added_at ASC
+            "#,
+            book_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(contributions
+            .into_iter()
+            .map(|c| BookContributionWithDisplay {
+                id: c.id,
+                book_id: c.book_id,
+                recipe_id: c.recipe_id,
+                contributor_id: c.contributor_id,
+                contributor_display_name: c.contributor_display_name,
+                added_at: c.added_at,
+                status: c.status,
+                rejection_reason: c.rejection_reason,
+            })
+            .collect())
+    }
+
+    /// Accept a pending contribution (T007)
+    ///
+    /// Only book owners can accept contributions.
+    pub async fn accept_contribution(
+        pool: &PgPool,
+        contribution_id: Uuid,
+        user_id: Uuid,
+    ) -> AppResult<BookContribution> {
+        // Get the contribution
+        let contribution = sqlx::query_as!(
+            BookContribution,
+            r#"
+            SELECT id, book_id, recipe_id, contributor_id, added_at, status, rejection_reason
+            FROM book_contributions
+            WHERE id = $1
+            "#,
+            contribution_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Contribution not found".to_string()))?;
+
+        // Check user is book owner
+        let is_owner =
+            PermissionService::is_owner(pool, user_id, ResourceType::Book, contribution.book_id)
+                .await?;
+
+        if !is_owner {
+            return Err(AppError::NotFound("Contribution not found".to_string()));
+        }
+
+        // Must be pending to accept
+        if contribution.status != "pending" {
+            return Err(AppError::BadRequest(
+                "Only pending contributions can be accepted".to_string(),
+            ));
+        }
+
+        // Update status to accepted
+        let updated = sqlx::query_as!(
+            BookContribution,
+            r#"
+            UPDATE book_contributions
+            SET status = 'accepted', rejection_reason = NULL
+            WHERE id = $1
+            RETURNING id, book_id, recipe_id, contributor_id, added_at, status, rejection_reason
+            "#,
+            contribution_id
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(updated)
+    }
+
+    /// Reject a pending contribution (T007)
+    ///
+    /// Only book owners can reject contributions.
+    /// An optional reason can be provided.
+    pub async fn reject_contribution(
+        pool: &PgPool,
+        contribution_id: Uuid,
+        user_id: Uuid,
+        reason: Option<String>,
+    ) -> AppResult<BookContribution> {
+        // Get the contribution
+        let contribution = sqlx::query_as!(
+            BookContribution,
+            r#"
+            SELECT id, book_id, recipe_id, contributor_id, added_at, status, rejection_reason
+            FROM book_contributions
+            WHERE id = $1
+            "#,
+            contribution_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Contribution not found".to_string()))?;
+
+        // Check user is book owner
+        let is_owner =
+            PermissionService::is_owner(pool, user_id, ResourceType::Book, contribution.book_id)
+                .await?;
+
+        if !is_owner {
+            return Err(AppError::NotFound("Contribution not found".to_string()));
+        }
+
+        // Must be pending to reject
+        if contribution.status != "pending" {
+            return Err(AppError::BadRequest(
+                "Only pending contributions can be rejected".to_string(),
+            ));
+        }
+
+        // Validate reason length if provided
+        let sanitized_reason = reason.map(|r| {
+            // Truncate to 500 chars and sanitize
+            let truncated = if r.len() > 500 { &r[..500] } else { &r };
+            truncated.trim().to_string()
+        });
+
+        // Update status to rejected with reason
+        let updated = sqlx::query_as!(
+            BookContribution,
+            r#"
+            UPDATE book_contributions
+            SET status = 'rejected', rejection_reason = $2
+            WHERE id = $1
+            RETURNING id, book_id, recipe_id, contributor_id, added_at, status, rejection_reason
+            "#,
+            contribution_id,
+            sanitized_reason
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(updated)
+    }
+
+    /// Get contribution count for a book (only accepted)
     pub async fn get_contribution_count(pool: &PgPool, book_id: Uuid) -> AppResult<i64> {
         let count = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM book_contributions WHERE book_id = $1",
+            "SELECT COUNT(*) FROM book_contributions WHERE book_id = $1 AND status = 'accepted'",
+            book_id
+        )
+        .fetch_one(pool)
+        .await?
+        .unwrap_or(0);
+
+        Ok(count)
+    }
+
+    /// Get pending contribution count for a book
+    pub async fn get_pending_count(pool: &PgPool, book_id: Uuid) -> AppResult<i64> {
+        let count = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM book_contributions WHERE book_id = $1 AND status = 'pending'",
             book_id
         )
         .fetch_one(pool)

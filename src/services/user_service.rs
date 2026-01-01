@@ -198,6 +198,44 @@ impl UserService {
         Ok(!exists.unwrap_or(false))
     }
 
+    /// Search users by username prefix (for autocomplete)
+    /// Returns up to `limit` users whose username starts with the query
+    pub async fn search_by_username(
+        pool: &PgPool,
+        query: &str,
+        limit: i64,
+    ) -> AppResult<Vec<User>> {
+        // Sanitize and prepare the query for LIKE matching
+        let pattern = format!(
+            "{}%",
+            query
+                .to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+                .collect::<String>()
+        );
+
+        let users = sqlx::query_as::<_, User>(
+            r#"
+            SELECT id, username, email, email_verified, password_hash,
+                   display_name, bio, avatar_url, measurement_pref,
+                   totp_secret_encrypted, totp_enabled,
+                   failed_login_attempts, locked_until, deletion_requested_at,
+                   deletion_content_choice, created_at, updated_at, ap_id, federation_enabled
+            FROM users
+            WHERE LOWER(username) LIKE $1
+            ORDER BY username ASC
+            LIMIT $2
+            "#,
+        )
+        .bind(&pattern)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(users)
+    }
+
     /// Get the public key PEM for a user (for ActivityPub Actor profile)
     pub async fn get_public_key(pool: &PgPool, user_id: Uuid) -> AppResult<String> {
         let key = sqlx::query_scalar!(
