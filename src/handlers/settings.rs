@@ -5,6 +5,14 @@
 
 use std::net::SocketAddr;
 
+use lazy_static::lazy_static;
+use regex::Regex;
+
+lazy_static! {
+    /// Regex for stripping HTML tags - compiled once at startup
+    static ref HTML_TAG_RE: Regex = Regex::new(r"<[^>]*>").unwrap();
+}
+
 use askama::Template;
 use axum::{
     extract::{ConnectInfo, State},
@@ -100,6 +108,11 @@ pub fn routes() -> Router<AppState> {
             "/security/sessions/revoke-others",
             post(revoke_other_sessions),
         )
+        .route(
+            "/security/sessions/{session_id}/revoke",
+            post(revoke_single_session),
+        )
+        .route("/security/events", get(security_events_page))
         // 2FA routes
         .route(
             "/security/2fa/setup",
@@ -121,6 +134,10 @@ pub fn routes() -> Router<AppState> {
             get(delete_account_page).post(delete_account),
         )
         .route("/account/cancel-deletion", post(cancel_deletion))
+        // Privacy routes
+        .route("/privacy", get(privacy_page))
+        .route("/privacy/federation", post(toggle_federation))
+        .route("/privacy/export", post(export_data))
 }
 
 /// Redirect /settings to /settings/profile (T020)
@@ -263,9 +280,8 @@ impl UpdateProfileForm {
 
 /// Sanitize text by removing HTML tags and script content (T027)
 fn sanitize_text(input: &str) -> String {
-    // Remove HTML tags
-    let tag_re = regex::Regex::new(r"<[^>]*>").unwrap();
-    let without_tags = tag_re.replace_all(input, "");
+    // Remove HTML tags using pre-compiled regex
+    let without_tags = HTML_TAG_RE.replace_all(input, "");
 
     // Trim and normalize whitespace
     without_tags.trim().to_string()
@@ -758,35 +774,59 @@ async fn password_change(
 }
 
 // =============================================================================
-// Sessions Management (Phase 8 - User Story 6)
+// Sessions Management (Phase 3 - User Story 1)
 // =============================================================================
 
-/// Sessions page template
+use crate::api::account::{SecurityEvent, SecurityEventView};
+use crate::models::session::SessionItemView;
+
+/// Sessions page template (T009)
 #[derive(Template)]
 #[template(path = "settings/sessions.html")]
-struct SessionsTemplate {
+struct SessionsPageTemplate {
     active_tab: &'static str,
     deletion_pending: bool,
     deletion_date: Option<String>,
     flash_success: Option<String>,
     flash_error: Option<String>,
+    sessions: Vec<SessionItemView>,
     session_count: i64,
     csrf_token: String,
 }
 
-/// Sessions page (GET)
+/// Sessions page handler (GET) (T010)
 async fn sessions_page(State(state): State<AppState>, auth: AuthUser) -> AppResult<Html<String>> {
     let user = UserService::get_by_id(&state.db, auth.id).await?;
     let csrf_token = generate_csrf(&state, auth.session_id);
 
-    // Count active sessions
-    let session_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sessions WHERE user_id = $1 AND expires_at > NOW()",
-    )
-    .bind(auth.id)
-    .fetch_one(&state.db)
-    .await
-    .unwrap_or(1);
+    // Get all active sessions with details
+    let session_service = SessionService::new(state.db.clone(), SESSION_EXPIRY_DAYS);
+    let session_infos = session_service
+        .list_for_user(auth.id, Some(auth.session_id))
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to list sessions");
+            AppError::Internal("Failed to load sessions".to_string())
+        })?;
+
+    // Convert to view models
+    let sessions: Vec<SessionItemView> = session_infos
+        .iter()
+        .map(|info| {
+            // Convert service::SessionInfo to models::SessionInfo first
+            let model_info = crate::models::SessionInfo {
+                id: info.id,
+                device_info: info.device_info.clone(),
+                ip_address: info.ip_address.clone(),
+                last_activity: info.last_activity,
+                created_at: info.created_at,
+                is_current: info.is_current,
+            };
+            SessionItemView::from_session_info(&model_info)
+        })
+        .collect();
+
+    let session_count = sessions.len() as i64;
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user.deletion_requested_at.map(|dt| {
@@ -795,12 +835,13 @@ async fn sessions_page(State(state): State<AppState>, auth: AuthUser) -> AppResu
             .to_string()
     });
 
-    let template = SessionsTemplate {
+    let template = SessionsPageTemplate {
         active_tab: "security",
         deletion_pending,
         deletion_date,
         flash_success: None,
         flash_error: None,
+        sessions,
         session_count,
         csrf_token,
     };
@@ -844,6 +885,194 @@ async fn revoke_other_sessions(
         .await;
 
     Ok(Redirect::to("/settings/security/sessions"))
+}
+
+/// Revoke single session handler (POST) (T011)
+///
+/// HTMX endpoint to revoke a specific session.
+/// Returns HTML fragment for the session row (removed or empty).
+async fn revoke_single_session(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
+    auth: AuthUser,
+    axum::extract::Path(session_id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<CsrfOnlyForm>,
+) -> Result<Response, AppError> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
+    // Prevent revoking current session
+    if session_id == auth.session_id {
+        return Err(AppError::BadRequest(
+            "Cannot revoke current session. Use logout instead.".to_string(),
+        ));
+    }
+
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+
+    // Verify session belongs to user before revoking
+    let session_service = SessionService::new(state.db.clone(), SESSION_EXPIRY_DAYS);
+    let sessions = session_service
+        .list_for_user(auth.id, None)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to verify session ownership");
+            AppError::Internal("Failed to revoke session".to_string())
+        })?;
+
+    if !sessions.iter().any(|s| s.id == session_id) {
+        return Err(AppError::NotFound("Session not found".to_string()));
+    }
+
+    // Revoke session
+    session_service
+        .revoke_by_id(session_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to revoke session");
+            AppError::Internal("Failed to revoke session".to_string())
+        })?;
+
+    // Log security event
+    AuditEvent::new("auth.session.revoke")
+        .with_user(auth.id)
+        .with_context(&ctx)
+        .with_metadata("session_id", &session_id.to_string())
+        .persist(&state.db)
+        .await;
+
+    // Return empty response for HTMX to swap out the row
+    Ok(Html("").into_response())
+}
+
+// =============================================================================
+// Security Events (Phase 4 - User Story 2)
+// =============================================================================
+
+/// Pagination info for security events
+#[derive(Debug, Clone)]
+struct PaginationInfo {
+    current_page: u32,
+    total_pages: u32,
+    has_prev: bool,
+    has_next: bool,
+    prev_page: u32,
+    next_page: u32,
+}
+
+/// Security events page template (T014)
+#[derive(Template)]
+#[template(path = "settings/security_events.html")]
+struct SecurityEventsPageTemplate {
+    active_tab: &'static str,
+    deletion_pending: bool,
+    deletion_date: Option<String>,
+    flash_success: Option<String>,
+    flash_error: Option<String>,
+    events: Vec<SecurityEventView>,
+    pagination: PaginationInfo,
+}
+
+/// Security events page handler (GET) (T015)
+///
+/// Displays paginated security events for the authenticated user.
+/// Default pagination: 20 events per page, most recent first.
+async fn security_events_page(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> AppResult<Html<String>> {
+    let user = UserService::get_by_id(&state.db, auth.id).await?;
+
+    // Parse pagination parameters
+    let page: u32 = params
+        .get("page")
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(1)
+        .max(1);
+    let per_page: u32 = 20; // FR-007: 20 events per page
+    let offset = (page - 1) * per_page;
+
+    // Get total count for pagination
+    let total_count: i64 = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM security_events WHERE user_id = $1",
+        auth.id
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+
+    let total_pages = ((total_count as u32).saturating_sub(1) / per_page) + 1;
+
+    // Get events for current page (FR-005: reverse chronological order)
+    // Cast event_type enum to text and ip_address to text
+    let event_rows = sqlx::query!(
+        r#"
+        SELECT
+            id,
+            event_type::text as "event_type!",
+            ip_address::text as ip_address,
+            user_agent,
+            metadata,
+            created_at
+        FROM security_events
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2 OFFSET $3
+        "#,
+        auth.id,
+        per_page as i64,
+        offset as i64
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    // Convert to SecurityEvent structs
+    let events: Vec<SecurityEvent> = event_rows
+        .into_iter()
+        .map(|row| SecurityEvent {
+            id: row.id,
+            event_type: row.event_type,
+            ip_address: row.ip_address,
+            user_agent: row.user_agent,
+            metadata: row.metadata,
+            created_at: row.created_at,
+        })
+        .collect();
+
+    // Convert to view models
+    let events: Vec<SecurityEventView> = events.iter().map(SecurityEventView::from_event).collect();
+
+    let pagination = PaginationInfo {
+        current_page: page,
+        total_pages,
+        has_prev: page > 1,
+        has_next: page < total_pages,
+        prev_page: page.saturating_sub(1).max(1),
+        next_page: (page + 1).min(total_pages),
+    };
+
+    let deletion_pending = user.deletion_requested_at.is_some();
+    let deletion_date = user.deletion_requested_at.map(|dt| {
+        (dt + chrono::Duration::days(30))
+            .format("%B %d, %Y")
+            .to_string()
+    });
+
+    let template = SecurityEventsPageTemplate {
+        active_tab: "security",
+        deletion_pending,
+        deletion_date,
+        flash_success: None,
+        flash_error: None,
+        events,
+        pagination,
+    };
+
+    Ok(Html(template.render().map_err(|e| {
+        AppError::Internal(format!("Template error: {}", e))
+    })?))
 }
 
 // =============================================================================
@@ -1670,6 +1899,315 @@ async fn cancel_deletion(
         .await;
 
     Ok(Redirect::to("/settings/account"))
+}
+
+// =============================================================================
+// Privacy Settings (Phase 5 - User Story 3 + Phase 6 - User Story 4)
+// =============================================================================
+
+/// Privacy page template (T019)
+#[derive(Template)]
+#[template(path = "settings/privacy.html")]
+struct PrivacyPageTemplate {
+    active_tab: &'static str,
+    deletion_pending: bool,
+    deletion_date: Option<String>,
+    flash_success: Option<String>,
+    flash_error: Option<String>,
+    federation_enabled: bool,
+    csrf_token: String,
+}
+
+/// Privacy settings page handler (GET) (T020)
+async fn privacy_page(State(state): State<AppState>, auth: AuthUser) -> AppResult<Html<String>> {
+    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let csrf_token = generate_csrf(&state, auth.session_id);
+
+    let deletion_pending = user.deletion_requested_at.is_some();
+    let deletion_date = user.deletion_requested_at.map(|dt| {
+        (dt + chrono::Duration::days(30))
+            .format("%B %d, %Y")
+            .to_string()
+    });
+
+    let template = PrivacyPageTemplate {
+        active_tab: "privacy",
+        deletion_pending,
+        deletion_date,
+        flash_success: None,
+        flash_error: None,
+        federation_enabled: user.federation_enabled,
+        csrf_token,
+    };
+
+    Ok(Html(template.render().map_err(|e| {
+        AppError::Internal(format!("Template error: {}", e))
+    })?))
+}
+
+/// Federation toggle handler (POST) (T021)
+///
+/// HTMX endpoint to toggle ActivityPub federation on/off.
+async fn toggle_federation(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
+    auth: AuthUser,
+    Form(form): Form<CsrfOnlyForm>,
+) -> AppResult<Html<String>> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+
+    // Get current state and toggle
+    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let new_state = !user.federation_enabled;
+
+    // Update federation status
+    sqlx::query!(
+        "UPDATE users SET federation_enabled = $1, updated_at = NOW() WHERE id = $2",
+        new_state,
+        auth.id
+    )
+    .execute(&state.db)
+    .await?;
+
+    // Log the change
+    let event_type = if new_state {
+        "settings.federation.enable"
+    } else {
+        "settings.federation.disable"
+    };
+    AuditEvent::new(event_type)
+        .with_user(auth.id)
+        .with_context(&ctx)
+        .persist(&state.db)
+        .await;
+
+    // Return updated toggle button for HTMX swap
+    let csrf_token = generate_csrf(&state, auth.session_id);
+    let html = format!(
+        r#"<form
+            method="POST"
+            action="/settings/privacy/federation"
+            hx-post="/settings/privacy/federation"
+            hx-swap="outerHTML"
+            hx-target="this"
+        >
+            <input type="hidden" name="_csrf" value="{}" />
+            <button
+                type="submit"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 {}"
+                role="switch"
+                aria-checked="{}"
+            >
+                <span
+                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {}"
+                ></span>
+            </button>
+        </form>"#,
+        csrf_token,
+        if new_state {
+            "bg-primary-600"
+        } else {
+            "bg-gray-200 dark:bg-gray-700"
+        },
+        new_state,
+        if new_state {
+            "translate-x-5"
+        } else {
+            "translate-x-0"
+        }
+    );
+
+    Ok(Html(html))
+}
+
+/// Export data handler (POST) (T024, T026)
+///
+/// Exports user's personal data as JSON download.
+/// Rate limited to 1 export per hour (T028).
+async fn export_data(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
+    auth: AuthUser,
+    Form(form): Form<CsrfOnlyForm>,
+) -> Result<Response, AppError> {
+    // Validate CSRF token
+    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+
+    // Check rate limit (T028): 1 export per hour
+    let last_export: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar!(
+        r#"
+        SELECT created_at FROM security_events
+        WHERE user_id = $1 AND event_type::text = 'account_export'
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#,
+        auth.id
+    )
+    .fetch_optional(&state.db)
+    .await?;
+
+    if let Some(last) = last_export {
+        let one_hour_ago = chrono::Utc::now() - chrono::Duration::hours(1);
+        if last > one_hour_ago {
+            let wait_mins = ((last - one_hour_ago).num_minutes() + 1).max(1);
+            return Err(AppError::BadRequest(format!(
+                "Export rate limit exceeded. Please wait {} more minute(s).",
+                wait_mins
+            )));
+        }
+    }
+
+    // Get user data
+    let user = UserService::get_by_id(&state.db, auth.id).await?;
+
+    // Check recipe count for async threshold (FR-015: >50 recipes = async)
+    let recipe_count: i64 =
+        sqlx::query_scalar!("SELECT COUNT(*) FROM recipes WHERE author_id = $1", auth.id)
+            .fetch_one(&state.db)
+            .await?
+            .unwrap_or(0);
+
+    // For now, we only implement sync export (T026)
+    // TODO: Implement async export for >50 recipes in future iteration
+    if recipe_count > 50 {
+        return Err(AppError::BadRequest(
+            "Large exports (>50 recipes) require async processing. Feature coming soon."
+                .to_string(),
+        ));
+    }
+
+    // Build export data (FR-013)
+    let mut export_data = serde_json::json!({
+        "@context": "https://www.w3.org/ns/activitystreams",
+        "type": "OrderedCollection",
+        "generator": "Oppskrift",
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+    });
+
+    // Profile info
+    export_data["profile"] = serde_json::json!({
+        "id": user.id,
+        "username": user.username,
+        "display_name": user.display_name,
+        "bio": user.bio,
+        "avatar_url": user.avatar_url,
+        "measurement_pref": format!("{:?}", user.measurement_pref),
+        "federation_enabled": user.federation_enabled,
+        "created_at": user.created_at.to_rfc3339(),
+    });
+
+    // Recipes
+    let recipes: Vec<serde_json::Value> = sqlx::query!(
+        r#"
+        SELECT id, title, description, prep_time_min, cook_time_min,
+               servings, visibility::text as visibility, created_at
+        FROM recipes WHERE author_id = $1
+        ORDER BY created_at DESC
+        "#,
+        auth.id
+    )
+    .fetch_all(&state.db)
+    .await?
+    .into_iter()
+    .map(|r| {
+        serde_json::json!({
+            "id": r.id,
+            "title": r.title,
+            "description": r.description,
+            "prep_time_min": r.prep_time_min,
+            "cook_time_min": r.cook_time_min,
+            "servings": r.servings,
+            "visibility": r.visibility,
+            "created_at": r.created_at.to_rfc3339(),
+        })
+    })
+    .collect();
+    export_data["recipes"] = serde_json::json!(recipes);
+
+    // Books (recipe_books table)
+    let books: Vec<serde_json::Value> = sqlx::query!(
+        r#"
+        SELECT id, title, description, visibility::text as visibility, created_at
+        FROM recipe_books WHERE owner_id = $1
+        ORDER BY created_at DESC
+        "#,
+        auth.id
+    )
+    .fetch_all(&state.db)
+    .await?
+    .into_iter()
+    .map(|b| {
+        serde_json::json!({
+            "id": b.id,
+            "title": b.title,
+            "description": b.description,
+            "visibility": b.visibility,
+            "created_at": b.created_at.to_rfc3339(),
+        })
+    })
+    .collect();
+    export_data["books"] = serde_json::json!(books);
+
+    // Followers (just counts for privacy)
+    let follower_count: i64 = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM follows WHERE following_id = $1",
+        auth.id
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+
+    let following_count: i64 = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM follows WHERE follower_id = $1",
+        auth.id
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+
+    export_data["social"] = serde_json::json!({
+        "follower_count": follower_count,
+        "following_count": following_count,
+    });
+
+    // Log export event
+    AuditEvent::new("account_export")
+        .with_user(auth.id)
+        .with_context(&ctx)
+        .persist(&state.db)
+        .await;
+
+    // Build JSON response with download headers
+    let json = serde_json::to_string_pretty(&export_data)
+        .map_err(|e| AppError::Internal(format!("JSON serialization failed: {}", e)))?;
+
+    let filename = format!(
+        "oppskrift-export-{}-{}.json",
+        user.username,
+        chrono::Utc::now().format("%Y%m%d")
+    );
+
+    Ok((
+        [
+            (
+                axum::http::header::CONTENT_TYPE,
+                "application/json; charset=utf-8",
+            ),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                &format!("attachment; filename=\"{}\"", filename),
+            ),
+        ],
+        json,
+    )
+        .into_response())
 }
 
 #[cfg(test)]
