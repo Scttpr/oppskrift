@@ -133,6 +133,60 @@ impl From<User> for UserProfile {
     }
 }
 
+/// User card view for follower/following display (T005)
+#[derive(Debug, Clone, Serialize)]
+pub struct UserCardView {
+    pub id: Uuid,
+    pub username: String,
+    pub display_name: String,
+    pub avatar_url: Option<String>,
+    pub bio_excerpt: Option<String>,
+    pub is_following: bool,
+    pub follows_you: bool,
+}
+
+impl UserCardView {
+    /// Create a UserCardView from a User with follow status
+    pub fn from_user(user: &User, is_following: bool, follows_you: bool) -> Self {
+        Self {
+            id: user.id,
+            username: user.username.clone(),
+            display_name: user.display_name.clone(),
+            avatar_url: user.avatar_url.clone(),
+            bio_excerpt: user.bio.as_ref().map(|b| Self::excerpt(b, 100)),
+            is_following,
+            follows_you,
+        }
+    }
+
+    /// Create a UserCardView from a UserProfile with follow status
+    pub fn from_profile(profile: &UserProfile, is_following: bool, follows_you: bool) -> Self {
+        Self {
+            id: profile.id,
+            username: profile.username.clone(),
+            display_name: profile.display_name.clone(),
+            avatar_url: profile.avatar_url.clone(),
+            bio_excerpt: profile.bio.as_ref().map(|b| Self::excerpt(b, 100)),
+            is_following,
+            follows_you,
+        }
+    }
+
+    /// Truncate text to max length, ending at word boundary with ellipsis
+    fn excerpt(text: &str, max_len: usize) -> String {
+        if text.len() <= max_len {
+            text.to_string()
+        } else {
+            // Find last space before max_len
+            let truncated = &text[..max_len];
+            match truncated.rfind(' ') {
+                Some(idx) if idx > max_len / 2 => format!("{}…", &text[..idx]),
+                _ => format!("{}…", truncated),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

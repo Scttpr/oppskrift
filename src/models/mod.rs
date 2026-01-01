@@ -49,8 +49,8 @@ pub use two_factor::{
     TwoFactorEnabledResponse, TwoFactorSetupResponse, TwoFactorStatusResponse,
 };
 pub use user::{
-    CreateUser, DeletionContentChoice, MeasurementPref, UpdateUser, User, UserProfile,
-    RESERVED_USERNAMES,
+    CreateUser, DeletionContentChoice, MeasurementPref, UpdateUser, User, UserCardView,
+    UserProfile, RESERVED_USERNAMES,
 };
 
 // ABAC Authorization models
