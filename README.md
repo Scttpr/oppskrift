@@ -40,13 +40,11 @@ cd oppskrift
 # Copy environment file
 cp .env.example .env
 
-# Start all services (db, minio, app)
-make up
+# First-time setup (starts database and runs migrations)
+make setup
 
-# Or for local development without Docker app:
-make db          # Start database only
-make migrate     # Run migrations
-make run         # Run app locally
+# Run the app with auto-reload
+make dev
 ```
 
 The app will be available at http://localhost:3000
@@ -55,33 +53,23 @@ The app will be available at http://localhost:3000
 
 ```bash
 # Development
-make run         # Build CSS and run app
+make setup       # First-time setup (db + migrations)
 make dev         # Run with auto-reload (requires cargo-watch)
 make css         # Build Tailwind CSS
 make css-watch   # Watch CSS for changes
 
 # Database
 make db          # Start database container
-make db-stop     # Stop database container
 make migrate     # Run migrations
-make seed        # Seed with test data
-make reset-db    # Drop, recreate, migrate, and seed
-
-# Docker/Podman
-make up          # Build and start all services
-make rebuild     # Full rebuild (no cache)
-make down        # Stop all services
+make reset-db    # Drop, recreate, and migrate
 
 # Quality
 make lint        # Run clippy + format check
 make test        # Run all tests
-make check       # Compile check only
 make fmt         # Format code
-make audit       # Security audit
 
-# Build
-make build       # Build release binary
-make clean       # Clean build artifacts
+# Cleanup
+make clean       # Clean build artifacts and stop containers
 ```
 
 ## Project Structure

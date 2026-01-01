@@ -21,24 +21,14 @@ cp .env.example .env
 # Install git hooks
 ./.githooks/install.sh
 
-# Start database
-make db
+# First-time setup (starts database and runs migrations)
+make setup
 
-# Run migrations
-make migrate
-
-# Run the app
-make run
+# Run the app with auto-reload
+make dev
 ```
 
 The app will be available at http://localhost:3000
-
-### Alternative: Full Docker Setup
-
-```bash
-# Start everything (db, minio, app)
-make up
-```
 
 ## Git Hooks
 
@@ -50,15 +40,15 @@ Pre-commit hooks ensure code quality before pushing:
 ```
 
 The pre-commit hook runs:
-- `cargo clippy --all-features -- -D warnings`
-- `cargo fmt -- --check`
+- `gitleaks` - Secret scanning on staged files
+- `make lint` - Clippy and format check (requires database)
 
 ## Makefile Commands
 
 ### Development
 
 ```bash
-make run         # Build CSS and run app
+make setup       # First-time setup (db + migrations)
 make dev         # Run with auto-reload (requires cargo-watch)
 make css         # Build Tailwind CSS
 make css-watch   # Watch CSS for changes
@@ -68,18 +58,8 @@ make css-watch   # Watch CSS for changes
 
 ```bash
 make db          # Start database container
-make db-stop     # Stop database container
 make migrate     # Run migrations
-make seed        # Seed with test data
-make reset-db    # Drop, recreate, migrate, and seed
-```
-
-### Docker/Podman
-
-```bash
-make up          # Build and start all services
-make rebuild     # Full rebuild (no cache)
-make down        # Stop all services
+make reset-db    # Drop, recreate, and migrate
 ```
 
 ### Quality
@@ -87,31 +67,26 @@ make down        # Stop all services
 ```bash
 make lint        # Run clippy + format check
 make test        # Run all tests
-make check       # Compile check only
 make fmt         # Format code
-make audit       # Security audit
 ```
 
-### Build
+### Cleanup
 
 ```bash
-make build       # Build release binary
-make clean       # Clean build artifacts
+make clean       # Clean build artifacts and stop containers
 ```
 
-## SQLx Offline Mode
+## SQLx and Database
 
-For faster local checks without a database connection:
+This project requires a running PostgreSQL database for compilation because SQLx verifies queries at compile time. The `make` commands handle this automatically.
 
 ```bash
-# Generate offline cache (with database running)
+# Start database and run migrations
+make setup
+
+# Regenerate SQLx query cache (rarely needed)
 cargo sqlx prepare
-
-# Commit the cache
-git add .sqlx
 ```
-
-The Docker build uses offline mode automatically.
 
 ## Code Style
 
@@ -200,11 +175,11 @@ cargo test --test login_test --test registration_test
 ## Adding New Features
 
 1. Create migration if needed: `sqlx migrate add feature_name`
-2. Add model in `src/models/`
-3. Add service in `src/services/`
-4. Add API endpoint in `src/api/`
-5. Add tests inline with `#[cfg(test)]`
-6. Update SQLx offline cache: `cargo sqlx prepare`
+2. Run migrations: `make migrate`
+3. Add model in `src/models/`
+4. Add service in `src/services/`
+5. Add API endpoint in `src/api/`
+6. Add tests inline with `#[cfg(test)]`
 
 ## License
 
