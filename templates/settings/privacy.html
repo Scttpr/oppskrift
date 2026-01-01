@@ -1,0 +1,101 @@
+{% extends "settings/_layout.html" %}
+
+{% block settings_content %}
+<section aria-labelledby="privacy-heading">
+    <h2 id="privacy-heading" class="text-lg font-medium text-gray-900 dark:text-white mb-6">
+        Privacy Settings
+    </h2>
+
+    {# Federation Toggle (FR-009, FR-010) #}
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-6">
+        <div class="flex items-start justify-between">
+            <div class="flex-grow mr-4">
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                    ActivityPub Federation
+                </h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    When enabled, your profile and public recipes can be discovered and followed by users on other ActivityPub-compatible platforms (such as Mastodon, Lemmy, or other Oppskrift instances).
+                </p>
+                <div class="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
+                    <p class="text-xs text-gray-600 dark:text-gray-300">
+                        <strong>When enabled:</strong> Your profile appears in WebFinger lookups and can be followed from other federated platforms.
+                    </p>
+                    <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                        <strong>When disabled:</strong> Your profile is hidden from federation. Existing followers on other instances will no longer receive your updates.
+                    </p>
+                </div>
+            </div>
+
+            {# Toggle switch #}
+            <div class="flex-shrink-0">
+                <form
+                    method="POST"
+                    action="/settings/privacy/federation"
+                    hx-post="/settings/privacy/federation"
+                    hx-swap="outerHTML"
+                    hx-target="this"
+                >
+                    <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
+                    <button
+                        type="submit"
+                        class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 {% if federation_enabled %}bg-primary-600{% else %}bg-gray-200 dark:bg-gray-700{% endif %}"
+                        role="switch"
+                        aria-checked="{{ federation_enabled }}"
+                        aria-label="Toggle ActivityPub federation"
+                    >
+                        <span
+                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {% if federation_enabled %}translate-x-5{% else %}translate-x-0{% endif %}"
+                        ></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {# Current status indicator #}
+        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div class="flex items-center text-sm">
+                {% if federation_enabled %}
+                <svg class="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span class="text-green-700 dark:text-green-400">Federation is enabled</span>
+                {% else %}
+                <svg class="w-4 h-4 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+                <span class="text-gray-500 dark:text-gray-400">Federation is disabled</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# Data Export Section (FR-012) #}
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+            Export Your Data
+        </h3>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Download a copy of your personal data, including your profile information, recipes, books, and activity history. The export is provided in JSON format.
+        </p>
+
+        <div class="mt-4">
+            <form method="POST" action="/settings/privacy/export" id="export-form">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
+                <button
+                    type="submit"
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-gray-800"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Download My Data
+                </button>
+            </form>
+        </div>
+
+        <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
+            Note: You can request one export per hour. Large exports may take a moment to prepare.
+        </p>
+    </div>
+</section>
+{% endblock %}
