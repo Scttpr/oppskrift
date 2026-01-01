@@ -20,10 +20,64 @@ pub fn routes() -> Router<AppState> {
         .route("/me", get(get_current_user).patch(update_current_user))
         .route("/me/export", get(export_user_data))
         .route("/me/federation", patch(toggle_federation))
+        .route("/search", get(search_users))
         .route("/{id}", get(get_user_by_id))
         .route("/{id}/followers", get(get_user_followers))
         .route("/{id}/following", get(get_user_following))
         .route("/{id}/books", get(get_user_books))
+}
+
+/// User search query parameters
+#[derive(Debug, Deserialize)]
+pub struct UserSearchParams {
+    /// Username query (prefix match)
+    pub q: String,
+    /// Max results to return (default 10, max 50)
+    #[serde(default = "default_search_limit")]
+    pub limit: i64,
+}
+
+fn default_search_limit() -> i64 {
+    10
+}
+
+/// User search result item
+#[derive(Debug, Serialize)]
+pub struct UserSearchResult {
+    pub id: Uuid,
+    pub username: String,
+    pub display_name: String,
+    pub avatar_url: Option<String>,
+}
+
+/// GET /api/v1/users/search?q=username
+/// Search users by username prefix (requires authentication)
+async fn search_users(
+    State(state): State<AppState>,
+    Query(params): Query<UserSearchParams>,
+    _auth: AuthUser,
+) -> AppResult<Json<Vec<UserSearchResult>>> {
+    // Validate query length
+    if params.q.is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    // Limit results
+    let limit = params.limit.clamp(1, 50);
+
+    let users = UserService::search_by_username(&state.db, &params.q, limit).await?;
+
+    let results: Vec<UserSearchResult> = users
+        .into_iter()
+        .map(|u| UserSearchResult {
+            id: u.id,
+            username: u.username,
+            display_name: u.display_name,
+            avatar_url: u.avatar_url,
+        })
+        .collect();
+
+    Ok(Json(results))
 }
 
 /// GET /api/v1/users/{id}
