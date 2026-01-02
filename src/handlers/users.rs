@@ -19,6 +19,7 @@ use crate::AppState;
 struct PaginationInfo {
     page: i64,
     total_pages: i64,
+    total_items: i64,
     has_prev: bool,
     has_next: bool,
 }
@@ -195,6 +196,7 @@ async fn followers_page(
     let pagination = PaginationInfo {
         page,
         total_pages,
+        total_items,
         has_prev: page > 1,
         has_next: page < total_pages,
     };
@@ -272,6 +274,7 @@ async fn following_page(
     let pagination = PaginationInfo {
         page,
         total_pages,
+        total_items,
         has_prev: page > 1,
         has_next: page < total_pages,
     };

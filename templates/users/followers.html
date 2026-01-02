@@ -19,7 +19,7 @@
             {% if is_own_profile %}Your Followers{% else %}{{ profile.display_name }}'s Followers{% endif %}
         </h1>
         <p class="mt-1 text-gray-500 dark:text-gray-400">
-            {{ users.len() }}{% if pagination.total_pages > 1 %} of {{ pagination.page * 20 }}{% endif %} followers
+            {{ pagination.total_items }} follower{% if pagination.total_items != 1 %}s{% endif %}
         </p>
     </header>
 

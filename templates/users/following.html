@@ -19,7 +19,7 @@
             {% if is_own_profile %}Following{% else %}{{ profile.display_name }} is Following{% endif %}
         </h1>
         <p class="mt-1 text-gray-500 dark:text-gray-400">
-            {{ users.len() }}{% if pagination.total_pages > 1 %} of {{ pagination.page * 20 }}{% endif %} following
+            Following {{ pagination.total_items }} user{% if pagination.total_items != 1 %}s{% endif %}
         </p>
     </header>
 
