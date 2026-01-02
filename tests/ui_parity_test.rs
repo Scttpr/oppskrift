@@ -1449,3 +1449,509 @@ async fn test_export_exactly_50_recipes() {
 
     ctx.cleanup().await;
 }
+
+// =============================================================================
+// CSRF Validation Tests
+// =============================================================================
+
+/// Test: Accept contribution without CSRF token fails
+#[tokio::test]
+async fn test_accept_contribution_missing_csrf() {
+    let mut ctx = TestContext::new().await;
+
+    let (owner_id, owner_session) = ctx.create_and_login("csrf_owner").await;
+    let (contributor_id, _) = ctx.create_and_login("csrf_contrib").await;
+
+    let book_id = ctx.create_book(owner_id, "CSRF Test Book", "private").await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "CSRF Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // Try to accept without CSRF token
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/accept",
+                book_id, contribution_id
+            ),
+            json!({}), // No csrf_token
+            &owner_session,
+        )
+        .await;
+
+    // Should fail with 400 or 403
+    assert!(
+        response.status == 400 || response.status == 403 || response.status == 422,
+        "Missing CSRF should be rejected: status={}, body={:?}",
+        response.status,
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Accept contribution with invalid CSRF token fails
+#[tokio::test]
+async fn test_accept_contribution_invalid_csrf() {
+    let mut ctx = TestContext::new().await;
+
+    let (owner_id, owner_session) = ctx.create_and_login("csrf_invalid_owner").await;
+    let (contributor_id, _) = ctx.create_and_login("csrf_invalid_contrib").await;
+
+    let book_id = ctx
+        .create_book(owner_id, "CSRF Invalid Book", "private")
+        .await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "CSRF Invalid Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // Try to accept with invalid CSRF token
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/accept",
+                book_id, contribution_id
+            ),
+            json!({ "csrf_token": "invalid_token_12345" }),
+            &owner_session,
+        )
+        .await;
+
+    // Should fail with 400 or 403
+    assert!(
+        response.status == 400 || response.status == 403,
+        "Invalid CSRF should be rejected: status={}, body={:?}",
+        response.status,
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Reject contribution without CSRF token fails
+#[tokio::test]
+async fn test_reject_contribution_missing_csrf() {
+    let mut ctx = TestContext::new().await;
+
+    let (owner_id, owner_session) = ctx.create_and_login("csrf_reject_owner").await;
+    let (contributor_id, _) = ctx.create_and_login("csrf_reject_contrib").await;
+
+    let book_id = ctx
+        .create_book(owner_id, "CSRF Reject Book", "private")
+        .await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "CSRF Reject Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // Try to reject without CSRF token
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/reject",
+                book_id, contribution_id
+            ),
+            json!({ "reason": "test" }), // No csrf_token
+            &owner_session,
+        )
+        .await;
+
+    // Should fail with 400 or 403
+    assert!(
+        response.status == 400 || response.status == 403 || response.status == 422,
+        "Missing CSRF should be rejected: status={}, body={:?}",
+        response.status,
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Data Consistency Tests
+// =============================================================================
+
+/// Test: After accepting contribution, recipe appears in book
+#[tokio::test]
+async fn test_accepted_contribution_adds_recipe_to_book() {
+    let mut ctx = TestContext::new().await;
+
+    let (owner_id, owner_session) = ctx.create_and_login("consist_owner").await;
+    let (contributor_id, _) = ctx.create_and_login("consist_contrib").await;
+
+    let book_id = ctx
+        .create_book(owner_id, "Consistency Book", "public")
+        .await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "Consistency Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // Verify recipe is NOT in book before accept
+    let before_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM book_recipe_entries WHERE book_id = $1 AND recipe_id = $2",
+    )
+    .bind(book_id)
+    .bind(recipe_id)
+    .fetch_one(&ctx.db)
+    .await
+    .expect("Failed to count entries");
+
+    assert_eq!(
+        before_count, 0,
+        "Recipe should not be in book before accept"
+    );
+
+    // Accept the contribution
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/accept",
+                book_id, contribution_id
+            ),
+            json!({ "csrf_token": "test" }),
+            &owner_session,
+        )
+        .await;
+
+    assert!(
+        response.status == 200 || response.status == 302,
+        "Accept should succeed: {:?}",
+        response.body
+    );
+
+    // Verify recipe IS in book after accept
+    let after_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM book_recipe_entries WHERE book_id = $1 AND recipe_id = $2",
+    )
+    .bind(book_id)
+    .bind(recipe_id)
+    .fetch_one(&ctx.db)
+    .await
+    .expect("Failed to count entries");
+
+    assert_eq!(after_count, 1, "Recipe should be in book after accept");
+
+    ctx.cleanup().await;
+}
+
+/// Test: After rejecting contribution, recipe does NOT appear in book
+#[tokio::test]
+async fn test_rejected_contribution_does_not_add_recipe() {
+    let mut ctx = TestContext::new().await;
+
+    let (owner_id, owner_session) = ctx.create_and_login("reject_consist_owner").await;
+    let (contributor_id, _) = ctx.create_and_login("reject_consist_contrib").await;
+
+    let book_id = ctx
+        .create_book(owner_id, "Reject Consistency Book", "public")
+        .await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "Reject Consistency Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // Reject the contribution
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/reject",
+                book_id, contribution_id
+            ),
+            json!({ "csrf_token": "test", "reason": "Not suitable" }),
+            &owner_session,
+        )
+        .await;
+
+    assert!(
+        response.status == 200 || response.status == 302,
+        "Reject should succeed: {:?}",
+        response.body
+    );
+
+    // Verify recipe is NOT in book
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM book_recipe_entries WHERE book_id = $1 AND recipe_id = $2",
+    )
+    .bind(book_id)
+    .bind(recipe_id)
+    .fetch_one(&ctx.db)
+    .await
+    .expect("Failed to count entries");
+
+    assert_eq!(count, 0, "Recipe should NOT be in book after reject");
+
+    ctx.cleanup().await;
+}
+
+/// Test: Follow count increases after following
+#[tokio::test]
+async fn test_follow_increases_count() {
+    let mut ctx = TestContext::new().await;
+
+    let (follower_id, follower_session) = ctx.create_and_login("count_follower").await;
+    let (target_id, _) = ctx.create_and_login("count_target").await;
+
+    // Get initial follower count
+    let initial_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM follows WHERE following_id = $1")
+            .bind(target_id)
+            .fetch_one(&ctx.db)
+            .await
+            .expect("Failed to count followers");
+
+    assert_eq!(initial_count, 0, "Should start with 0 followers");
+
+    // Follow the target
+    let response = ctx
+        .post_with_session(
+            &format!("/api/v1/users/{}/follow", target_id),
+            json!({}),
+            &follower_session,
+        )
+        .await;
+
+    assert!(
+        response.status == 200 || response.status == 201,
+        "Follow should succeed: {:?}",
+        response.body
+    );
+
+    // Check follower count increased
+    let after_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM follows WHERE following_id = $1")
+            .bind(target_id)
+            .fetch_one(&ctx.db)
+            .await
+            .expect("Failed to count followers");
+
+    assert_eq!(after_count, 1, "Should have 1 follower after follow");
+
+    ctx.cleanup().await;
+}
+
+/// Test: Follow count decreases after unfollowing
+#[tokio::test]
+async fn test_unfollow_decreases_count() {
+    let mut ctx = TestContext::new().await;
+
+    let (follower_id, follower_session) = ctx.create_and_login("uncount_follower").await;
+    let (target_id, _) = ctx.create_and_login("uncount_target").await;
+
+    // Create follow relationship
+    ctx.create_follow(follower_id, target_id).await;
+
+    // Verify we have 1 follower
+    let initial_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM follows WHERE following_id = $1")
+            .bind(target_id)
+            .fetch_one(&ctx.db)
+            .await
+            .expect("Failed to count followers");
+
+    assert_eq!(initial_count, 1, "Should have 1 follower");
+
+    // Unfollow
+    let response = ctx
+        .delete_with_session(
+            &format!("/api/v1/users/{}/follow", target_id),
+            &follower_session,
+        )
+        .await;
+
+    assert!(
+        response.status == 200 || response.status == 204,
+        "Unfollow should succeed: {:?}",
+        response.body
+    );
+
+    // Check follower count decreased
+    let after_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM follows WHERE following_id = $1")
+            .bind(target_id)
+            .fetch_one(&ctx.db)
+            .await
+            .expect("Failed to count followers");
+
+    assert_eq!(after_count, 0, "Should have 0 followers after unfollow");
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Idempotency Tests - Follow/Unfollow
+// =============================================================================
+
+/// Test: Double follow is handled gracefully
+#[tokio::test]
+async fn test_double_follow() {
+    let mut ctx = TestContext::new().await;
+
+    let (_follower_id, follower_session) = ctx.create_and_login("double_follower").await;
+    let (target_id, _) = ctx.create_and_login("double_target").await;
+
+    // First follow
+    let response1 = ctx
+        .post_with_session(
+            &format!("/api/v1/users/{}/follow", target_id),
+            json!({}),
+            &follower_session,
+        )
+        .await;
+
+    assert!(
+        response1.status == 200 || response1.status == 201,
+        "First follow should succeed: {:?}",
+        response1.body
+    );
+
+    // Second follow (already following)
+    let response2 = ctx
+        .post_with_session(
+            &format!("/api/v1/users/{}/follow", target_id),
+            json!({}),
+            &follower_session,
+        )
+        .await;
+
+    // Should either succeed (idempotent) or return 409 (conflict)
+    assert!(
+        response2.status == 200 || response2.status == 201 || response2.status == 409,
+        "Double follow should be handled gracefully: status={}, body={:?}",
+        response2.status,
+        response2.body
+    );
+
+    // Verify still only 1 follow relationship
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM follows WHERE following_id = $1")
+        .bind(target_id)
+        .fetch_one(&ctx.db)
+        .await
+        .expect("Failed to count followers");
+
+    assert_eq!(count, 1, "Should still have only 1 follower");
+
+    ctx.cleanup().await;
+}
+
+/// Test: Double unfollow is handled gracefully
+#[tokio::test]
+async fn test_double_unfollow() {
+    let mut ctx = TestContext::new().await;
+
+    let (follower_id, follower_session) = ctx.create_and_login("double_unfollower").await;
+    let (target_id, _) = ctx.create_and_login("double_unfollow_target").await;
+
+    // Create follow relationship
+    ctx.create_follow(follower_id, target_id).await;
+
+    // First unfollow
+    let response1 = ctx
+        .delete_with_session(
+            &format!("/api/v1/users/{}/follow", target_id),
+            &follower_session,
+        )
+        .await;
+
+    assert!(
+        response1.status == 200 || response1.status == 204,
+        "First unfollow should succeed: {:?}",
+        response1.body
+    );
+
+    // Second unfollow (already unfollowed)
+    let response2 = ctx
+        .delete_with_session(
+            &format!("/api/v1/users/{}/follow", target_id),
+            &follower_session,
+        )
+        .await;
+
+    // Should either succeed (idempotent) or return 404 (not found)
+    assert!(
+        response2.status == 200 || response2.status == 204 || response2.status == 404,
+        "Double unfollow should be handled gracefully: status={}, body={:?}",
+        response2.status,
+        response2.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Security event recorded on session revoke
+#[tokio::test]
+async fn test_security_event_on_session_revoke() {
+    let mut ctx = TestContext::new().await;
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+    let password = "Xk9#mP2$vL5@nQ8!";
+
+    let user_id = ctx.create_user(&email, &username, password, true).await;
+
+    // Create two sessions
+    let session1 = ctx
+        .login_and_get_session(&email, password)
+        .await
+        .expect("First login should succeed");
+
+    let session2 = ctx
+        .login_and_get_session(&email, password)
+        .await
+        .expect("Second login should succeed");
+
+    // Get initial security event count
+    let initial_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM security_events WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(&ctx.db)
+            .await
+            .expect("Failed to count events");
+
+    // Revoke session1 from session2
+    let session1_id = ctx
+        .get_session_id(&session1)
+        .await
+        .expect("Should find session ID");
+    let response = ctx
+        .delete_with_session(
+            &format!("/api/v1/account/sessions/{}", session1_id),
+            &session2,
+        )
+        .await;
+
+    assert!(
+        response.status == 200 || response.status == 204,
+        "Revoke should succeed: {:?}",
+        response.body
+    );
+
+    // Check security event was recorded
+    let after_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM security_events WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(&ctx.db)
+            .await
+            .expect("Failed to count events");
+
+    assert!(
+        after_count > initial_count,
+        "Security event should be recorded: before={}, after={}",
+        initial_count,
+        after_count
+    );
+
+    ctx.cleanup().await;
+}
