@@ -2040,6 +2040,20 @@ async fn export_data(
 
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
 
+    // Use advisory lock to prevent TOCTOU race condition on rate limit
+    // Lock key is based on user_id to allow concurrent exports by different users
+    let lock_key = auth.id.as_u128() as i64; // Use lower 64 bits of UUID
+    let lock_acquired: bool = sqlx::query_scalar!("SELECT pg_try_advisory_xact_lock($1)", lock_key)
+        .fetch_one(&state.db)
+        .await?
+        .unwrap_or(false);
+
+    if !lock_acquired {
+        return Err(AppError::BadRequest(
+            "Export already in progress. Please wait and try again.".to_string(),
+        ));
+    }
+
     // Check rate limit (T028): 1 export per hour
     let last_export: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar!(
         r#"
