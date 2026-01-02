@@ -916,6 +916,44 @@ impl TestContext {
         result.is_some()
     }
 
+    /// Create a book contribution directly in database
+    pub async fn create_book_contribution(
+        &self,
+        book_id: Uuid,
+        recipe_id: Uuid,
+        contributor_id: Uuid,
+    ) -> Uuid {
+        let contribution_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO book_contributions (book_id, recipe_id, contributor_id, status)
+            VALUES ($1, $2, $3, 'pending')
+            RETURNING id
+            "#,
+        )
+        .bind(book_id)
+        .bind(recipe_id)
+        .bind(contributor_id)
+        .fetch_one(&self.db)
+        .await
+        .expect("Failed to create book contribution");
+
+        contribution_id
+    }
+
+    /// Get session ID from session token (for individual revoke tests)
+    pub async fn get_session_id(&self, session_token: &str) -> Option<Uuid> {
+        // Hash the token like the server does
+        let mut hasher = Sha256::new();
+        hasher.update(session_token.as_bytes());
+        let token_hash = hex::encode(hasher.finalize());
+
+        sqlx::query_scalar("SELECT id FROM sessions WHERE token_hash = $1")
+            .bind(&token_hash)
+            .fetch_optional(&self.db)
+            .await
+            .expect("Failed to get session ID")
+    }
+
     /// DELETE with session cookie
     pub async fn delete_with_session(&self, path: &str, session: &str) -> ApiResponse {
         let response = self

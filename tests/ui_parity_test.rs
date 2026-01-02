@@ -611,3 +611,484 @@ async fn test_search_users_empty_query() {
 
     ctx.cleanup().await;
 }
+
+// =============================================================================
+// Authorization Tests - Contribution Accept/Reject (Security Fix Validation)
+// =============================================================================
+
+/// Test: Non-owner cannot accept contribution (authorization check)
+#[tokio::test]
+async fn test_non_owner_cannot_accept_contribution() {
+    let mut ctx = TestContext::new().await;
+
+    // Create book owner
+    let (owner_id, _owner_session) = ctx.create_and_login("auth_owner").await;
+
+    // Create contributor
+    let (contributor_id, _contributor_session) = ctx.create_and_login("auth_contributor").await;
+
+    // Create attacker (neither owner nor contributor)
+    let (_attacker_id, attacker_session) = ctx.create_and_login("auth_attacker").await;
+
+    // Create a book and a pending contribution
+    let book_id = ctx.create_book(owner_id, "Auth Test Book", "private").await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "Contributed Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // Attacker tries to accept the contribution
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/accept",
+                book_id, contribution_id
+            ),
+            json!({ "csrf_token": "test" }),
+            &attacker_session,
+        )
+        .await;
+
+    // Should be forbidden (403) or unauthorized
+    assert!(
+        response.status == 403 || response.status == 401,
+        "Non-owner should not be able to accept contribution: status={}, body={:?}",
+        response.status,
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Non-owner cannot reject contribution (authorization check)
+#[tokio::test]
+async fn test_non_owner_cannot_reject_contribution() {
+    let mut ctx = TestContext::new().await;
+
+    // Create book owner
+    let (owner_id, _owner_session) = ctx.create_and_login("reject_owner").await;
+
+    // Create contributor
+    let (contributor_id, _contributor_session) = ctx.create_and_login("reject_contributor").await;
+
+    // Create attacker
+    let (_attacker_id, attacker_session) = ctx.create_and_login("reject_attacker").await;
+
+    // Create a book and a pending contribution
+    let book_id = ctx
+        .create_book(owner_id, "Reject Auth Test Book", "private")
+        .await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "Reject Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // Attacker tries to reject the contribution
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/reject",
+                book_id, contribution_id
+            ),
+            json!({ "csrf_token": "test", "reason": "malicious rejection" }),
+            &attacker_session,
+        )
+        .await;
+
+    // Should be forbidden (403) or unauthorized
+    assert!(
+        response.status == 403 || response.status == 401,
+        "Non-owner should not be able to reject contribution: status={}, body={:?}",
+        response.status,
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Contribution Accept/Reject Flow Tests
+// =============================================================================
+
+/// Test: Owner can accept a pending contribution
+#[tokio::test]
+async fn test_owner_can_accept_contribution() {
+    let mut ctx = TestContext::new().await;
+
+    // Create book owner
+    let (owner_id, owner_session) = ctx.create_and_login("accept_owner").await;
+
+    // Create contributor
+    let (contributor_id, _contributor_session) = ctx.create_and_login("accept_contrib").await;
+
+    // Create book, recipe, and contribution
+    let book_id = ctx
+        .create_book(owner_id, "Accept Test Book", "private")
+        .await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "Accept Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // Owner accepts the contribution
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/accept",
+                book_id, contribution_id
+            ),
+            json!({ "csrf_token": "test" }),
+            &owner_session,
+        )
+        .await;
+
+    // Should succeed (200 or redirect)
+    assert!(
+        response.status == 200 || response.status == 302 || response.status == 303,
+        "Owner should be able to accept contribution: status={}, body={:?}",
+        response.status,
+        response.body
+    );
+
+    // Verify contribution status changed to accepted
+    let status: Option<String> =
+        sqlx::query_scalar("SELECT status::text FROM book_contributions WHERE id = $1")
+            .bind(contribution_id)
+            .fetch_optional(&ctx.db)
+            .await
+            .expect("Failed to query contribution");
+
+    assert_eq!(
+        status,
+        Some("accepted".to_string()),
+        "Contribution status should be 'accepted'"
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Owner can reject a pending contribution
+#[tokio::test]
+async fn test_owner_can_reject_contribution() {
+    let mut ctx = TestContext::new().await;
+
+    // Create book owner
+    let (owner_id, owner_session) = ctx.create_and_login("reject_own").await;
+
+    // Create contributor
+    let (contributor_id, _contributor_session) = ctx.create_and_login("reject_contrib").await;
+
+    // Create book, recipe, and contribution
+    let book_id = ctx
+        .create_book(owner_id, "Reject Test Book", "private")
+        .await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "Reject Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // Owner rejects the contribution
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/reject",
+                book_id, contribution_id
+            ),
+            json!({ "csrf_token": "test", "reason": "Not a good fit" }),
+            &owner_session,
+        )
+        .await;
+
+    // Should succeed (200 or redirect)
+    assert!(
+        response.status == 200 || response.status == 302 || response.status == 303,
+        "Owner should be able to reject contribution: status={}, body={:?}",
+        response.status,
+        response.body
+    );
+
+    // Verify contribution status changed to rejected
+    let status: Option<String> =
+        sqlx::query_scalar("SELECT status::text FROM book_contributions WHERE id = $1")
+            .bind(contribution_id)
+            .fetch_optional(&ctx.db)
+            .await
+            .expect("Failed to query contribution");
+
+    assert_eq!(
+        status,
+        Some("rejected".to_string()),
+        "Contribution status should be 'rejected'"
+    );
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Individual Session Revoke Tests
+// =============================================================================
+
+/// Test: Revoke a specific session by ID
+#[tokio::test]
+async fn test_revoke_individual_session() {
+    let mut ctx = TestContext::new().await;
+
+    let email = TestContext::unique_email();
+    let username = TestContext::unique_username();
+    let password = "Xk9#mP2$vL5@nQ8!";
+
+    ctx.create_user(&email, &username, password, true).await;
+
+    // Create two sessions
+    let session1 = ctx
+        .login_and_get_session(&email, password)
+        .await
+        .expect("First login should succeed");
+
+    let session2 = ctx
+        .login_and_get_session(&email, password)
+        .await
+        .expect("Second login should succeed");
+
+    // Get session1's ID
+    let session1_id = ctx
+        .get_session_id(&session1)
+        .await
+        .expect("Should find session1 ID");
+
+    // From session2, revoke session1 specifically
+    let response = ctx
+        .delete_with_session(
+            &format!("/api/v1/account/sessions/{}", session1_id),
+            &session2,
+        )
+        .await;
+
+    assert!(
+        response.status == 200 || response.status == 204,
+        "Should successfully revoke session: {:?}",
+        response.body
+    );
+
+    // session1 should now be invalid
+    let check1 = ctx
+        .get_with_session("/api/v1/account/profile", &session1)
+        .await;
+    assert_eq!(check1.status, 401, "Revoked session should be invalid");
+
+    // session2 should still work
+    let check2 = ctx
+        .get_with_session("/api/v1/account/profile", &session2)
+        .await;
+    assert_eq!(check2.status, 200, "Current session should still be valid");
+
+    ctx.cleanup().await;
+}
+
+/// Test: Cannot revoke your own current session via individual revoke
+#[tokio::test]
+async fn test_cannot_revoke_current_session() {
+    let mut ctx = TestContext::new().await;
+    let (_user_id, session) = ctx.create_and_login("self_revoke").await;
+
+    // Get current session's ID
+    let session_id = ctx
+        .get_session_id(&session)
+        .await
+        .expect("Should find session ID");
+
+    // Try to revoke own session
+    let response = ctx
+        .delete_with_session(
+            &format!("/api/v1/account/sessions/{}", session_id),
+            &session,
+        )
+        .await;
+
+    // Should fail with 400 or 403 (can't revoke current session)
+    assert!(
+        response.status == 400 || response.status == 403,
+        "Should not be able to revoke current session: status={}, body={:?}",
+        response.status,
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Export Rate Limit Tests
+// =============================================================================
+
+/// Test: Export rate limit is enforced
+#[tokio::test]
+async fn test_export_rate_limit() {
+    let mut ctx = TestContext::new().await;
+    let (user_id, session) = ctx.create_and_login("rate_limit").await;
+
+    // First export should succeed
+    let response1 = ctx
+        .get_with_session("/api/v1/users/me/export", &session)
+        .await;
+
+    assert_eq!(
+        response1.status, 200,
+        "First export should succeed: {:?}",
+        response1.body
+    );
+
+    // Insert a fake export event within the last hour
+    sqlx::query(
+        r#"
+        INSERT INTO security_events (user_id, event_type, ip_address, user_agent)
+        VALUES ($1, 'account_export', '127.0.0.1', 'test')
+        "#,
+    )
+    .bind(user_id)
+    .execute(&ctx.db)
+    .await
+    .expect("Failed to insert security event");
+
+    // Second export should be rate limited
+    let response2 = ctx
+        .get_with_session("/api/v1/users/me/export", &session)
+        .await;
+
+    assert_eq!(
+        response2.status, 400,
+        "Second export should be rate limited: {:?}",
+        response2.body
+    );
+
+    // Error message should mention rate limit
+    let error_msg = response2.error_message().unwrap_or("");
+    assert!(
+        error_msg.contains("rate") || error_msg.contains("limit") || error_msg.contains("wait"),
+        "Error should mention rate limit: {}",
+        error_msg
+    );
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Pagination Tests for Followers/Following
+// =============================================================================
+
+/// Test: Followers pagination works correctly
+#[tokio::test]
+async fn test_followers_pagination() {
+    let mut ctx = TestContext::new().await;
+
+    // Create target user
+    let (target_id, _target_session) = ctx.create_and_login("paginate_target").await;
+
+    // Create 25 followers (more than page size of 20)
+    for i in 0..25 {
+        let (follower_id, _) = ctx
+            .create_and_login(&format!("paginate_follower_{}", i))
+            .await;
+        ctx.create_follow(follower_id, target_id).await;
+    }
+
+    // Get first page
+    let response1 = ctx
+        .get(&format!("/api/v1/users/{}/followers?page=1", target_id))
+        .await;
+
+    assert_eq!(
+        response1.status, 200,
+        "First page should succeed: {:?}",
+        response1.body
+    );
+
+    let followers1 = response1.body.as_array().expect("Should return array");
+    assert_eq!(
+        followers1.len(),
+        20,
+        "First page should have 20 followers (page size)"
+    );
+
+    // Get second page
+    let response2 = ctx
+        .get(&format!("/api/v1/users/{}/followers?page=2", target_id))
+        .await;
+
+    assert_eq!(
+        response2.status, 200,
+        "Second page should succeed: {:?}",
+        response2.body
+    );
+
+    let followers2 = response2.body.as_array().expect("Should return array");
+    assert_eq!(
+        followers2.len(),
+        5,
+        "Second page should have remaining 5 followers"
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Following pagination works correctly
+#[tokio::test]
+async fn test_following_pagination() {
+    let mut ctx = TestContext::new().await;
+
+    // Create user who follows many
+    let (user_id, _user_session) = ctx.create_and_login("following_user").await;
+
+    // Create 25 users to follow
+    for i in 0..25 {
+        let (target_id, _) = ctx
+            .create_and_login(&format!("following_target_{}", i))
+            .await;
+        ctx.create_follow(user_id, target_id).await;
+    }
+
+    // Get first page
+    let response1 = ctx
+        .get(&format!("/api/v1/users/{}/following?page=1", user_id))
+        .await;
+
+    assert_eq!(
+        response1.status, 200,
+        "First page should succeed: {:?}",
+        response1.body
+    );
+
+    let following1 = response1.body.as_array().expect("Should return array");
+    assert_eq!(
+        following1.len(),
+        20,
+        "First page should have 20 users (page size)"
+    );
+
+    // Get second page
+    let response2 = ctx
+        .get(&format!("/api/v1/users/{}/following?page=2", user_id))
+        .await;
+
+    assert_eq!(
+        response2.status, 200,
+        "Second page should succeed: {:?}",
+        response2.body
+    );
+
+    let following2 = response2.body.as_array().expect("Should return array");
+    assert_eq!(
+        following2.len(),
+        5,
+        "Second page should have remaining 5 users"
+    );
+
+    ctx.cleanup().await;
+}
