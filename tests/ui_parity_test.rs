@@ -336,7 +336,7 @@ async fn test_create_book_contribution() {
     let mut ctx = TestContext::new().await;
 
     // Create book owner
-    let (owner_id, owner_session) = ctx.create_and_login("book_owner").await;
+    let (owner_id, _owner_session) = ctx.create_and_login("book_owner").await;
 
     // Create contributor
     let (contributor_id, contributor_session) = ctx.create_and_login("contributor").await;
@@ -1701,7 +1701,7 @@ async fn test_rejected_contribution_does_not_add_recipe() {
 async fn test_follow_increases_count() {
     let mut ctx = TestContext::new().await;
 
-    let (follower_id, follower_session) = ctx.create_and_login("count_follower").await;
+    let (_follower_id, follower_session) = ctx.create_and_login("count_follower").await;
     let (target_id, _) = ctx.create_and_login("count_target").await;
 
     // Get initial follower count
