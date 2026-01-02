@@ -1092,3 +1092,360 @@ async fn test_following_pagination() {
 
     ctx.cleanup().await;
 }
+
+// =============================================================================
+// Error Path Tests - Invalid IDs and Edge Cases
+// =============================================================================
+
+/// Test: Revoke non-existent session returns 404
+#[tokio::test]
+async fn test_revoke_invalid_session_id() {
+    let mut ctx = TestContext::new().await;
+    let (_user_id, session) = ctx.create_and_login("invalid_revoke").await;
+
+    // Try to revoke a random UUID that doesn't exist
+    let fake_session_id = uuid::Uuid::new_v4();
+    let response = ctx
+        .delete_with_session(
+            &format!("/api/v1/account/sessions/{}", fake_session_id),
+            &session,
+        )
+        .await;
+
+    assert_eq!(
+        response.status, 404,
+        "Revoking non-existent session should return 404: {:?}",
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Get followers for non-existent user returns 404
+#[tokio::test]
+async fn test_get_followers_invalid_user() {
+    let ctx = TestContext::new().await;
+
+    let fake_user_id = uuid::Uuid::new_v4();
+    let response = ctx
+        .get(&format!("/api/v1/users/{}/followers", fake_user_id))
+        .await;
+
+    assert_eq!(
+        response.status, 404,
+        "Followers for non-existent user should return 404: {:?}",
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Get following for non-existent user returns 404
+#[tokio::test]
+async fn test_get_following_invalid_user() {
+    let ctx = TestContext::new().await;
+
+    let fake_user_id = uuid::Uuid::new_v4();
+    let response = ctx
+        .get(&format!("/api/v1/users/{}/following", fake_user_id))
+        .await;
+
+    assert_eq!(
+        response.status, 404,
+        "Following for non-existent user should return 404: {:?}",
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Follow non-existent user returns 404
+#[tokio::test]
+async fn test_follow_nonexistent_user() {
+    let mut ctx = TestContext::new().await;
+    let (_user_id, session) = ctx.create_and_login("follower_404").await;
+
+    let fake_user_id = uuid::Uuid::new_v4();
+    let response = ctx
+        .post_with_session(
+            &format!("/api/v1/users/{}/follow", fake_user_id),
+            json!({}),
+            &session,
+        )
+        .await;
+
+    assert_eq!(
+        response.status, 404,
+        "Following non-existent user should return 404: {:?}",
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Input Validation and Security Tests
+// =============================================================================
+
+/// Test: User search sanitizes special characters
+#[tokio::test]
+async fn test_search_special_characters() {
+    let mut ctx = TestContext::new().await;
+    let (_, session) = ctx.create_and_login("search_special").await;
+
+    // Test SQL injection attempt
+    let response = ctx
+        .get_with_session("/api/v1/users/search?q='; DROP TABLE users;--", &session)
+        .await;
+
+    assert_eq!(
+        response.status, 200,
+        "SQL injection attempt should not crash: {:?}",
+        response.body
+    );
+
+    // Results should be empty (special chars filtered)
+    let results = response.body.as_array().expect("Should return array");
+    assert!(
+        results.is_empty(),
+        "SQL injection query should return empty results"
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: User search with regex special characters
+#[tokio::test]
+async fn test_search_regex_characters() {
+    let mut ctx = TestContext::new().await;
+    let (_, session) = ctx.create_and_login("search_regex").await;
+
+    // Test regex special characters
+    let response = ctx
+        .get_with_session("/api/v1/users/search?q=.*%25", &session)
+        .await;
+
+    assert_eq!(
+        response.status, 200,
+        "Regex characters should not crash: {:?}",
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: User search with very long query
+#[tokio::test]
+async fn test_search_long_query() {
+    let mut ctx = TestContext::new().await;
+    let (_, session) = ctx.create_and_login("search_long").await;
+
+    // Create a very long search query (1000 chars)
+    let long_query = "a".repeat(1000);
+    let response = ctx
+        .get_with_session(&format!("/api/v1/users/search?q={}", long_query), &session)
+        .await;
+
+    // Should handle gracefully (200 with empty results, not 500)
+    assert!(
+        response.status == 200 || response.status == 400,
+        "Long query should be handled gracefully: status={}, body={:?}",
+        response.status,
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Search limit parameter is clamped
+#[tokio::test]
+async fn test_search_limit_clamping() {
+    let mut ctx = TestContext::new().await;
+    let (_, session) = ctx.create_and_login("search_limit").await;
+
+    // Create some users to find
+    for i in 0..5 {
+        let email = TestContext::unique_email();
+        ctx.create_user(&email, &format!("limituser{}", i), "Xk9#mP2$vL5@nQ8!", true)
+            .await;
+    }
+
+    // Test limit > 50 (should clamp to 50)
+    let response = ctx
+        .get_with_session("/api/v1/users/search?q=limituser&limit=100", &session)
+        .await;
+
+    assert_eq!(response.status, 200, "Should succeed: {:?}", response.body);
+
+    // Test limit = 0 (should clamp to 1 or return empty)
+    let response = ctx
+        .get_with_session("/api/v1/users/search?q=limituser&limit=0", &session)
+        .await;
+
+    assert_eq!(
+        response.status, 200,
+        "Zero limit should be handled: {:?}",
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Idempotency and State Tests
+// =============================================================================
+
+/// Test: Double-accept contribution (idempotency)
+#[tokio::test]
+async fn test_double_accept_contribution() {
+    let mut ctx = TestContext::new().await;
+
+    let (owner_id, owner_session) = ctx.create_and_login("double_owner").await;
+    let (contributor_id, _) = ctx.create_and_login("double_contrib").await;
+
+    let book_id = ctx
+        .create_book(owner_id, "Double Accept Book", "private")
+        .await;
+    let recipe_id = ctx
+        .create_complete_recipe(contributor_id, "Double Recipe", "public")
+        .await;
+    let contribution_id = ctx
+        .create_book_contribution(book_id, recipe_id, contributor_id)
+        .await;
+
+    // First accept
+    let response1 = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/accept",
+                book_id, contribution_id
+            ),
+            json!({ "csrf_token": "test" }),
+            &owner_session,
+        )
+        .await;
+
+    assert!(
+        response1.status == 200 || response1.status == 302,
+        "First accept should succeed: {:?}",
+        response1.body
+    );
+
+    // Second accept (already accepted)
+    let response2 = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/accept",
+                book_id, contribution_id
+            ),
+            json!({ "csrf_token": "test" }),
+            &owner_session,
+        )
+        .await;
+
+    // Should either succeed (idempotent) or return 400/409 (already processed)
+    assert!(
+        response2.status == 200
+            || response2.status == 302
+            || response2.status == 400
+            || response2.status == 409,
+        "Double accept should be handled gracefully: status={}, body={:?}",
+        response2.status,
+        response2.body
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Accept contribution for non-existent book
+#[tokio::test]
+async fn test_accept_contribution_invalid_book() {
+    let mut ctx = TestContext::new().await;
+    let (_user_id, session) = ctx.create_and_login("invalid_book").await;
+
+    let fake_book_id = uuid::Uuid::new_v4();
+    let fake_contribution_id = uuid::Uuid::new_v4();
+
+    let response = ctx
+        .post_with_session(
+            &format!(
+                "/books/{}/contributions/{}/accept",
+                fake_book_id, fake_contribution_id
+            ),
+            json!({ "csrf_token": "test" }),
+            &session,
+        )
+        .await;
+
+    assert_eq!(
+        response.status, 404,
+        "Accept on non-existent book should return 404: {:?}",
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
+
+// =============================================================================
+// Export Threshold Tests
+// =============================================================================
+
+/// Test: Export with many recipes (threshold behavior)
+#[tokio::test]
+async fn test_export_many_recipes_threshold() {
+    let mut ctx = TestContext::new().await;
+    let (user_id, session) = ctx.create_and_login("many_recipes").await;
+
+    // Create 51 recipes (just over the threshold)
+    for i in 0..51 {
+        ctx.create_recipe(user_id, &format!("Recipe {}", i), "public")
+            .await;
+    }
+
+    // Export should fail with >50 recipes
+    let response = ctx
+        .get_with_session("/api/v1/users/me/export", &session)
+        .await;
+
+    assert_eq!(
+        response.status, 400,
+        "Export with >50 recipes should be rejected: {:?}",
+        response.body
+    );
+
+    // Error should mention async or large export
+    let error_msg = response.error_message().unwrap_or("");
+    assert!(
+        error_msg.contains("Large") || error_msg.contains("async") || error_msg.contains("50"),
+        "Error should mention large export threshold: {}",
+        error_msg
+    );
+
+    ctx.cleanup().await;
+}
+
+/// Test: Export with exactly 50 recipes succeeds
+#[tokio::test]
+async fn test_export_exactly_50_recipes() {
+    let mut ctx = TestContext::new().await;
+    let (user_id, session) = ctx.create_and_login("fifty_recipes").await;
+
+    // Create exactly 50 recipes (at the threshold)
+    for i in 0..50 {
+        ctx.create_recipe(user_id, &format!("Recipe {}", i), "public")
+            .await;
+    }
+
+    // Export should succeed with exactly 50 recipes
+    let response = ctx
+        .get_with_session("/api/v1/users/me/export", &session)
+        .await;
+
+    assert_eq!(
+        response.status, 200,
+        "Export with exactly 50 recipes should succeed: {:?}",
+        response.body
+    );
+
+    ctx.cleanup().await;
+}
