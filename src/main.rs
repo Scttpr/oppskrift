@@ -40,6 +40,14 @@ async fn main() -> anyhow::Result<()> {
     let db = core::db::create_default_pool().await?;
     tracing::info!("Database connection pool created");
 
+    // Run migrations (embedded in binary for production deployments)
+    tracing::info!("Running database migrations...");
+    sqlx::migrate!("./migrations")
+        .run(&db)
+        .await
+        .expect("Failed to run database migrations");
+    tracing::info!("Database migrations complete");
+
     // Run seeds if requested (then exit)
     if should_seed {
         match core::seeds::run(&db).await {
