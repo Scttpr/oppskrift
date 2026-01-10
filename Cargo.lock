@@ -1867,7 +1867,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3233,7 +3233,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3880,7 +3880,7 @@ dependencies = [
  "once_cell",
  "socket2 0.6.1",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4140,9 +4140,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv"
-version = "0.7.45"
+version = "0.7.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9008cd6385b9e161d8229e1f6549dd23c3d022f132a2ea37ac3a10ac4935779b"
+checksum = "2297bf9c81a3f0dc96bc9521370b88f054168c29826a75e89c55ff196e7ed6a1"
 dependencies = [
  "bitvec",
  "bytecheck",
@@ -4158,9 +4158,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv_derive"
-version = "0.7.45"
+version = "0.7.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "503d1d27590a2b0a3a4ca4c94755aa2875657196ecbf401a42eff41d7de532c0"
+checksum = "84d7b42d4b8d06048d3ac8db0eb31bcb942cbeb709f0b5f2b2ebde398d3038f5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4289,7 +4289,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5030,7 +5030,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5892,7 +5892,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
