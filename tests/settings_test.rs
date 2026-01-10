@@ -416,9 +416,7 @@ async fn test_password_change_rate_limit() {
 
     // Rate limiting should kick in (though may not with only 10 attempts)
     // This test documents the expected behavior
-    if rate_limited {
-        assert!(true, "Rate limiting is working");
-    }
+    let _ = rate_limited;
 
     ctx.cleanup().await;
 }

@@ -321,7 +321,7 @@ async fn test_recipes_page_returns_html_content_type() {
         .map(|v| v.to_str().unwrap_or(""));
 
     assert!(
-        content_type.map_or(false, |ct| ct.contains("text/html")),
+        content_type.is_some_and(|ct| ct.contains("text/html")),
         "Page /recipes should return HTML content type"
     );
 }
@@ -338,7 +338,7 @@ async fn test_books_page_returns_html_content_type() {
         .map(|v| v.to_str().unwrap_or(""));
 
     assert!(
-        content_type.map_or(false, |ct| ct.contains("text/html")),
+        content_type.is_some_and(|ct| ct.contains("text/html")),
         "Page /books should return HTML content type"
     );
 }
@@ -355,7 +355,7 @@ async fn test_login_page_returns_html_content_type() {
         .map(|v| v.to_str().unwrap_or(""));
 
     assert!(
-        content_type.map_or(false, |ct| ct.contains("text/html")),
+        content_type.is_some_and(|ct| ct.contains("text/html")),
         "Page /login should return HTML content type"
     );
 }

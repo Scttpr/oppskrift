@@ -843,6 +843,7 @@ impl TestContext {
     }
 
     /// Grant a permission on a resource
+    #[allow(clippy::too_many_arguments)]
     pub async fn grant_permission(
         &self,
         granter_id: Uuid,

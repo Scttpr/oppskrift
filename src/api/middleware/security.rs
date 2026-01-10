@@ -71,7 +71,6 @@ mod tests {
 
     #[test]
     fn test_csp_header_not_empty() {
-        assert!(!CSP_HEADER.is_empty());
         assert!(CSP_HEADER.contains("default-src"));
         assert!(CSP_HEADER.contains("script-src"));
         assert!(CSP_HEADER.contains("frame-ancestors 'none'"));
