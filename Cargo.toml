@@ -80,7 +80,7 @@ jsonwebtoken = "9"
 
 # RSA key generation for ActivityPub signatures
 rsa = { version = "0.9", features = ["sha2"] }
-rand = "0.8"
+rand = "0.9"
 
 # Authentication
 argon2 = "0.5"
