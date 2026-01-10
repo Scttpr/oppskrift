@@ -388,14 +388,14 @@ async fn test_settings_require_auth() {
     ctx.cleanup().await;
 }
 
-/// Test: Password change endpoint rate limited
+/// Test: Password change endpoint handles rapid requests correctly
 #[tokio::test]
 async fn test_password_change_rate_limit() {
     let mut ctx = TestContext::new().await;
     let (_user_id, session) = ctx.create_and_login("rate_limit_tester").await;
 
-    // Make multiple rapid requests
-    let mut rate_limited = false;
+    // Make multiple rapid requests with wrong password
+    let mut responses = Vec::new();
     for _ in 0..10 {
         let response = ctx
             .post_with_session(
@@ -408,15 +408,24 @@ async fn test_password_change_rate_limit() {
             )
             .await;
 
+        responses.push(response.status);
+
+        // Stop early if rate limited
         if response.status == 429 {
-            rate_limited = true;
             break;
         }
     }
 
-    // Rate limiting should kick in (though may not with only 10 attempts)
-    // This test documents the expected behavior
-    let _ = rate_limited;
+    // All responses should be either:
+    // - 401/400: wrong password (expected)
+    // - 429: rate limited (also acceptable)
+    for status in &responses {
+        assert!(
+            *status == 400 || *status == 401 || *status == 429,
+            "Unexpected status code: {}. Expected 400, 401, or 429",
+            status
+        );
+    }
 
     ctx.cleanup().await;
 }
