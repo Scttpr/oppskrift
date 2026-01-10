@@ -269,6 +269,27 @@ impl BookContributionService {
         .fetch_one(pool)
         .await?;
 
+        // Add the recipe to the book (position at end)
+        let next_position: Option<i32> = sqlx::query_scalar!(
+            r#"SELECT COALESCE(MAX(position), 0) + 1 FROM book_recipe_entries WHERE book_id = $1"#,
+            contribution.book_id
+        )
+        .fetch_one(pool)
+        .await?;
+
+        sqlx::query!(
+            r#"
+            INSERT INTO book_recipe_entries (book_id, recipe_id, position)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (book_id, recipe_id) DO NOTHING
+            "#,
+            contribution.book_id,
+            contribution.recipe_id,
+            next_position.unwrap_or(1)
+        )
+        .execute(pool)
+        .await?;
+
         Ok(updated)
     }
 

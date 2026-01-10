@@ -315,7 +315,7 @@ async fn get_security_events(
 
     let events = sqlx::query_as::<_, SecurityEvent>(
         r#"
-        SELECT id, event_type, ip_address::text as ip_address, user_agent, metadata, created_at
+        SELECT id, event_type::text as event_type, ip_address::text as ip_address, user_agent, metadata, created_at
         FROM security_events
         WHERE user_id = $1
         ORDER BY created_at DESC

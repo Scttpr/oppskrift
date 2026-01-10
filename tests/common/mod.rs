@@ -23,6 +23,7 @@ use uuid::Uuid;
 pub struct TestContext {
     pub db: PgPool,
     pub server: TestServer,
+    pub csrf_secret: Vec<u8>,
     created_users: Vec<Uuid>,
     created_recipes: Vec<Uuid>,
     created_books: Vec<Uuid>,
@@ -47,7 +48,7 @@ impl TestContext {
         // Create app state and router (using test_app_router for mock ConnectInfo)
         let state = AppState {
             db: db.clone(),
-            csrf_secret,
+            csrf_secret: csrf_secret.clone(),
         };
         let app = test_app_router(state);
 
@@ -57,6 +58,7 @@ impl TestContext {
         Self {
             db,
             server,
+            csrf_secret,
             created_users: Vec::new(),
             created_recipes: Vec::new(),
             created_books: Vec::new(),
@@ -651,6 +653,36 @@ impl TestContext {
         }
     }
 
+    /// POST form data with session cookie
+    pub async fn post_form_with_session(
+        &self,
+        path: &str,
+        form_data: &[(&str, &str)],
+        session: &str,
+    ) -> ApiResponse {
+        let response = self
+            .server
+            .post(path)
+            .add_cookie(cookie::Cookie::new(
+                "oppskrift_session",
+                session.to_string(),
+            ))
+            .form(form_data)
+            .await;
+
+        let status = response.status_code().as_u16();
+        let session_cookie = extract_session_cookie(&response);
+        let text = response.text();
+        let body = serde_json::from_str::<Value>(&text)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+
+        ApiResponse {
+            status,
+            body,
+            session_cookie,
+        }
+    }
+
     /// PATCH JSON with session cookie
     pub async fn patch_with_session(&self, path: &str, body: Value, session: &str) -> ApiResponse {
         let response = self
@@ -942,9 +974,11 @@ impl TestContext {
 
     /// Get session ID from session token (for individual revoke tests)
     pub async fn get_session_id(&self, session_token: &str) -> Option<Uuid> {
-        // Hash the token like the server does
+        // The session token is hex-encoded bytes
+        // Server hashes the RAW bytes, not the hex string
+        let token_bytes = hex::decode(session_token).ok()?;
         let mut hasher = Sha256::new();
-        hasher.update(session_token.as_bytes());
+        hasher.update(&token_bytes);
         let token_hash = hex::encode(hasher.finalize());
 
         sqlx::query_scalar("SELECT id FROM sessions WHERE token_hash = $1")
@@ -952,6 +986,46 @@ impl TestContext {
             .fetch_optional(&self.db)
             .await
             .expect("Failed to get session ID")
+    }
+
+    /// Generate a valid CSRF token for a session
+    pub async fn generate_csrf_token(&self, session_token: &str) -> String {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+        use hmac::{Hmac, Mac};
+        use rand::RngCore;
+        use sha2::Sha256 as HmacSha256Digest;
+
+        type HmacSha256 = Hmac<HmacSha256Digest>;
+
+        let session_id = self
+            .get_session_id(session_token)
+            .await
+            .expect("Session not found");
+
+        let expires_at = chrono::Utc::now() + chrono::Duration::hours(1);
+        let timestamp = expires_at.timestamp();
+
+        // Generate random bytes
+        let mut random_bytes = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
+
+        // Create token payload: random || session_id || timestamp
+        let mut payload = Vec::with_capacity(32 + 16 + 8);
+        payload.extend_from_slice(&random_bytes);
+        payload.extend_from_slice(session_id.as_bytes());
+        payload.extend_from_slice(&timestamp.to_be_bytes());
+
+        // Sign the payload
+        let mut mac = HmacSha256::new_from_slice(&self.csrf_secret).expect("Invalid HMAC key");
+        mac.update(&payload);
+        let signature = mac.finalize().into_bytes();
+
+        // Combine payload and signature
+        let mut token_bytes = payload;
+        token_bytes.extend_from_slice(&signature);
+
+        // Encode as URL-safe Base64
+        URL_SAFE_NO_PAD.encode(&token_bytes)
     }
 
     /// DELETE with session cookie
