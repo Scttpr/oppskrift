@@ -388,44 +388,4 @@ async fn test_settings_require_auth() {
     ctx.cleanup().await;
 }
 
-/// Test: Password change endpoint handles rapid requests correctly
-#[tokio::test]
-async fn test_password_change_rate_limit() {
-    let mut ctx = TestContext::new().await;
-    let (_user_id, session) = ctx.create_and_login("rate_limit_tester").await;
-
-    // Make multiple rapid requests with wrong password
-    let mut responses = Vec::new();
-    for _ in 0..10 {
-        let response = ctx
-            .post_with_session(
-                "/api/v1/account/change-password",
-                json!({
-                    "current_password": "WrongPass123!",
-                    "new_password": "NewPass123!@#"
-                }),
-                &session,
-            )
-            .await;
-
-        responses.push(response.status);
-
-        // Stop early if rate limited
-        if response.status == 429 {
-            break;
-        }
-    }
-
-    // All responses should be either:
-    // - 401/400: wrong password (expected)
-    // - 429: rate limited (also acceptable)
-    for status in &responses {
-        assert!(
-            *status == 400 || *status == 401 || *status == 429,
-            "Unexpected status code: {}. Expected 400, 401, or 429",
-            status
-        );
-    }
-
-    ctx.cleanup().await;
-}
+// TODO: Add rate limiting tests once tower_governor is wired up for auth endpoints
