@@ -5,7 +5,6 @@
 
 mod common;
 
-use axum::http::header::CONTENT_TYPE;
 use common::TestContext;
 use serde_json::json;
 
@@ -18,7 +17,7 @@ use serde_json::json;
 async fn test_create_book_success() {
     let mut ctx = TestContext::new().await;
 
-    let (_user_id, session) = ctx.create_and_login("book_creator").await;
+    let (user_id, _) = ctx.create_and_login("book_creator").await;
 
     // The books API uses multipart form, so we'll test via direct database creation
     // and verify the book can be retrieved. For actual multipart testing, we'd need
@@ -26,7 +25,7 @@ async fn test_create_book_success() {
 
     // For now, test that we can create via helper and retrieve via API
     let book_id = ctx
-        .create_book(_user_id, "My Recipe Collection", "public")
+        .create_book(user_id, "My Recipe Collection", "public")
         .await;
 
     let response = ctx.get(&format!("/api/v1/books/{}", book_id)).await;

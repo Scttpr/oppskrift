@@ -125,10 +125,8 @@ async fn test_login_constant_time() {
         avg_existing.as_millis() > 0,
         "Should be able to measure timing for existing user"
     );
-    assert!(
-        avg_not_existing.as_millis() >= 0,
-        "Should be able to measure timing for non-existing user"
-    );
+    // Verify timing was measured (always true for Duration, but documents intent)
+    let _ = avg_not_existing;
 
     ctx.cleanup().await;
 }
@@ -254,11 +252,8 @@ async fn test_password_verification_constant_time_by_length() {
         );
     }
 
-    // The test documents behavior - verify we can measure
-    assert!(
-        avg_short.as_millis() >= 0 && avg_long.as_millis() >= 0,
-        "Should be able to measure password verification timing"
-    );
+    // Verify timing was measured (always true for Duration, but documents intent)
+    let _ = (avg_short, avg_long);
 
     ctx.cleanup().await;
 }
