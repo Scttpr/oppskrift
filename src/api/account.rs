@@ -155,6 +155,134 @@ pub struct SecurityEvent {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
+/// Security event view for template display (T004)
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SecurityEventView {
+    pub id: uuid::Uuid,
+    pub event_type: String,
+    pub event_icon: String,
+    pub ip_address: String,
+    pub device_info: String,
+    pub timestamp: String,
+    pub metadata_summary: String,
+}
+
+impl SecurityEventView {
+    /// Create a view from SecurityEvent with human-readable formatting
+    pub fn from_event(event: &SecurityEvent) -> Self {
+        Self {
+            id: event.id,
+            event_type: Self::format_event_type(&event.event_type),
+            event_icon: Self::get_event_icon(&event.event_type),
+            ip_address: event
+                .ip_address
+                .clone()
+                .unwrap_or_else(|| "Unknown".to_string()),
+            device_info: Self::parse_user_agent(event.user_agent.as_deref()),
+            timestamp: crate::models::session::format_relative_time(event.created_at),
+            metadata_summary: Self::summarize_metadata(event.metadata.as_ref()),
+        }
+    }
+
+    /// Convert event type code to human-readable label
+    fn format_event_type(event_type: &str) -> String {
+        match event_type {
+            "auth.login" => "Login".to_string(),
+            "auth.login.failed" => "Failed login attempt".to_string(),
+            "auth.logout" => "Logout".to_string(),
+            "auth.password.change" => "Password changed".to_string(),
+            "auth.password.reset" => "Password reset".to_string(),
+            "auth.email.change" => "Email changed".to_string(),
+            "auth.2fa.enable" => "2FA enabled".to_string(),
+            "auth.2fa.disable" => "2FA disabled".to_string(),
+            "auth.session.revoke" => "Session revoked".to_string(),
+            "auth.recovery_code.used" => "Recovery code used".to_string(),
+            "auth.deletion.request" => "Account deletion requested".to_string(),
+            "auth.deletion.cancel" => "Account deletion cancelled".to_string(),
+            other => other.replace(['.', '_'], " "),
+        }
+    }
+
+    /// Get SVG icon path for event type
+    fn get_event_icon(event_type: &str) -> String {
+        match event_type {
+            "auth.login" | "auth.logout" => "M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9".to_string(),
+            "auth.login.failed" => "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z".to_string(),
+            "auth.password.change" | "auth.password.reset" => "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z".to_string(),
+            "auth.email.change" => "M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75".to_string(),
+            "auth.2fa.enable" | "auth.2fa.disable" => "M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z".to_string(),
+            "auth.session.revoke" => "M6 18L18 6M6 6l12 12".to_string(),
+            "auth.recovery_code.used" => "M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z".to_string(),
+            "auth.deletion.request" | "auth.deletion.cancel" => "M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0".to_string(),
+            _ => "M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z".to_string(),
+        }
+    }
+
+    /// Parse user agent string to human-readable device info
+    fn parse_user_agent(user_agent: Option<&str>) -> String {
+        match user_agent {
+            Some(ua) if !ua.is_empty() => {
+                // Simple parsing - extract browser and OS
+                let browser = if ua.contains("Firefox") {
+                    "Firefox"
+                } else if ua.contains("Chrome") && !ua.contains("Edg") {
+                    "Chrome"
+                } else if ua.contains("Safari") && !ua.contains("Chrome") {
+                    "Safari"
+                } else if ua.contains("Edg") {
+                    "Edge"
+                } else {
+                    "Browser"
+                };
+
+                let os = if ua.contains("Windows") {
+                    "Windows"
+                } else if ua.contains("Mac OS") || ua.contains("Macintosh") {
+                    "macOS"
+                } else if ua.contains("Linux") {
+                    "Linux"
+                } else if ua.contains("Android") {
+                    "Android"
+                } else if ua.contains("iPhone") || ua.contains("iPad") {
+                    "iOS"
+                } else {
+                    "Unknown OS"
+                };
+
+                format!("{} on {}", browser, os)
+            }
+            _ => "Unknown device".to_string(),
+        }
+    }
+
+    /// Summarize metadata JSON to a one-line string
+    fn summarize_metadata(metadata: Option<&serde_json::Value>) -> String {
+        match metadata {
+            Some(serde_json::Value::Object(map)) if !map.is_empty() => {
+                let parts: Vec<String> = map
+                    .iter()
+                    .take(3) // Limit to 3 fields
+                    .filter_map(|(k, v)| {
+                        let value_str = match v {
+                            serde_json::Value::String(s) => s.clone(),
+                            serde_json::Value::Bool(b) => b.to_string(),
+                            serde_json::Value::Number(n) => n.to_string(),
+                            _ => return None,
+                        };
+                        Some(format!("{}: {}", k, value_str))
+                    })
+                    .collect();
+                if parts.is_empty() {
+                    String::new()
+                } else {
+                    parts.join(", ")
+                }
+            }
+            _ => String::new(),
+        }
+    }
+}
+
 /// Security events list response (T083)
 #[derive(Debug, serde::Serialize)]
 pub struct SecurityEventsResponse {
@@ -187,7 +315,7 @@ async fn get_security_events(
 
     let events = sqlx::query_as::<_, SecurityEvent>(
         r#"
-        SELECT id, event_type, ip_address::text as ip_address, user_agent, metadata, created_at
+        SELECT id, event_type::text as event_type, ip_address::text as ip_address, user_agent, metadata, created_at
         FROM security_events
         WHERE user_id = $1
         ORDER BY created_at DESC

@@ -388,37 +388,4 @@ async fn test_settings_require_auth() {
     ctx.cleanup().await;
 }
 
-/// Test: Password change endpoint rate limited
-#[tokio::test]
-async fn test_password_change_rate_limit() {
-    let mut ctx = TestContext::new().await;
-    let (_user_id, session) = ctx.create_and_login("rate_limit_tester").await;
-
-    // Make multiple rapid requests
-    let mut rate_limited = false;
-    for _ in 0..10 {
-        let response = ctx
-            .post_with_session(
-                "/api/v1/account/change-password",
-                json!({
-                    "current_password": "WrongPass123!",
-                    "new_password": "NewPass123!@#"
-                }),
-                &session,
-            )
-            .await;
-
-        if response.status == 429 {
-            rate_limited = true;
-            break;
-        }
-    }
-
-    // Rate limiting should kick in (though may not with only 10 attempts)
-    // This test documents the expected behavior
-    if rate_limited {
-        assert!(true, "Rate limiting is working");
-    }
-
-    ctx.cleanup().await;
-}
+// TODO: Add rate limiting tests once tower_governor is wired up for auth endpoints

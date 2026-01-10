@@ -41,16 +41,16 @@
                 </p>
                 {% endif %}
 
-                {# Follow Stats #}
+                {# Follow Stats - Clickable links to followers/following pages (T042) #}
                 <div class="mt-3 flex items-center gap-4 text-sm">
-                    <span class="text-gray-700 dark:text-gray-300">
+                    <a href="/users/{{ profile.id }}/followers" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                         <strong>{{ follow_counts.followers_count }}</strong>
                         <span class="text-gray-500 dark:text-gray-400">followers</span>
-                    </span>
-                    <span class="text-gray-700 dark:text-gray-300">
+                    </a>
+                    <a href="/users/{{ profile.id }}/following" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                         <strong>{{ follow_counts.following_count }}</strong>
                         <span class="text-gray-500 dark:text-gray-400">following</span>
-                    </span>
+                    </a>
                 </div>
 
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">

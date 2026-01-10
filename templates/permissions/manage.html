@@ -29,16 +29,40 @@
         </div>
         <form class="p-6" onsubmit="shareWithUser(event)">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="md:col-span-2">
-                    <label for="share-user-id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        User ID
+                <div class="md:col-span-2 relative">
+                    <label for="share-username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Username
                     </label>
                     <input
                         type="text"
-                        id="share-user-id"
+                        id="share-username"
+                        autocomplete="off"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                        placeholder="Enter user UUID..."
+                        placeholder="Search by username..."
+                        oninput="searchUsers(this.value)"
+                        onfocus="showSearchResults()"
                     />
+                    <input type="hidden" id="share-user-id" />
+                    {# Search results dropdown #}
+                    <div
+                        id="user-search-results"
+                        class="hidden absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto"
+                    ></div>
+                    {# Selected user display #}
+                    <div id="selected-user" class="hidden mt-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-md flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div id="selected-user-avatar" class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-sm font-bold text-primary-600 dark:text-primary-400"></div>
+                            <div>
+                                <span id="selected-user-name" class="text-sm font-medium text-gray-900 dark:text-white"></span>
+                                <span id="selected-user-username" class="text-xs text-gray-500 dark:text-gray-400 ml-1"></span>
+                            </div>
+                        </div>
+                        <button type="button" onclick="clearSelectedUser()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <div>
                     <label for="share-user-level" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -58,7 +82,8 @@
             </div>
             <button
                 type="submit"
-                class="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                class="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                id="share-user-btn"
             >
                 Share
             </button>
@@ -190,6 +215,114 @@
 <script>
 const resourceType = '{{ resource_type }}';
 const resourceId = '{{ resource_id }}';
+let searchTimeout = null;
+let selectedUserId = null;
+
+// User search functionality
+async function searchUsers(query) {
+    clearTimeout(searchTimeout);
+    const resultsDiv = document.getElementById('user-search-results');
+
+    if (!query || query.length < 2) {
+        resultsDiv.classList.add('hidden');
+        resultsDiv.innerHTML = '';
+        return;
+    }
+
+    // Debounce search
+    searchTimeout = setTimeout(async () => {
+        try {
+            const response = await fetch(`/api/v1/users/search?q=${encodeURIComponent(query)}&limit=10`);
+            if (!response.ok) throw new Error('Search failed');
+
+            const users = await response.json();
+            displaySearchResults(users);
+        } catch (e) {
+            console.error('Search error:', e);
+            resultsDiv.innerHTML = '<div class="p-3 text-sm text-gray-500 dark:text-gray-400">Search failed</div>';
+            resultsDiv.classList.remove('hidden');
+        }
+    }, 300);
+}
+
+function displaySearchResults(users) {
+    const resultsDiv = document.getElementById('user-search-results');
+
+    if (users.length === 0) {
+        resultsDiv.innerHTML = '<div class="p-3 text-sm text-gray-500 dark:text-gray-400">No users found</div>';
+        resultsDiv.classList.remove('hidden');
+        return;
+    }
+
+    resultsDiv.innerHTML = users.map(user => `
+        <button
+            type="button"
+            class="w-full p-3 flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 text-left"
+            onclick="selectUser('${user.id}', '${escapeHtml(user.username)}', '${escapeHtml(user.display_name)}', '${user.avatar_url || ''}')"
+        >
+            ${user.avatar_url
+                ? `<img src="${escapeHtml(user.avatar_url)}" class="w-8 h-8 rounded-full object-cover" alt="" />`
+                : `<div class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-sm font-bold text-primary-600 dark:text-primary-400">${escapeHtml(user.display_name.charAt(0))}</div>`
+            }
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-gray-900 dark:text-white truncate">${escapeHtml(user.display_name)}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">@${escapeHtml(user.username)}</div>
+            </div>
+        </button>
+    `).join('');
+    resultsDiv.classList.remove('hidden');
+}
+
+function selectUser(id, username, displayName, avatarUrl) {
+    selectedUserId = id;
+    document.getElementById('share-user-id').value = id;
+    document.getElementById('share-username').value = '';
+    document.getElementById('user-search-results').classList.add('hidden');
+
+    // Show selected user
+    const selectedDiv = document.getElementById('selected-user');
+    const avatarDiv = document.getElementById('selected-user-avatar');
+    document.getElementById('selected-user-name').textContent = displayName;
+    document.getElementById('selected-user-username').textContent = '@' + username;
+
+    if (avatarUrl) {
+        avatarDiv.innerHTML = `<img src="${escapeHtml(avatarUrl)}" class="w-8 h-8 rounded-full object-cover" alt="" />`;
+    } else {
+        avatarDiv.textContent = displayName.charAt(0).toUpperCase();
+    }
+
+    selectedDiv.classList.remove('hidden');
+    document.getElementById('share-username').classList.add('hidden');
+}
+
+function clearSelectedUser() {
+    selectedUserId = null;
+    document.getElementById('share-user-id').value = '';
+    document.getElementById('selected-user').classList.add('hidden');
+    document.getElementById('share-username').classList.remove('hidden');
+    document.getElementById('share-username').focus();
+}
+
+function showSearchResults() {
+    const query = document.getElementById('share-username').value;
+    if (query && query.length >= 2) {
+        document.getElementById('user-search-results').classList.remove('hidden');
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Hide search results when clicking outside
+document.addEventListener('click', (e) => {
+    const searchContainer = document.querySelector('#share-username')?.parentElement;
+    if (searchContainer && !searchContainer.contains(e.target)) {
+        document.getElementById('user-search-results').classList.add('hidden');
+    }
+});
 
 async function shareWithUser(event) {
     event.preventDefault();
@@ -197,7 +330,7 @@ async function shareWithUser(event) {
     const level = document.getElementById('share-user-level').value;
 
     if (!userId) {
-        alert('Please enter a user ID');
+        alert('Please search and select a user');
         return;
     }
 

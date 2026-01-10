@@ -1,17 +1,24 @@
+use std::net::SocketAddr;
+
 use askama::Template;
 use axum::{
-    extract::{Path, Query, State},
-    response::Html,
-    routing::get,
-    Router,
+    extract::{ConnectInfo, Path, Query, State},
+    response::{Html, IntoResponse, Response},
+    routing::{get, post},
+    Form, Router,
 };
+use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::middleware::OptionalAuthUser;
-use crate::core::error::AppResult;
+use crate::api::middleware::{AuthUser, OptionalAuthUser};
+use crate::core::audit::AuditEvent;
+use crate::core::csrf::{generate_csrf_token, validate_csrf_token};
+use crate::core::error::{AppError, AppResult};
 use crate::core::pagination::{PaginationMeta, PaginationParams};
+use crate::core::request_id::{RequestContext, RequestId};
+use crate::models::book_contribution::{BookContributionWithDisplay, ContributionStatus};
 use crate::models::{RecipeBook, RecipeBookSummary, RecipeSummary, User};
-use crate::services::{BookService, UserService};
+use crate::services::{BookContributionService, BookService, UserService};
 use crate::AppState;
 
 /// Book page routes
@@ -21,6 +28,15 @@ pub fn routes() -> Router<AppState> {
         .route("/new", get(new_book_page))
         .route("/{id}", get(view_book_page))
         .route("/{id}/edit", get(edit_book_page))
+        // Contribution management routes (T035)
+        .route(
+            "/{book_id}/contributions/{contribution_id}/accept",
+            post(accept_contribution),
+        )
+        .route(
+            "/{book_id}/contributions/{contribution_id}/reject",
+            post(reject_contribution),
+        )
 }
 
 /// Book list page template
@@ -73,7 +89,48 @@ async fn new_book_page() -> AppResult<Html<String>> {
     })?))
 }
 
-/// Book view page template
+/// Contribution view for template display (T029)
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // status_label and status_class reserved for future template use
+struct ContributionItemView {
+    id: Uuid,
+    recipe_id: Uuid,
+    recipe_title: String,
+    contributor_name: String,
+    added_at: String,
+    status: ContributionStatus,
+    status_label: &'static str,
+    status_class: &'static str,
+    rejection_reason: Option<String>,
+}
+
+impl ContributionItemView {
+    fn from_display(contrib: &BookContributionWithDisplay, recipe_title: String) -> Self {
+        let status = contrib.contribution_status();
+        Self {
+            id: contrib.id,
+            recipe_id: contrib.recipe_id,
+            recipe_title,
+            contributor_name: contrib.contributor_display_name.clone(),
+            added_at: crate::models::session::format_relative_time(contrib.added_at),
+            status,
+            status_label: status.display_label(),
+            status_class: status.css_class(),
+            rejection_reason: contrib.rejection_reason.clone(),
+        }
+    }
+}
+
+/// Contribution list for book view (T029)
+#[derive(Debug, Clone, Default)]
+struct ContributionListView {
+    pending: Vec<ContributionItemView>,
+    accepted: Vec<ContributionItemView>,
+    rejected: Vec<ContributionItemView>,
+    pending_count: usize,
+}
+
+/// Book view page template (T030)
 #[derive(Template)]
 #[template(path = "books/view.html")]
 struct BookViewTemplate {
@@ -82,9 +139,11 @@ struct BookViewTemplate {
     recipes: Vec<RecipeSummary>,
     recipe_count: i64,
     is_owner: bool,
+    contributions: ContributionListView,
+    csrf_token: String,
 }
 
-/// View book page handler
+/// View book page handler (T030)
 async fn view_book_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -97,12 +156,71 @@ async fn view_book_page(
 
     let is_owner = auth.0.as_ref().map(|u| u.id) == Some(book.owner_id);
 
+    // Generate CSRF token if logged in
+    let csrf_token = if let Some(ref auth_user) = auth.0 {
+        generate_csrf_token(auth_user.session_id, &state.csrf_secret)
+            .map(|t| t.token)
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    // Load contributions if owner
+    let contributions = if is_owner {
+        let all_contributions = BookContributionService::get_contributions(&state.db, id).await?;
+
+        // Get recipe titles for contributions
+        let recipe_ids: Vec<Uuid> = all_contributions.iter().map(|c| c.recipe_id).collect();
+        let recipe_titles: std::collections::HashMap<Uuid, String> = if !recipe_ids.is_empty() {
+            sqlx::query!(
+                "SELECT id, title FROM recipes WHERE id = ANY($1)",
+                &recipe_ids
+            )
+            .fetch_all(&state.db)
+            .await?
+            .into_iter()
+            .map(|r| (r.id, r.title))
+            .collect()
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        let mut pending = Vec::new();
+        let mut accepted = Vec::new();
+        let mut rejected = Vec::new();
+
+        for contrib in &all_contributions {
+            let title = recipe_titles
+                .get(&contrib.recipe_id)
+                .cloned()
+                .unwrap_or_else(|| "Unknown Recipe".to_string());
+            let view = ContributionItemView::from_display(contrib, title);
+            match view.status {
+                ContributionStatus::Pending => pending.push(view),
+                ContributionStatus::Accepted => accepted.push(view),
+                ContributionStatus::Rejected => rejected.push(view),
+            }
+        }
+
+        let pending_count = pending.len();
+        ContributionListView {
+            pending,
+            accepted,
+            rejected,
+            pending_count,
+        }
+    } else {
+        ContributionListView::default()
+    };
+
     let template = BookViewTemplate {
         book,
         owner,
         recipes: recipes_page.data,
         recipe_count: recipes_page.pagination.total_items as i64,
         is_owner,
+        contributions,
+        csrf_token,
     };
 
     Ok(Html(template.render().map_err(|e| {
@@ -129,6 +247,168 @@ async fn edit_book_page(
     Ok(Html(template.render().map_err(|e| {
         crate::core::error::AppError::Internal(format!("Template error: {}", e))
     })?))
+}
+
+// =============================================================================
+// Contribution Management (Phase 7 - User Story 5)
+// =============================================================================
+
+/// Helper to create request context
+fn create_request_context(
+    addr: SocketAddr,
+    request_id: Option<&RequestId>,
+    session_id: Uuid,
+) -> RequestContext {
+    RequestContext {
+        session_id: Some(session_id),
+        request_id: request_id.map(|r| r.0),
+        ip: Some(addr.ip()),
+    }
+}
+
+/// CSRF-only form for simple actions
+#[derive(Debug, Deserialize)]
+struct CsrfOnlyForm {
+    #[serde(rename = "_csrf")]
+    csrf_token: String,
+}
+
+/// Rejection form with optional reason
+#[derive(Debug, Deserialize)]
+struct RejectContributionForm {
+    #[serde(rename = "_csrf")]
+    csrf_token: String,
+    reason: Option<String>,
+}
+
+/// Accept contribution handler (POST) (T031)
+///
+/// HTMX endpoint to accept a pending contribution.
+async fn accept_contribution(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
+    auth: AuthUser,
+    Path((book_id, contribution_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<CsrfOnlyForm>,
+) -> Result<Response, AppError> {
+    // Validate CSRF token
+    validate_csrf_token(&form.csrf_token, auth.session_id, &state.csrf_secret)?;
+
+    // Verify user owns the book (authorization check)
+    let book = BookService::get_by_id(&state.db, book_id).await?;
+    if book.owner_id != auth.id {
+        return Err(AppError::Forbidden(
+            "Only the book owner can manage contributions".to_string(),
+        ));
+    }
+
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+
+    // Accept the contribution
+    let contribution =
+        BookContributionService::accept_contribution(&state.db, contribution_id, auth.id).await?;
+
+    // Log the action
+    AuditEvent::new("book.contribution.accept")
+        .with_user(auth.id)
+        .with_context(&ctx)
+        .with_metadata("book_id", &book_id.to_string())
+        .with_metadata("contribution_id", &contribution_id.to_string())
+        .persist(&state.db)
+        .await;
+
+    // Get recipe title for display
+    let title: String = sqlx::query_scalar!(
+        "SELECT title FROM recipes WHERE id = $1",
+        contribution.recipe_id
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .unwrap_or_else(|| "Recipe".to_string());
+
+    // Return updated row HTML for HTMX swap
+    let html = format!(
+        r#"<div id="contribution-{}" class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+            <div class="flex items-center">
+                <a href="/recipes/{}" class="text-sm font-medium text-gray-900 dark:text-white hover:underline">{}</a>
+                <span class="ml-2 text-xs text-green-600 dark:text-green-400">Accepted</span>
+            </div>
+        </div>"#,
+        contribution_id, contribution.recipe_id, title
+    );
+
+    Ok(Html(html).into_response())
+}
+
+/// Reject contribution handler (POST) (T032)
+///
+/// HTMX endpoint to reject a pending contribution with optional reason.
+async fn reject_contribution(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request_id: Option<axum::Extension<RequestId>>,
+    auth: AuthUser,
+    Path((book_id, contribution_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<RejectContributionForm>,
+) -> Result<Response, AppError> {
+    // Validate CSRF token
+    validate_csrf_token(&form.csrf_token, auth.session_id, &state.csrf_secret)?;
+
+    // Verify user owns the book (authorization check)
+    let book = BookService::get_by_id(&state.db, book_id).await?;
+    if book.owner_id != auth.id {
+        return Err(AppError::Forbidden(
+            "Only the book owner can manage contributions".to_string(),
+        ));
+    }
+
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+
+    // Reject the contribution
+    let contribution = BookContributionService::reject_contribution(
+        &state.db,
+        contribution_id,
+        auth.id,
+        form.reason.clone(),
+    )
+    .await?;
+
+    // Log the action
+    AuditEvent::new("book.contribution.reject")
+        .with_user(auth.id)
+        .with_context(&ctx)
+        .with_metadata("book_id", &book_id.to_string())
+        .with_metadata("contribution_id", &contribution_id.to_string())
+        .persist(&state.db)
+        .await;
+
+    // Get recipe title for display
+    let title: String = sqlx::query_scalar!(
+        "SELECT title FROM recipes WHERE id = $1",
+        contribution.recipe_id
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .unwrap_or_else(|| "Recipe".to_string());
+
+    // Return updated row HTML for HTMX swap
+    let reason_display = form
+        .reason
+        .as_ref()
+        .map(|r| format!(" - {}", r))
+        .unwrap_or_default();
+    let html = format!(
+        r#"<div id="contribution-{}" class="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+            <div class="flex items-center">
+                <span class="text-sm text-gray-900 dark:text-white">{}</span>
+                <span class="ml-2 text-xs text-red-600 dark:text-red-400">Rejected{}</span>
+            </div>
+        </div>"#,
+        contribution_id, title, reason_display
+    );
+
+    Ok(Html(html).into_response())
 }
 
 #[cfg(test)]
@@ -221,6 +501,8 @@ mod tests {
             recipes: vec![],
             recipe_count: 0,
             is_owner: false,
+            contributions: ContributionListView::default(),
+            csrf_token: String::new(),
         };
         let result = template.render();
         assert!(result.is_ok());
@@ -308,6 +590,8 @@ mod tests {
             recipes: vec![],
             recipe_count: 0,
             is_owner: true,
+            contributions: ContributionListView::default(),
+            csrf_token: String::new(),
         };
         assert!(owner_template.render().is_ok());
 
@@ -318,6 +602,8 @@ mod tests {
             recipes: vec![],
             recipe_count: 0,
             is_owner: false,
+            contributions: ContributionListView::default(),
+            csrf_token: String::new(),
         };
         assert!(guest_template.render().is_ok());
     }
@@ -342,6 +628,8 @@ mod tests {
             recipes: vec![],
             recipe_count: 42,
             is_owner: false,
+            contributions: ContributionListView::default(),
+            csrf_token: String::new(),
         };
 
         let html = template.render().unwrap();

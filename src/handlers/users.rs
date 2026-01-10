@@ -10,15 +10,28 @@ use uuid::Uuid;
 use crate::api::middleware::{AuthUser, OptionalAuthUser};
 use crate::core::error::AppResult;
 use crate::core::pagination::{PaginationMeta, PaginationParams};
-use crate::models::{FollowCounts, RecipeSummary, UserProfile};
+use crate::models::{FollowCounts, RecipeSummary, UserCardView, UserProfile};
 use crate::services::{FollowService, RecipeService, SavedRecipeService, UserService};
 use crate::AppState;
+
+/// Pagination info for templates (simplified version)
+#[derive(Debug, Clone)]
+struct PaginationInfo {
+    page: i64,
+    total_pages: i64,
+    total_items: i64,
+    has_prev: bool,
+    has_next: bool,
+}
 
 /// User page routes
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/{id}", get(user_profile_page))
         .route("/{id}/saved", get(saved_recipes_page))
+        // Followers/Following routes (T041)
+        .route("/{id}/followers", get(followers_page))
+        .route("/{id}/following", get(following_page))
 }
 
 /// User profile page template
@@ -94,6 +107,184 @@ async fn saved_recipes_page(
     let template = SavedRecipesTemplate {
         recipes: saved_page.data,
         pagination: saved_page.pagination,
+    };
+
+    Ok(Html(template.render().map_err(|e| {
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
+    })?))
+}
+
+/// Followers page template (T036)
+#[derive(Template)]
+#[template(path = "users/followers.html")]
+struct FollowersPageTemplate {
+    profile: UserProfile,
+    users: Vec<UserCardView>,
+    pagination: PaginationInfo,
+    is_own_profile: bool,
+    current_user_id: Option<Uuid>,
+}
+
+/// Following page template (T036)
+#[derive(Template)]
+#[template(path = "users/following.html")]
+struct FollowingPageTemplate {
+    profile: UserProfile,
+    users: Vec<UserCardView>,
+    pagination: PaginationInfo,
+    is_own_profile: bool,
+    current_user_id: Option<Uuid>,
+}
+
+/// Followers page handler (T037)
+async fn followers_page(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<PaginationParams>,
+    auth: OptionalAuthUser,
+) -> AppResult<Html<String>> {
+    let user = UserService::get_by_id(&state.db, id).await?;
+    let profile = UserProfile::from(user);
+
+    // Get all followers
+    let all_followers = FollowService::get_followers(&state.db, id).await?;
+
+    // Manual pagination
+    let page = params.page.max(1) as i64;
+    let page_size = params.page_size.clamp(1, 50) as i64;
+    let total_items = all_followers.len() as i64;
+    let total_pages = (total_items + page_size - 1) / page_size;
+    let offset = ((page - 1) * page_size) as usize;
+
+    let paginated_followers: Vec<_> = all_followers
+        .into_iter()
+        .skip(offset)
+        .take(page_size as usize)
+        .collect();
+
+    // Get current user ID and build user cards with follow status
+    let current_user_id = auth.0.as_ref().map(|u| u.id);
+    let is_own_profile = current_user_id == Some(id);
+
+    // Batch load follow statuses to avoid N+1 queries
+    let follow_statuses = if let Some(current_id) = current_user_id {
+        let target_ids: Vec<Uuid> = paginated_followers
+            .iter()
+            .filter(|u| u.id != current_id) // Exclude self
+            .map(|u| u.id)
+            .collect();
+        FollowService::check_follow_statuses_batch(&state.db, current_id, &target_ids).await?
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    let user_cards: Vec<UserCardView> = paginated_followers
+        .iter()
+        .map(|follower| {
+            let (is_following, follows_you) = if current_user_id == Some(follower.id) {
+                (false, false) // Can't follow yourself
+            } else {
+                follow_statuses
+                    .get(&follower.id)
+                    .copied()
+                    .unwrap_or((false, false))
+            };
+            UserCardView::from_user(follower, is_following, follows_you)
+        })
+        .collect();
+
+    let pagination = PaginationInfo {
+        page,
+        total_pages,
+        total_items,
+        has_prev: page > 1,
+        has_next: page < total_pages,
+    };
+
+    let template = FollowersPageTemplate {
+        profile,
+        users: user_cards,
+        pagination,
+        is_own_profile,
+        current_user_id,
+    };
+
+    Ok(Html(template.render().map_err(|e| {
+        crate::core::error::AppError::Internal(format!("Template error: {}", e))
+    })?))
+}
+
+/// Following page handler (T038)
+async fn following_page(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<PaginationParams>,
+    auth: OptionalAuthUser,
+) -> AppResult<Html<String>> {
+    let user = UserService::get_by_id(&state.db, id).await?;
+    let profile = UserProfile::from(user);
+
+    // Get all following
+    let all_following = FollowService::get_following(&state.db, id).await?;
+
+    // Manual pagination
+    let page = params.page.max(1) as i64;
+    let page_size = params.page_size.clamp(1, 50) as i64;
+    let total_items = all_following.len() as i64;
+    let total_pages = (total_items + page_size - 1) / page_size;
+    let offset = ((page - 1) * page_size) as usize;
+
+    let paginated_following: Vec<_> = all_following
+        .into_iter()
+        .skip(offset)
+        .take(page_size as usize)
+        .collect();
+
+    // Get current user ID and build user cards with follow status
+    let current_user_id = auth.0.as_ref().map(|u| u.id);
+    let is_own_profile = current_user_id == Some(id);
+
+    // Batch load follow statuses to avoid N+1 queries
+    let follow_statuses = if let Some(current_id) = current_user_id {
+        let target_ids: Vec<Uuid> = paginated_following
+            .iter()
+            .filter(|u| u.id != current_id) // Exclude self
+            .map(|u| u.id)
+            .collect();
+        FollowService::check_follow_statuses_batch(&state.db, current_id, &target_ids).await?
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    let user_cards: Vec<UserCardView> = paginated_following
+        .iter()
+        .map(|followed| {
+            let (is_following, follows_you) = if current_user_id == Some(followed.id) {
+                (false, false) // Can't follow yourself
+            } else {
+                follow_statuses
+                    .get(&followed.id)
+                    .copied()
+                    .unwrap_or((false, false))
+            };
+            UserCardView::from_user(followed, is_following, follows_you)
+        })
+        .collect();
+
+    let pagination = PaginationInfo {
+        page,
+        total_pages,
+        total_items,
+        has_prev: page > 1,
+        has_next: page < total_pages,
+    };
+
+    let template = FollowingPageTemplate {
+        profile,
+        users: user_cards,
+        pagination,
+        is_own_profile,
+        current_user_id,
     };
 
     Ok(Html(template.render().map_err(|e| {

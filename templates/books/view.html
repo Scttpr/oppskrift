@@ -107,5 +107,114 @@
         </div>
         {% endif %}
     </section>
+
+    {# Contributions Section (T033, T034) - Owner only #}
+    {% if is_owner %}
+    <section aria-labelledby="contributions-heading" class="mt-8">
+        <h2 id="contributions-heading" class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Contributions
+            {% if contributions.pending_count > 0 %}
+            <span class="ml-2 px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded-full">
+                {{ contributions.pending_count }} pending
+            </span>
+            {% endif %}
+        </h2>
+
+        {# Pending Contributions #}
+        {% if !contributions.pending.is_empty() %}
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
+            <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Pending Review</h3>
+            <div class="space-y-3">
+                {% for contrib in contributions.pending %}
+                <div id="contribution-{{ contrib.id }}" class="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                    <div class="flex items-center">
+                        <a href="/recipes/{{ contrib.recipe_id }}" class="text-sm font-medium text-gray-900 dark:text-white hover:underline">
+                            {{ contrib.recipe_title }}
+                        </a>
+                        <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                            by {{ contrib.contributor_name }} &middot; {{ contrib.added_at }}
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <form
+                            method="POST"
+                            action="/books/{{ book.id }}/contributions/{{ contrib.id }}/accept"
+                            hx-post="/books/{{ book.id }}/contributions/{{ contrib.id }}/accept"
+                            hx-target="#contribution-{{ contrib.id }}"
+                            hx-swap="outerHTML"
+                        >
+                            <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
+                            <button type="submit" class="px-3 py-1 text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-400 dark:hover:bg-green-900 rounded">
+                                Accept
+                            </button>
+                        </form>
+                        <form
+                            method="POST"
+                            action="/books/{{ book.id }}/contributions/{{ contrib.id }}/reject"
+                            hx-post="/books/{{ book.id }}/contributions/{{ contrib.id }}/reject"
+                            hx-target="#contribution-{{ contrib.id }}"
+                            hx-swap="outerHTML"
+                            hx-confirm="Reject this contribution?"
+                        >
+                            <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
+                            <button type="submit" class="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-400 dark:hover:bg-red-900 rounded">
+                                Reject
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Accepted Contributions #}
+        {% if !contributions.accepted.is_empty() %}
+        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
+            <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Accepted</h3>
+            <div class="space-y-2">
+                {% for contrib in contributions.accepted %}
+                <div class="flex items-center justify-between p-2 text-sm">
+                    <a href="/recipes/{{ contrib.recipe_id }}" class="text-gray-900 dark:text-white hover:underline">
+                        {{ contrib.recipe_title }}
+                    </a>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                        by {{ contrib.contributor_name }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Rejected Contributions #}
+        {% if !contributions.rejected.is_empty() %}
+        <details class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <summary class="p-4 cursor-pointer text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                Rejected ({{ contributions.rejected.len() }})
+            </summary>
+            <div class="px-4 pb-4 space-y-2">
+                {% for contrib in contributions.rejected %}
+                <div class="flex items-center justify-between p-2 text-sm text-gray-500 dark:text-gray-400">
+                    <span>{{ contrib.recipe_title }}</span>
+                    {% if let Some(reason) = contrib.rejection_reason %}
+                    <span class="text-xs">{{ reason }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+
+        {# No contributions message #}
+        {% if contributions.pending.is_empty() && contributions.accepted.is_empty() && contributions.rejected.is_empty() %}
+        <div class="text-center py-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <p class="text-gray-500 dark:text-gray-400">
+                No contributions yet. Share your book to receive recipe contributions.
+            </p>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
 </div>
 {% endblock %}

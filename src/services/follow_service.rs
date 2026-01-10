@@ -148,6 +148,61 @@ impl FollowService {
 
         Ok(counts)
     }
+
+    /// Batch check follow statuses between current user and multiple target users.
+    /// Returns a map of target_user_id -> (is_following, follows_you).
+    /// This avoids N+1 queries when displaying follower/following lists.
+    pub async fn check_follow_statuses_batch(
+        pool: &PgPool,
+        current_user_id: Uuid,
+        target_user_ids: &[Uuid],
+    ) -> AppResult<std::collections::HashMap<Uuid, (bool, bool)>> {
+        use std::collections::HashMap;
+
+        if target_user_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // Query 1: Get all users that current_user is following (from target list)
+        let following_ids: Vec<Uuid> = sqlx::query_scalar!(
+            r#"
+            SELECT following_id
+            FROM follows
+            WHERE follower_id = $1 AND following_id = ANY($2)
+            "#,
+            current_user_id,
+            target_user_ids
+        )
+        .fetch_all(pool)
+        .await?;
+
+        // Query 2: Get all users from target list that follow current_user
+        let followers_ids: Vec<Uuid> = sqlx::query_scalar!(
+            r#"
+            SELECT follower_id
+            FROM follows
+            WHERE following_id = $1 AND follower_id = ANY($2)
+            "#,
+            current_user_id,
+            target_user_ids
+        )
+        .fetch_all(pool)
+        .await?;
+
+        // Build sets for O(1) lookup
+        let following_set: std::collections::HashSet<Uuid> = following_ids.into_iter().collect();
+        let followers_set: std::collections::HashSet<Uuid> = followers_ids.into_iter().collect();
+
+        // Build result map
+        let mut result = HashMap::with_capacity(target_user_ids.len());
+        for &target_id in target_user_ids {
+            let is_following = following_set.contains(&target_id);
+            let follows_you = followers_set.contains(&target_id);
+            result.insert(target_id, (is_following, follows_you));
+        }
+
+        Ok(result)
+    }
 }
 
 #[cfg(test)]

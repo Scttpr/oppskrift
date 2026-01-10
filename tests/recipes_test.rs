@@ -18,7 +18,7 @@ async fn test_create_recipe_success() {
     let mut ctx = TestContext::new().await;
 
     // Create and login a user
-    let (user_id, session) = ctx.create_and_login("recipe_creator").await;
+    let (_, session) = ctx.create_and_login("recipe_creator").await;
 
     // Create recipe via API
     let recipe_data = fixtures::create_test_recipe();

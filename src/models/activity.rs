@@ -135,12 +135,10 @@ mod tests {
     }
 
     #[test]
-    fn test_activity_type_copy_clone() {
+    fn test_activity_type_copy() {
         let original = ActivityType::Create;
         let copied = original;
-        let cloned = original.clone();
         assert_eq!(original, copied);
-        assert_eq!(original, cloned);
     }
 
     // ==========================================================================
@@ -192,12 +190,10 @@ mod tests {
     }
 
     #[test]
-    fn test_target_type_copy_clone() {
+    fn test_target_type_copy() {
         let original = TargetType::Recipe;
         let copied = original;
-        let cloned = original.clone();
         assert_eq!(original, copied);
-        assert_eq!(original, cloned);
     }
 
     // ==========================================================================

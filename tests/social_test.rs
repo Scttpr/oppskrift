@@ -196,7 +196,7 @@ async fn test_get_following() {
 async fn test_get_activity_feed() {
     let mut ctx = TestContext::new().await;
 
-    let (user_id, session) = ctx.create_and_login("feed_viewer").await;
+    let (_, session) = ctx.create_and_login("feed_viewer").await;
 
     // Get feed (may be empty but should work)
     let response = ctx.get_with_session("/api/v1/feed", &session).await;

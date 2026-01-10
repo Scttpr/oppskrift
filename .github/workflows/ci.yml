@@ -63,10 +63,8 @@ jobs:
         run: cargo install sqlx-cli --no-default-features --features postgres --locked
       - name: Run migrations
         run: sqlx migrate run
-      - name: Build
-        run: cargo build
       - name: Clippy
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
       # Save artifacts for test job
       - uses: actions/cache/save@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:

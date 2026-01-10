@@ -1,0 +1,143 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}{{ profile.display_name }}'s Followers - Oppskrift{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    {# Header with back link #}
+    <header class="mb-8">
+        <a
+            href="/users/{{ profile.id }}"
+            class="inline-flex items-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 mb-4"
+        >
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to profile
+        </a>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+            {% if is_own_profile %}Your Followers{% else %}{{ profile.display_name }}'s Followers{% endif %}
+        </h1>
+        <p class="mt-1 text-gray-500 dark:text-gray-400">
+            {{ pagination.total_items }} follower{% if pagination.total_items != 1 %}s{% endif %}
+        </p>
+    </header>
+
+    {# User Cards Grid #}
+    {% if !users.is_empty() %}
+    <div class="space-y-4">
+        {% for user in users %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex items-start gap-4">
+                {# Avatar #}
+                <a href="/users/{{ user.id }}" class="flex-shrink-0">
+                    {% if let Some(avatar) = user.avatar_url %}
+                    <img
+                        src="{{ avatar }}"
+                        alt="{{ user.display_name }}'s avatar"
+                        class="w-12 h-12 rounded-full object-cover"
+                    />
+                    {% else %}
+                    <div class="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+                        <span class="text-lg font-bold text-primary-600 dark:text-primary-400">
+                            {{ user.display_name.chars().next().unwrap_or('?') }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </a>
+
+                {# User Info #}
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <a href="/users/{{ user.id }}" class="font-medium text-gray-900 dark:text-white hover:underline">
+                            {{ user.display_name }}
+                        </a>
+                        {% if user.follows_you %}
+                        <span class="px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded">
+                            Follows you
+                        </span>
+                        {% endif %}
+                    </div>
+                    <a href="/users/{{ user.id }}" class="text-sm text-gray-500 dark:text-gray-400 hover:underline">
+                        @{{ user.username }}
+                    </a>
+                    {% if let Some(bio) = user.bio_excerpt %}
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                        {{ bio }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                {# Follow/Unfollow Button #}
+                {% if let Some(current_id) = current_user_id %}
+                    {% if *current_id != user.id %}
+                    {% if user.is_following %}
+                    <button
+                        hx-delete="/api/v1/users/{{ user.id }}/follow"
+                        hx-swap="outerHTML"
+                        hx-target="this"
+                        class="flex-shrink-0 px-4 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
+                    >
+                        Following
+                    </button>
+                    {% else %}
+                    <button
+                        hx-post="/api/v1/users/{{ user.id }}/follow"
+                        hx-swap="outerHTML"
+                        hx-target="this"
+                        class="flex-shrink-0 px-4 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                    >
+                        Follow
+                    </button>
+                    {% endif %}
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    {# Empty State #}
+    <div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <h2 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No followers yet</h2>
+        <p class="mt-2 text-gray-500 dark:text-gray-400">
+            {% if is_own_profile %}
+            Share your recipes to gain followers.
+            {% else %}
+            {{ profile.display_name }} doesn't have any followers yet.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+
+    {# Pagination #}
+    {% if pagination.total_pages > 1 %}
+    <nav class="mt-8 flex items-center justify-center gap-2" aria-label="Pagination">
+        {% if pagination.has_prev %}
+        <a
+            href="?page={{ pagination.page - 1 }}"
+            class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+            Previous
+        </a>
+        {% endif %}
+
+        <span class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+            Page {{ pagination.page }} of {{ pagination.total_pages }}
+        </span>
+
+        {% if pagination.has_next %}
+        <a
+            href="?page={{ pagination.page + 1 }}"
+            class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+            Next
+        </a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}
