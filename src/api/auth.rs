@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 use validator::Validate;
 
 use crate::api::middleware::{
-    clear_session_cookie, create_session_cookie, AuthUser, SESSION_EXPIRY_DAYS,
+    clear_session_cookie, create_session_cookie, AuthUser, RateLimiterState, SESSION_EXPIRY_DAYS,
 };
 use crate::core::config::SmtpConfig;
 use crate::core::error::AppError;
@@ -27,7 +27,7 @@ use crate::models::{
 use crate::services::{AuthError, AuthService, EmailService, LoginResult, PasswordService};
 use crate::AppState;
 
-/// Auth routes
+/// Auth routes (without rate limiting, for backwards compatibility and tests)
 pub fn routes() -> Router<AppState> {
     Router::new()
         // Registration endpoints
@@ -42,6 +42,24 @@ pub fn routes() -> Router<AppState> {
         // Password recovery
         .route("/forgot-password", post(forgot_password))
         .route("/reset-password", post(reset_password))
+}
+
+/// Auth routes with rate limiting applied
+/// Takes a RateLimiterState to apply auth-specific rate limits
+pub fn routes_with_rate_limit(rate_limiter: RateLimiterState) -> Router<AppState> {
+    use crate::api::middleware::rate_limit::AuthRateLimitLayer;
+
+    // All routes with rate limiting layer
+    Router::new()
+        .route("/register", post(register))
+        .route("/confirm-email/{token}", get(confirm_email))
+        .route("/resend-confirmation", post(resend_confirmation))
+        .route("/login", post(login))
+        .route("/logout", post(logout))
+        .route("/2fa/verify", post(verify_2fa))
+        .route("/forgot-password", post(forgot_password))
+        .route("/reset-password", post(reset_password))
+        .layer(AuthRateLimitLayer::new(rate_limiter))
 }
 
 // =============================================================================

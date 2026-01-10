@@ -1,4 +1,4 @@
-use oppskrift::{app_router, core, AppState};
+use oppskrift::{app_router_with_rate_limit, core, AppState};
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -86,8 +86,8 @@ async fn main() -> anyhow::Result<()> {
     // Create application state
     let state = AppState { db, csrf_secret };
 
-    // Build the router
-    let app = app_router(state);
+    // Build the router with rate limiting enabled
+    let app = app_router_with_rate_limit(state);
 
     // Get host and port from environment (LISTEN_* to avoid conflict with system HOST)
     let host = std::env::var("LISTEN_HOST")
