@@ -13,10 +13,10 @@ use axum::{
 use std::net::SocketAddr;
 use validator::Validate;
 
+use crate::api::middleware::rate_limit::{rate_limit_response, RateLimitType};
 use crate::api::middleware::{
-    clear_session_cookie, create_session_cookie, AuthUser, SESSION_EXPIRY_DAYS,
+    clear_session_cookie, create_session_cookie, AuthUser, RateLimiterState, SESSION_EXPIRY_DAYS,
 };
-use crate::core::config::SmtpConfig;
 use crate::core::error::AppError;
 use crate::core::{RequestContext, RequestId};
 use crate::models::{
@@ -24,10 +24,10 @@ use crate::models::{
     ForgotPasswordResponse, LoginRequest, LoginResponse, LogoutResponse, RegisterRequest,
     ResendConfirmationRequest, ResetPasswordRequest, ResetPasswordResponse, UserProfile,
 };
-use crate::services::{AuthError, AuthService, EmailService, LoginResult, PasswordService};
+use crate::services::{AuthError, LoginResult, ServiceFactory};
 use crate::AppState;
 
-/// Auth routes
+/// Auth routes (without rate limiting, for backwards compatibility and tests)
 pub fn routes() -> Router<AppState> {
     Router::new()
         // Registration endpoints
@@ -42,6 +42,46 @@ pub fn routes() -> Router<AppState> {
         // Password recovery
         .route("/forgot-password", post(forgot_password))
         .route("/reset-password", post(reset_password))
+}
+
+/// Auth routes with rate limiting applied
+/// Takes a RateLimiterState to apply auth-specific rate limits
+///
+/// Rate limiting strategies:
+/// - Login/2FA: Count only FAILED attempts (401/403 responses) per IP
+///   Also checks account-level rate limiting (FR-002) to prevent distributed attacks
+/// - Registration/Password Reset: Count ALL requests (to prevent spam)
+/// - Logout/Confirm Email: No rate limiting
+pub fn routes_with_rate_limit(rate_limiter: RateLimiterState) -> Router<AppState> {
+    use crate::api::middleware::rate_limit::{AllRequestsRateLimitLayer, AuthRateLimitLayer};
+    use axum::Extension;
+
+    // Login and 2FA: Count only failures (401/403)
+    // This implements FR-001: "rate limit failed authentication attempts"
+    // The Extension provides RateLimiterState to handlers for FR-002 account-level checks
+    let login_routes = Router::new()
+        .route("/login", post(login))
+        .route("/2fa/verify", post(verify_2fa))
+        .layer(Extension(rate_limiter.clone()))
+        .layer(AuthRateLimitLayer::new(rate_limiter.clone()));
+
+    // Registration and password reset: Count ALL requests (to prevent spam)
+    let spam_protected_routes = Router::new()
+        .route("/register", post(register))
+        .route("/resend-confirmation", post(resend_confirmation))
+        .route("/forgot-password", post(forgot_password))
+        .route("/reset-password", post(reset_password))
+        .layer(AllRequestsRateLimitLayer::new(rate_limiter));
+
+    // Routes that should NOT be rate limited
+    let unprotected_routes = Router::new()
+        .route("/confirm-email/{token}", get(confirm_email))
+        .route("/logout", post(logout));
+
+    // Merge all sets of routes
+    login_routes
+        .merge(spam_protected_routes)
+        .merge(unprotected_routes)
 }
 
 // =============================================================================
@@ -234,13 +274,17 @@ const USER_AGENT_HEADER: &str = "User-Agent";
 /// - `401 Unauthorized`: Invalid credentials
 /// - `403 Forbidden`: Account locked or email not verified
 /// - `422 Unprocessable Entity`: 2FA required
+/// - `429 Too Many Requests`: Account is rate limited
 async fn login(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
+    rate_limiter: Option<axum::Extension<RateLimiterState>>,
     headers: axum::http::HeaderMap,
     Json(input): Json<LoginRequest>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<axum::response::Response, AppError> {
+    use axum::response::IntoResponse;
+
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0));
     let user_agent = headers
         .get(USER_AGENT_HEADER)
@@ -252,6 +296,19 @@ async fn login(
         tracing::debug!(errors = %e, "Login validation failed");
         AppError::Validation(e.to_string())
     })?;
+
+    // Check account-level rate limiting (FR-002: distributed brute force protection)
+    // This protects against attackers trying same account from multiple IPs
+    let email_normalized = input.email.to_lowercase();
+    if let Some(axum::Extension(ref rl)) = rate_limiter {
+        if let Err(retry_after) = rl.auth_account.is_limited(&email_normalized) {
+            tracing::warn!(
+                email_domain = email_normalized.split('@').next_back(),
+                "Account rate limited - too many failed attempts across IPs"
+            );
+            return Ok(rate_limit_response(RateLimitType::Auth, retry_after));
+        }
+    }
 
     // Create auth service
     let auth_service = create_auth_service(&state);
@@ -265,8 +322,18 @@ async fn login(
             user_agent.clone(),
             None,
         )
-        .await
-        .map_err(|e| match e {
+        .await;
+
+    // Handle login errors - record account-level failures
+    let result = result.map_err(|e| {
+        // Record failed attempt for account-level rate limiting
+        if let Some(axum::Extension(ref rl)) = rate_limiter {
+            if matches!(e, AuthError::InvalidCredentials) {
+                rl.auth_account.record_failure(&email_normalized);
+            }
+        }
+
+        match e {
             AuthError::InvalidCredentials => {
                 AppError::Unauthorized("Invalid email or password".to_string())
             }
@@ -280,7 +347,8 @@ async fn login(
                 tracing::error!(error = %e, "Login failed");
                 AppError::Internal("Login failed".to_string())
             }
-        })?;
+        }
+    })?;
 
     match result {
         LoginResult::Success {
@@ -543,30 +611,8 @@ fn create_request_context(addr: SocketAddr, request_id: Option<&RequestId>) -> R
 }
 
 /// Create an AuthService instance from AppState
-fn create_auth_service(state: &AppState) -> AuthService {
-    let base_url =
-        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-
-    let is_production = std::env::var("APP_ENV")
-        .map(|v| v == "production")
-        .unwrap_or(false);
-
-    let password_service = PasswordService::new(
-        std::env::var("HIBP_ENABLED")
-            .map(|v| v == "true")
-            .unwrap_or(true),
-    );
-
-    let smtp_config = SmtpConfig::from_env(is_production);
-    let email_service = EmailService::new(smtp_config, base_url.clone());
-
-    AuthService::new(
-        state.db.clone(),
-        password_service,
-        email_service,
-        base_url,
-        SESSION_EXPIRY_DAYS,
-    )
+fn create_auth_service(state: &AppState) -> crate::services::AuthService {
+    ServiceFactory::create_auth_service(state.db.clone())
 }
 
 #[cfg(test)]

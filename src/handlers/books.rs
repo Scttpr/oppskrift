@@ -18,7 +18,7 @@ use crate::core::pagination::{PaginationMeta, PaginationParams};
 use crate::core::request_id::{RequestContext, RequestId};
 use crate::models::book_contribution::{BookContributionWithDisplay, ContributionStatus};
 use crate::models::{RecipeBook, RecipeBookSummary, RecipeSummary, User};
-use crate::services::{BookContributionService, BookService, UserService};
+use crate::services::{BookContributionService, BookService, RecipeService, UserService};
 use crate::AppState;
 
 /// Book page routes
@@ -91,7 +91,6 @@ async fn new_book_page() -> AppResult<Html<String>> {
 
 /// Contribution view for template display (T029)
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // status_label and status_class reserved for future template use
 struct ContributionItemView {
     id: Uuid,
     recipe_id: Uuid,
@@ -99,23 +98,18 @@ struct ContributionItemView {
     contributor_name: String,
     added_at: String,
     status: ContributionStatus,
-    status_label: &'static str,
-    status_class: &'static str,
     rejection_reason: Option<String>,
 }
 
 impl ContributionItemView {
     fn from_display(contrib: &BookContributionWithDisplay, recipe_title: String) -> Self {
-        let status = contrib.contribution_status();
         Self {
             id: contrib.id,
             recipe_id: contrib.recipe_id,
             recipe_title,
             contributor_name: contrib.contributor_display_name.clone(),
             added_at: crate::models::session::format_relative_time(contrib.added_at),
-            status,
-            status_label: status.display_label(),
-            status_class: status.css_class(),
+            status: contrib.contribution_status(),
             rejection_reason: contrib.rejection_reason.clone(),
         }
     }
@@ -171,19 +165,7 @@ async fn view_book_page(
 
         // Get recipe titles for contributions
         let recipe_ids: Vec<Uuid> = all_contributions.iter().map(|c| c.recipe_id).collect();
-        let recipe_titles: std::collections::HashMap<Uuid, String> = if !recipe_ids.is_empty() {
-            sqlx::query!(
-                "SELECT id, title FROM recipes WHERE id = ANY($1)",
-                &recipe_ids
-            )
-            .fetch_all(&state.db)
-            .await?
-            .into_iter()
-            .map(|r| (r.id, r.title))
-            .collect()
-        } else {
-            std::collections::HashMap::new()
-        };
+        let recipe_titles = RecipeService::get_titles_by_ids(&state.db, &recipe_ids).await?;
 
         let mut pending = Vec::new();
         let mut accepted = Vec::new();
@@ -319,13 +301,11 @@ async fn accept_contribution(
         .await;
 
     // Get recipe title for display
-    let title: String = sqlx::query_scalar!(
-        "SELECT title FROM recipes WHERE id = $1",
-        contribution.recipe_id
-    )
-    .fetch_optional(&state.db)
-    .await?
-    .unwrap_or_else(|| "Recipe".to_string());
+    let titles = RecipeService::get_titles_by_ids(&state.db, &[contribution.recipe_id]).await?;
+    let title = titles
+        .get(&contribution.recipe_id)
+        .cloned()
+        .unwrap_or_else(|| "Recipe".to_string());
 
     // Return updated row HTML for HTMX swap
     let html = format!(
@@ -384,13 +364,11 @@ async fn reject_contribution(
         .await;
 
     // Get recipe title for display
-    let title: String = sqlx::query_scalar!(
-        "SELECT title FROM recipes WHERE id = $1",
-        contribution.recipe_id
-    )
-    .fetch_optional(&state.db)
-    .await?
-    .unwrap_or_else(|| "Recipe".to_string());
+    let titles = RecipeService::get_titles_by_ids(&state.db, &[contribution.recipe_id]).await?;
+    let title = titles
+        .get(&contribution.recipe_id)
+        .cloned()
+        .unwrap_or_else(|| "Recipe".to_string());
 
     // Return updated row HTML for HTMX swap
     let reason_display = form

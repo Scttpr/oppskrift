@@ -12,13 +12,12 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use crate::api::middleware::security_headers;
+use crate::api::middleware::{security_headers, RateLimiterState};
 use crate::core::request_id::request_id_middleware;
 
 pub mod api;
 pub mod core;
 pub mod handlers;
-pub mod jobs;
 pub mod models;
 pub mod services;
 
@@ -33,31 +32,44 @@ pub struct AppState {
 /// Create the application router (exposed for testing)
 /// For production, use with `into_make_service_with_connect_info::<SocketAddr>()`
 pub fn app_router(state: AppState) -> Router {
-    create_router(state)
+    create_router(state.clone(), None)
+}
+
+/// Create the application router with rate limiting
+/// For production use with rate limiting enabled
+pub fn app_router_with_rate_limit(state: AppState) -> Router {
+    let rate_limiter = RateLimiterState::from_env(state.db.clone());
+    create_router(state, Some(rate_limiter))
 }
 
 /// Create the application router for testing
 /// Adds a mock ConnectInfo layer for tests that don't have real socket connections
 pub fn test_app_router(state: AppState) -> Router {
-    create_router(state).layer(axum::Extension(ConnectInfo(SocketAddr::from((
+    create_router(state.clone(), None).layer(axum::Extension(ConnectInfo(SocketAddr::from((
         [127, 0, 0, 1],
         0,
     )))))
 }
 
 /// Create the application router with all middleware
-fn create_router(state: AppState) -> Router {
+fn create_router(state: AppState, rate_limiter: Option<RateLimiterState>) -> Router {
     // CORS configuration
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
+    // Choose API routes with or without rate limiting
+    let api_routes = match rate_limiter {
+        Some(rl) => api::routes_with_rate_limit(rl),
+        None => api::routes(),
+    };
+
     Router::new()
         // Health check endpoint
         .route("/health", get(health_check))
-        // API routes
-        .nest("/api/v1", api::routes())
+        // API routes (with optional rate limiting)
+        .nest("/api/v1", api_routes)
         // ActivityPub federation routes
         .merge(api::federation_routes())
         // Content syndication routes (RSS, Atom, oEmbed)

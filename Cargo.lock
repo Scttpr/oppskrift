@@ -3417,6 +3417,7 @@ dependencies = [
  "chrono",
  "cookie",
  "dotenvy",
+ "futures",
  "hex",
  "hmac",
  "html-escape",

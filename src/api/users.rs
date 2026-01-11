@@ -6,7 +6,8 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::rate_limit::{ExportRateLimitLayer, SearchRateLimitLayer};
+use crate::api::middleware::{AuthUser, RateLimiterState};
 use crate::core::error::AppResult;
 use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::models::user::{UpdateUser, User, UserProfile};
@@ -14,7 +15,7 @@ use crate::models::{RecipeBookSummary, RecipeSummary};
 use crate::services::{BookService, FollowService, RecipeService, SavedRecipeService, UserService};
 use crate::AppState;
 
-/// User API routes
+/// User API routes (without rate limiting, for tests)
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/me", get(get_current_user).patch(update_current_user))
@@ -25,6 +26,35 @@ pub fn routes() -> Router<AppState> {
         .route("/{id}/followers", get(get_user_followers))
         .route("/{id}/following", get(get_user_following))
         .route("/{id}/books", get(get_user_books))
+}
+
+/// User API routes with rate limiting applied
+///
+/// Rate limiting strategies:
+/// - Export: 1 request per hour (GDPR data export is expensive)
+/// - Search: 10 requests per minute (to prevent abuse)
+pub fn routes_with_rate_limit(rate_limiter: RateLimiterState) -> Router<AppState> {
+    // Export endpoint with strict rate limiting (1/hour)
+    let export_routes = Router::new()
+        .route("/me/export", get(export_user_data))
+        .layer(ExportRateLimitLayer::new(rate_limiter.clone()));
+
+    // Search endpoint with moderate rate limiting (10/min)
+    let search_routes = Router::new()
+        .route("/search", get(search_users))
+        .layer(SearchRateLimitLayer::new(rate_limiter));
+
+    // Routes without special rate limiting
+    let standard_routes = Router::new()
+        .route("/me", get(get_current_user).patch(update_current_user))
+        .route("/me/federation", patch(toggle_federation))
+        .route("/{id}", get(get_user_by_id))
+        .route("/{id}/followers", get(get_user_followers))
+        .route("/{id}/following", get(get_user_following))
+        .route("/{id}/books", get(get_user_books));
+
+    // Merge with rate-limited routes taking precedence
+    export_routes.merge(search_routes).merge(standard_routes)
 }
 
 /// User search query parameters

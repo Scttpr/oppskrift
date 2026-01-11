@@ -47,6 +47,27 @@ impl BookService {
         .map_err(AppError::from)
     }
 
+    /// Get a book title by ID (for contribution notifications)
+    pub async fn get_title(pool: &PgPool, id: Uuid) -> AppResult<String> {
+        sqlx::query_scalar!("SELECT title FROM recipe_books WHERE id = $1", id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Recipe book {} not found", id)))
+    }
+
+    /// Get the count of recipes in a book
+    pub async fn get_recipe_count(pool: &PgPool, book_id: Uuid) -> AppResult<i64> {
+        let count: i64 = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM book_recipe_entries WHERE book_id = $1",
+            book_id
+        )
+        .fetch_one(pool)
+        .await?
+        .unwrap_or(0);
+
+        Ok(count)
+    }
+
     /// Get a recipe book by ID (internal, no visibility check)
     pub async fn get_by_id(pool: &PgPool, id: Uuid) -> AppResult<RecipeBook> {
         sqlx::query_as!(

@@ -91,6 +91,38 @@ impl RecipeService {
         Ok(recipe)
     }
 
+    /// Count recipes by author (for export threshold check)
+    pub async fn count_by_author(pool: &PgPool, author_id: Uuid) -> AppResult<i64> {
+        let count: i64 = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM recipes WHERE author_id = $1",
+            author_id
+        )
+        .fetch_one(pool)
+        .await?
+        .unwrap_or(0);
+
+        Ok(count)
+    }
+
+    /// Get recipe titles by IDs (for contribution display)
+    pub async fn get_titles_by_ids(
+        pool: &PgPool,
+        recipe_ids: &[Uuid],
+    ) -> AppResult<std::collections::HashMap<Uuid, String>> {
+        if recipe_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let rows = sqlx::query!(
+            "SELECT id, title FROM recipes WHERE id = ANY($1)",
+            recipe_ids
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|r| (r.id, r.title)).collect())
+    }
+
     /// Get a recipe by ID (internal, no visibility check)
     pub async fn get_by_id(pool: &PgPool, id: Uuid) -> AppResult<Recipe> {
         sqlx::query_as!(

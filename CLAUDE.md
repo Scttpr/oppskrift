@@ -13,6 +13,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-25
 - PostgreSQL 15+ (via SQLx with offline mode) (005-abac-authorization)
 - Rust 2021 edition (1.75+) + Axum 0.8, Askama 0.15, SQLx 0.8, HTMX (vendored in static/) (006-ui-parity)
 - PostgreSQL 15+ (existing tables: sessions, security_events, follows, book_contributions) (006-ui-parity)
+- Rust 1.75+ (2021 edition) + Axum 0.8, tower_governor 0.8, tower 0.5 (007-rate-limiting)
+- PostgreSQL (for security event logging), In-memory (for rate limit counters) (007-rate-limiting)
 
 - **Language**: Rust 1.75+
 - **Framework**: Axum 0.8
@@ -59,9 +61,9 @@ cargo run                # Run dev server
 - Use `thiserror` for library errors, `anyhow` for application errors
 
 ## Recent Changes
+- 007-rate-limiting: Added Rust 1.75+ (2021 edition) + Axum 0.8, tower_governor 0.8, tower 0.5
 - 006-ui-parity: Added Rust 2021 edition (1.75+) + Axum 0.8, Askama 0.15, SQLx 0.8, HTMX (vendored in static/)
 - 005-abac-authorization: Added Rust 2021 edition (1.75+) + Axum 0.8, SQLx 0.8, tokio 1.x, tower-http 0.6, validator 0.20, activitypub_federation 0.6
-- 004-user-profile-settings: Added Rust 1.75+ + Axum 0.8, Askama (templates), SQLx (database), validator (input validation)
 
 
 <!-- MANUAL ADDITIONS START -->
