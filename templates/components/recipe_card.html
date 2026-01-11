@@ -2,26 +2,18 @@
    Usage: {% include "components/recipe_card.html" %}
    Variables: recipe (RecipeSummary), show_author (bool, optional)
 #}
-<article class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-    <a href="/recipes/{{ recipe.id }}" class="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-        {# Recipe Image #}
+<article class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow h-full flex flex-col">
+    <a href="/recipes/{{ recipe.id }}" class="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 flex flex-col h-full">
+        {# Recipe Image - only shown when image exists #}
+        {% if let Some(img_url) = recipe.primary_image_url %}
         <div class="aspect-video bg-gray-200 dark:bg-gray-700 relative">
-            {% if let Some(img_url) = recipe.primary_image_url %}
             <img
                 src="{{ img_url }}"
                 alt="{{ recipe.title }}"
                 class="w-full h-full object-cover"
                 loading="lazy"
             />
-            {% else %}
-            <div class="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
-                <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-            </div>
-            {% endif %}
-
-            {# Difficulty Badge - Icon + Text for accessibility (T141: color not sole carrier) #}
+            {# Difficulty Badge on image #}
             {% if let Some(difficulty) = recipe.difficulty %}
             <span class="absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded-full flex items-center gap-1
                 {% match difficulty %}
@@ -42,9 +34,35 @@
             </span>
             {% endif %}
         </div>
+        {% endif %}
 
         {# Recipe Info #}
-        <div class="p-4">
+        <div class="p-4 flex-grow flex flex-col">
+            {# Difficulty Badge in content area when no image #}
+            {% if recipe.primary_image_url.is_none() %}
+                {% if let Some(difficulty) = recipe.difficulty %}
+                <div class="mb-2">
+                    <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full items-center gap-1
+                        {% match difficulty %}
+                        {% when crate::models::Difficulty::Easy %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                        {% when crate::models::Difficulty::Medium %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                        {% when crate::models::Difficulty::Hard %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                        {% endmatch %}
+                    ">
+                        {% match difficulty %}
+                        {% when crate::models::Difficulty::Easy %}
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="4"/></svg>
+                        {% when crate::models::Difficulty::Medium %}
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="3"/><circle cx="15" cy="10" r="3"/></svg>
+                        {% when crate::models::Difficulty::Hard %}
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="2.5"/><circle cx="10" cy="10" r="2.5"/><circle cx="16" cy="10" r="2.5"/></svg>
+                        {% endmatch %}
+                        {{ difficulty }}
+                    </span>
+                </div>
+                {% endif %}
+            {% endif %}
+
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white line-clamp-2">
                 {{ recipe.title }}
             </h3>
@@ -55,8 +73,8 @@
             </p>
             {% endif %}
 
-            {# Time Info #}
-            <div class="mt-3 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+            {# Time Info - pushed to bottom with mt-auto #}
+            <div class="mt-auto pt-3 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                 {% if let Some(prep) = recipe.prep_time_min %}
                 <span class="flex items-center gap-1" title="Prep time">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

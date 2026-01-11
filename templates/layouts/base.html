@@ -14,7 +14,7 @@
 
     {% block head %}{% endblock %}
 </head>
-<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+<body class="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
     <!-- Skip Links for Keyboard Navigation (Constitution IV) -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <a href="#main-nav" class="skip-link">Skip to navigation</a>
@@ -70,7 +70,7 @@
     </header>
 
     <!-- Main Content Landmark -->
-    <main id="main-content" role="main" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main id="main-content" role="main" class="flex-grow flex flex-col max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {% block content %}{% endblock %}
     </main>
 
