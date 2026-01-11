@@ -18,7 +18,6 @@ use crate::core::request_id::request_id_middleware;
 pub mod api;
 pub mod core;
 pub mod handlers;
-pub mod jobs;
 pub mod models;
 pub mod services;
 
