@@ -3,101 +3,107 @@
 //! Tests for OSK Principle IV compliance - Rate Limiting
 //! Verifies that authentication endpoints are rate limited to prevent brute force attacks.
 //!
+//! Important: Rate limiting only counts FAILED authentication attempts (401/403 responses).
+//! Successful logins do not count against the rate limit.
+//!
 //! Run with: cargo test --test security_rate_limit_test
 
 mod common;
 
-use common::TestContext;
+use common::{run_test, run_test_with_rate_limiting};
 use serde_json::json;
 
 // =============================================================================
-// Login Rate Limiting Tests (T066)
+// Login Rate Limiting Tests (T066) - Using Rate-Limited Router
 // =============================================================================
 
-/// Test: Login endpoint should be rate limited by IP
+/// Test: Login endpoint should return 429 after exceeding FAILED attempts
 ///
-/// Note: This test verifies the rate limiting behavior exists.
-/// The actual rate limit thresholds may vary based on configuration.
+/// This test uses the rate-limited router to verify end-to-end rate limiting.
+/// Default limit: 5 FAILED attempts per 15 minutes per IP
+/// Note: Only 401/403 responses count against the limit
 #[tokio::test]
-async fn test_login_rate_limit_by_ip() {
-    let ctx = TestContext::new().await;
+async fn test_login_rate_limit_middleware_blocks_after_failures() {
+    run_test_with_rate_limiting(|ctx| async move {
+        // Make 6 failed login attempts (wrong password = 401)
+        // After 5 failures, the 6th should be blocked with 429
+        let mut last_response = None;
+        for i in 0..6 {
+            let response = ctx
+                .post(
+                    "/api/v1/auth/login",
+                    json!({
+                        "email": format!("user{}@example.com", i),
+                        "password": "WrongPassword123!"
+                    }),
+                )
+                .await;
 
-    // Make multiple login attempts - track responses
-    let mut rate_limited = false;
-    let mut successful_requests = 0;
-
-    // Try 15 requests - should hit rate limit before this
-    for i in 0..15 {
-        let response = ctx
-            .post(
-                "/api/v1/auth/login",
-                json!({
-                    "email": format!("user{}@example.com", i),
-                    "password": "AnyPassword123!"
-                }),
-            )
-            .await;
-
-        if response.status == 429 {
-            rate_limited = true;
-            break;
+            last_response = Some(response);
         }
-        successful_requests += 1;
-    }
 
-    // Rate limiting should either be enabled (429 response)
-    // or all requests should get through (no rate limiting configured)
-    // This test documents the behavior
-    if rate_limited {
+        let response = last_response.expect("Should have made requests");
+
+        // 6th request should be rate limited (after 5 failures)
+        assert_eq!(
+            response.status, 429,
+            "6th request should return 429 Too Many Requests after 5 failures. Got {} - {:?}",
+            response.status, response.body
+        );
+
+        // Should have Retry-After header
         assert!(
-            successful_requests < 15,
-            "Rate limiting triggered after {} requests",
-            successful_requests
+            response.retry_after.is_some(),
+            "Rate limited response should include Retry-After header"
         );
-    } else {
-        // If no rate limiting, this is a security finding but not a test failure
-        // The security spec recommends rate limiting at 10 requests per minute
-        eprintln!(
-            "SECURITY NOTE: No rate limiting detected on login endpoint after {} requests",
-            successful_requests
+
+        // Response body should have expected structure
+        assert_eq!(
+            response.body.get("error").and_then(|v| v.as_str()),
+            Some("rate_limit_exceeded"),
+            "Response should have error: rate_limit_exceeded"
         );
-    }
+    })
+    .await;
 }
 
-/// Test: Login rate limit should include appropriate headers
+/// Test: Rate limit response includes proper JSON body
 #[tokio::test]
-async fn test_login_rate_limit_headers() {
-    let ctx = TestContext::new().await;
+async fn test_login_rate_limit_response_body() {
+    run_test_with_rate_limiting(|ctx| async move {
+        // Exhaust rate limit
+        for i in 0..6 {
+            let response = ctx
+                .post(
+                    "/api/v1/auth/login",
+                    json!({
+                        "email": format!("bodytest{}@example.com", i),
+                        "password": "WrongPassword123!"
+                    }),
+                )
+                .await;
 
-    // Make a login request and check for rate limit headers
-    let response = ctx
-        .server
-        .post("/api/v1/auth/login")
-        .json(&json!({
-            "email": "test@example.com",
-            "password": "Password123!"
-        }))
-        .await;
+            if response.status == 429 {
+                // Verify response body structure
+                assert!(
+                    response.body.get("error").is_some(),
+                    "Response should have 'error' field"
+                );
+                assert!(
+                    response.body.get("message").is_some(),
+                    "Response should have 'message' field"
+                );
+                assert!(
+                    response.body.get("retry_after").is_some(),
+                    "Response should have 'retry_after' field"
+                );
+                return;
+            }
+        }
 
-    // Check for common rate limit headers
-    // Note: These headers are recommended but not mandatory
-    let has_ratelimit_headers = response
-        .iter_headers_by_name("x-ratelimit-limit")
-        .next()
-        .is_some()
-        || response
-            .iter_headers_by_name("x-ratelimit-remaining")
-            .next()
-            .is_some()
-        || response
-            .iter_headers_by_name("retry-after")
-            .next()
-            .is_some();
-
-    // Document whether headers are present
-    if !has_ratelimit_headers {
-        eprintln!("SECURITY NOTE: Rate limit headers not present on login response");
-    }
+        panic!("Should have received 429 response");
+    })
+    .await;
 }
 
 // =============================================================================
@@ -106,208 +112,155 @@ async fn test_login_rate_limit_headers() {
 
 /// Test: Registration endpoint should be rate limited
 #[tokio::test]
-async fn test_registration_rate_limit() {
-    let ctx = TestContext::new().await;
+async fn test_registration_rate_limit_middleware() {
+    run_test_with_rate_limiting(|ctx| async move {
+        let mut rate_limited = false;
+        let mut successful_requests = 0;
 
-    let mut rate_limited = false;
-    let mut successful_requests = 0;
+        // Try 7 registrations - should hit rate limit
+        for i in 0..7 {
+            let response = ctx
+                .post(
+                    "/api/v1/auth/register",
+                    json!({
+                        "email": format!("ratetest{}@example.com", i),
+                        "username": format!("ratetest{}", i),
+                        "password": "SecurePass123!@#"
+                    }),
+                )
+                .await;
 
-    // Try 10 registrations - should hit rate limit
-    for i in 0..10 {
-        let response = ctx
-            .post(
-                "/api/v1/auth/register",
-                json!({
-                    "email": format!("ratetest{}@example.com", i),
-                    "username": format!("ratetest{}", i),
-                    "password": "SecurePass123!@#"
-                }),
-            )
-            .await;
-
-        if response.status == 429 {
-            rate_limited = true;
-            break;
-        }
-        // Count requests that weren't rate limited
-        if response.status != 429 {
+            if response.status == 429 {
+                rate_limited = true;
+                // Verify has proper response structure
+                assert!(
+                    response.retry_after.is_some(),
+                    "Rate limited response should have Retry-After header"
+                );
+                break;
+            }
             successful_requests += 1;
         }
-    }
 
-    if rate_limited {
         assert!(
-            successful_requests < 10,
-            "Registration rate limiting triggered after {} requests",
+            rate_limited,
+            "Registration endpoint should be rate limited after {} successful requests",
             successful_requests
         );
-    } else {
-        eprintln!(
-            "SECURITY NOTE: No rate limiting detected on registration endpoint after {} requests",
-            successful_requests
-        );
-    }
-}
-
-/// Test: Registration rate limit should be per IP
-#[tokio::test]
-async fn test_registration_rate_limit_per_ip() {
-    let ctx = TestContext::new().await;
-
-    // Make several registration requests from same context (same IP)
-    // All should either work or be rate limited consistently
-    let mut statuses = Vec::new();
-
-    for i in 0..5 {
-        let response = ctx
-            .post(
-                "/api/v1/auth/register",
-                json!({
-                    "email": format!("ipratetest{}@example.com", i),
-                    "username": format!("ipratetest{}", i),
-                    "password": "SecurePass123!@#"
-                }),
-            )
-            .await;
-        statuses.push(response.status);
-    }
-
-    // Once rate limited, should stay rate limited
-    let first_429_pos = statuses.iter().position(|&s| s == 429);
-    if let Some(pos) = first_429_pos {
-        for (i, status) in statuses.iter().enumerate().skip(pos) {
-            assert_eq!(
-                *status, 429,
-                "After rate limiting at position {}, request {} should also be rate limited",
-                pos, i
-            );
-        }
-    }
+    })
+    .await;
 }
 
 // =============================================================================
 // Password Reset Rate Limiting Tests (T068)
 // =============================================================================
 
-/// Test: Password reset should be rate limited per email
-///
-/// Note: The auth service has a cooldown mechanism (resend_confirmation has 5 min cooldown)
-/// but forgot-password may intentionally return 200 to prevent enumeration.
-/// This test documents the behavior.
+/// Test: Password reset endpoint should be rate limited
 #[tokio::test]
-async fn test_password_reset_rate_limit_per_email() {
-    let mut ctx = TestContext::new().await;
+async fn test_password_reset_rate_limit_middleware() {
+    run_test_with_rate_limiting(|ctx| async move {
+        let mut rate_limited = false;
 
-    // Create a user to test reset on
-    let email = TestContext::unique_email();
-    let username = TestContext::unique_username();
-    ctx.create_user(&email, &username, "Xk9#mP2$vL5@nQ8!", true)
-        .await;
+        // Try many password reset requests - should hit rate limit
+        for i in 0..7 {
+            let response = ctx
+                .post(
+                    "/api/v1/auth/forgot-password",
+                    json!({ "email": format!("resettest{}@example.com", i) }),
+                )
+                .await;
 
-    // First request should succeed
-    let response1 = ctx
-        .post("/api/v1/auth/forgot-password", json!({ "email": email }))
-        .await;
+            if response.status == 429 {
+                rate_limited = true;
+                assert!(
+                    response.retry_after.is_some(),
+                    "Rate limited response should have Retry-After header"
+                );
+                break;
+            }
+        }
 
-    assert_eq!(
-        response1.status, 200,
-        "First password reset request should succeed: {:?}",
-        response1.body
-    );
-
-    // Second request within cooldown - behavior varies:
-    // - 429: Rate limited
-    // - 400: Too many requests error
-    // - 200: Silent success (for anti-enumeration, always returns success)
-    let response2 = ctx
-        .post("/api/v1/auth/forgot-password", json!({ "email": email }))
-        .await;
-
-    // Document the behavior
-    if response2.status == 200 {
-        // This is acceptable for anti-enumeration purposes
-        // The API returns 200 to prevent attackers from knowing if email exists
-        // The backend should still enforce cooldown (not send another email)
-        eprintln!(
-            "INFO: Password reset returns 200 for repeated requests (anti-enumeration).\n\
-             Backend should still enforce cooldown to prevent email spam."
+        assert!(
+            rate_limited,
+            "Password reset endpoint should be rate limited"
         );
-    }
-
-    // Test passes as long as we get a valid HTTP response
-    assert!(
-        response2.status == 200 || response2.status == 429 || response2.status == 400,
-        "Password reset should return 200, 429, or 400. Got {} - {:?}",
-        response2.status,
-        response2.body
-    );
-
-    ctx.cleanup().await;
+    })
+    .await;
 }
 
-/// Test: Password reset rate limit should not reveal email existence
+// =============================================================================
+// Security Event Logging Tests
+// =============================================================================
+
+/// Test: Rate limit events should be logged to security_events table
 #[tokio::test]
-async fn test_password_reset_rate_limit_no_enumeration() {
-    let ctx = TestContext::new().await;
-
-    // Request reset for non-existent email
-    let response1 = ctx
-        .post(
-            "/api/v1/auth/forgot-password",
-            json!({ "email": "nonexistent@example.com" }),
-        )
-        .await;
-
-    // Request reset for another non-existent email
-    let response2 = ctx
-        .post(
-            "/api/v1/auth/forgot-password",
-            json!({ "email": "alsonotexist@example.com" }),
-        )
-        .await;
-
-    // Both should return the same response (no enumeration)
-    assert_eq!(
-        response1.status, response2.status,
-        "Password reset responses should be identical regardless of email existence"
-    );
-}
-
-/// Test: Password reset should be rate limited globally per IP
-#[tokio::test]
-async fn test_password_reset_global_rate_limit() {
-    let ctx = TestContext::new().await;
-
-    let mut rate_limited = false;
-    let mut request_count = 0;
-
-    // Try many different emails from same IP
-    for i in 0..20 {
-        let response = ctx
-            .post(
-                "/api/v1/auth/forgot-password",
-                json!({ "email": format!("globalrate{}@example.com", i) }),
-            )
+async fn test_rate_limit_event_logged() {
+    run_test_with_rate_limiting(|ctx| async move {
+        // Clear any existing rate limit events for test IP
+        let _ = sqlx::query("DELETE FROM security_events WHERE event_type = 'rate_limit_exceeded' AND ip_address = '127.0.0.1'")
+            .execute(&ctx.db)
             .await;
 
-        request_count += 1;
-        if response.status == 429 {
-            rate_limited = true;
-            break;
+        // Exhaust rate limit
+        for i in 0..6 {
+            let _ = ctx
+                .post(
+                    "/api/v1/auth/login",
+                    json!({
+                        "email": format!("logevent{}@example.com", i),
+                        "password": "WrongPassword123!"
+                    }),
+                )
+                .await;
         }
-    }
 
-    if rate_limited {
+        // Give a moment for async logging
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Check that a rate limit event was logged
+        let event_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM security_events WHERE event_type = 'rate_limit_exceeded' AND ip_address = '127.0.0.1'"
+        )
+        .fetch_one(&ctx.db)
+        .await
+        .expect("Failed to query security events");
+
         assert!(
-            request_count < 20,
-            "Global rate limiting triggered after {} requests",
-            request_count
+            event_count > 0,
+            "Rate limit exceeded event should be logged to security_events table"
         );
-    } else {
-        // Note: Per-email rate limiting (cooldown) is different from global rate limiting
-        eprintln!(
-            "SECURITY NOTE: No global rate limiting detected on forgot-password endpoint after {} requests",
-            request_count
-        );
-    }
+    })
+    .await;
+}
+
+// =============================================================================
+// Legacy Tests (Non-Rate-Limited Context for Backward Compatibility)
+// =============================================================================
+
+/// Test: Non-rate-limited context should allow unlimited requests
+///
+/// This verifies that test_app_router (used by most tests) doesn't have rate limiting,
+/// ensuring test isolation.
+#[tokio::test]
+async fn test_non_rate_limited_context_allows_requests() {
+    run_test(|ctx| async move {
+        // Make many requests - none should be rate limited
+        for i in 0..20 {
+            let response = ctx
+                .post(
+                    "/api/v1/auth/login",
+                    json!({
+                        "email": format!("unlimited{}@example.com", i),
+                        "password": "WrongPassword123!"
+                    }),
+                )
+                .await;
+
+            assert_ne!(
+                response.status, 429,
+                "Non-rate-limited context should not return 429"
+            );
+        }
+    })
+    .await;
 }

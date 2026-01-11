@@ -12,12 +12,210 @@ pub mod security;
 
 use axum_test::TestServer;
 use chrono::{Duration, Utc};
-use oppskrift::{test_app_router, AppState};
+use futures::FutureExt;
+use oppskrift::{app_router_with_rate_limit, test_app_router, AppState};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
+
+/// Shared cleanup data that survives panics.
+/// Used by run_test wrapper to ensure cleanup happens even if tests panic.
+#[derive(Clone)]
+struct CleanupData {
+    db: PgPool,
+    users: Arc<Mutex<Vec<Uuid>>>,
+    recipes: Arc<Mutex<Vec<Uuid>>>,
+    books: Arc<Mutex<Vec<Uuid>>>,
+    groups: Arc<Mutex<Vec<Uuid>>>,
+}
+
+impl CleanupData {
+    fn new(db: PgPool) -> Self {
+        Self {
+            db,
+            users: Arc::new(Mutex::new(Vec::new())),
+            recipes: Arc::new(Mutex::new(Vec::new())),
+            books: Arc::new(Mutex::new(Vec::new())),
+            groups: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    fn track_user(&self, id: Uuid) {
+        self.users.lock().unwrap().push(id);
+    }
+
+    fn track_recipe(&self, id: Uuid) {
+        self.recipes.lock().unwrap().push(id);
+    }
+
+    fn track_book(&self, id: Uuid) {
+        self.books.lock().unwrap().push(id);
+    }
+
+    fn track_group(&self, id: Uuid) {
+        self.groups.lock().unwrap().push(id);
+    }
+
+    async fn cleanup(&self) {
+        let users = self.users.lock().unwrap().clone();
+        let recipes = self.recipes.lock().unwrap().clone();
+        let books = self.books.lock().unwrap().clone();
+        let groups = self.groups.lock().unwrap().clone();
+
+        // Clean up permissions first
+        for recipe_id in &recipes {
+            let _ = sqlx::query(
+                "DELETE FROM permissions WHERE resource_type = 'recipe' AND resource_id = $1",
+            )
+            .bind(recipe_id)
+            .execute(&self.db)
+            .await;
+        }
+        for book_id in &books {
+            let _ = sqlx::query(
+                "DELETE FROM permissions WHERE resource_type = 'book' AND resource_id = $1",
+            )
+            .bind(book_id)
+            .execute(&self.db)
+            .await;
+        }
+        for group_id in &groups {
+            let _ = sqlx::query(
+                "DELETE FROM permissions WHERE subject_type = 'group' AND subject_id = $1",
+            )
+            .bind(group_id)
+            .execute(&self.db)
+            .await;
+        }
+        for user_id in &users {
+            let _ = sqlx::query(
+                "DELETE FROM permissions WHERE subject_type = 'user' AND subject_id = $1",
+            )
+            .bind(user_id)
+            .execute(&self.db)
+            .await;
+        }
+
+        // Clean up groups
+        for group_id in &groups {
+            let _ = sqlx::query("DELETE FROM group_members WHERE group_id = $1")
+                .bind(group_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM groups WHERE id = $1")
+                .bind(group_id)
+                .execute(&self.db)
+                .await;
+        }
+
+        // Clean up books
+        for book_id in &books {
+            let _ = sqlx::query("DELETE FROM book_recipe_entries WHERE book_id = $1")
+                .bind(book_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM book_contributions WHERE book_id = $1")
+                .bind(book_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM recipe_books WHERE id = $1")
+                .bind(book_id)
+                .execute(&self.db)
+                .await;
+        }
+
+        // Clean up recipes
+        for recipe_id in &recipes {
+            let _ = sqlx::query("DELETE FROM saved_recipes WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM book_recipe_entries WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM book_contributions WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM ingredients WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM instruction_steps WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM recipe_images WHERE recipe_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM activities WHERE target_id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+            let _ = sqlx::query("DELETE FROM recipes WHERE id = $1")
+                .bind(recipe_id)
+                .execute(&self.db)
+                .await;
+        }
+
+        // Clean up users
+        for user_id in &users {
+            let tables = [
+                "sessions",
+                "email_confirmation_tokens",
+                "password_reset_tokens",
+                "recovery_codes",
+                "security_events",
+                "saved_recipes",
+                "follows",
+                "activities",
+                "group_members",
+                "two_factor_auth",
+            ];
+
+            for table in tables {
+                let query = format!("DELETE FROM {} WHERE user_id = $1", table);
+                let _ = sqlx::query(&query).bind(user_id).execute(&self.db).await;
+            }
+
+            // Delete follows where user is being followed
+            let _ = sqlx::query("DELETE FROM follows WHERE following_id = $1")
+                .bind(user_id)
+                .execute(&self.db)
+                .await;
+
+            // Delete groups owned by user
+            let _ = sqlx::query("DELETE FROM groups WHERE owner_id = $1")
+                .bind(user_id)
+                .execute(&self.db)
+                .await;
+
+            // Delete recipes owned by user
+            let _ = sqlx::query("DELETE FROM recipes WHERE author_id = $1")
+                .bind(user_id)
+                .execute(&self.db)
+                .await;
+
+            // Delete books owned by user
+            let _ = sqlx::query("DELETE FROM recipe_books WHERE owner_id = $1")
+                .bind(user_id)
+                .execute(&self.db)
+                .await;
+
+            // Delete user
+            let _ = sqlx::query("DELETE FROM users WHERE id = $1")
+                .bind(user_id)
+                .execute(&self.db)
+                .await;
+        }
+    }
+}
 
 /// Test context with database connection and test server
 pub struct TestContext {
@@ -28,6 +226,8 @@ pub struct TestContext {
     created_recipes: Vec<Uuid>,
     created_books: Vec<Uuid>,
     created_groups: Vec<Uuid>,
+    /// Shared cleanup data for automatic cleanup (used by run_test wrapper)
+    cleanup_data: Option<CleanupData>,
 }
 
 impl TestContext {
@@ -63,6 +263,51 @@ impl TestContext {
             created_recipes: Vec::new(),
             created_books: Vec::new(),
             created_groups: Vec::new(),
+            cleanup_data: None,
+        }
+    }
+
+    /// Create a new test context with rate limiting enabled
+    ///
+    /// Unlike `new()`, this uses the production rate-limited router
+    /// with a mock ConnectInfo for IP extraction.
+    pub async fn new_with_rate_limiting() -> Self {
+        dotenvy::dotenv().ok();
+
+        let database_url =
+            std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for tests");
+
+        let db = PgPool::connect(&database_url)
+            .await
+            .expect("Failed to connect to test database");
+
+        // Generate CSRF secret for testing (32 bytes)
+        let csrf_secret = b"test_csrf_secret_32_bytes_long!!".to_vec();
+
+        // Create app state and rate-limited router with mock ConnectInfo
+        let state = AppState {
+            db: db.clone(),
+            csrf_secret: csrf_secret.clone(),
+        };
+
+        // Use app_router_with_rate_limit and add mock ConnectInfo
+        use axum::{extract::ConnectInfo, Extension};
+        let app = app_router_with_rate_limit(state).layer(Extension(ConnectInfo(
+            SocketAddr::from(([127, 0, 0, 1], 0)),
+        )));
+
+        // Create test server
+        let server = TestServer::new(app).expect("Failed to create test server");
+
+        Self {
+            db,
+            server,
+            csrf_secret,
+            created_users: Vec::new(),
+            created_recipes: Vec::new(),
+            created_books: Vec::new(),
+            created_groups: Vec::new(),
+            cleanup_data: None,
         }
     }
 
@@ -115,12 +360,18 @@ impl TestContext {
         .expect("Failed to create test user");
 
         self.created_users.push(user_id);
+        if let Some(ref cleanup) = self.cleanup_data {
+            cleanup.track_user(user_id);
+        }
         user_id
     }
 
     /// Track a user for cleanup
     pub fn track_user(&mut self, user_id: Uuid) {
         self.created_users.push(user_id);
+        if let Some(ref cleanup) = self.cleanup_data {
+            cleanup.track_user(user_id);
+        }
     }
 
     // ==========================================================================
@@ -147,6 +398,9 @@ impl TestContext {
         .expect("Failed to create test recipe");
 
         self.created_recipes.push(recipe_id);
+        if let Some(ref cleanup) = self.cleanup_data {
+            cleanup.track_recipe(recipe_id);
+        }
         recipe_id
     }
 
@@ -225,6 +479,9 @@ impl TestContext {
         .expect("Failed to create test book");
 
         self.created_books.push(book_id);
+        if let Some(ref cleanup) = self.cleanup_data {
+            cleanup.track_book(book_id);
+        }
         book_id
     }
 
@@ -577,6 +834,7 @@ impl TestContext {
 
         let status = response.status_code().as_u16();
         let session_cookie = extract_session_cookie(&response);
+        let retry_after = extract_retry_after(&response);
         let text = response.text();
         let body = serde_json::from_str::<Value>(&text)
             .unwrap_or_else(|_| Value::Object(Default::default()));
@@ -585,6 +843,7 @@ impl TestContext {
             status,
             body,
             session_cookie,
+            retry_after,
         }
     }
 
@@ -593,6 +852,7 @@ impl TestContext {
         let response = self.server.get(path).await;
 
         let status = response.status_code().as_u16();
+        let retry_after = extract_retry_after(&response);
         // Try to parse as JSON, fall back to empty object
         let text = response.text();
         let body = serde_json::from_str::<Value>(&text)
@@ -602,6 +862,7 @@ impl TestContext {
             status,
             body,
             session_cookie: None,
+            retry_after,
         }
     }
 
@@ -617,6 +878,7 @@ impl TestContext {
             .await;
 
         let status = response.status_code().as_u16();
+        let retry_after = extract_retry_after(&response);
         let text = response.text();
         let body = serde_json::from_str::<Value>(&text)
             .unwrap_or_else(|_| Value::Object(Default::default()));
@@ -625,6 +887,7 @@ impl TestContext {
             status,
             body,
             session_cookie: None,
+            retry_after,
         }
     }
 
@@ -642,6 +905,7 @@ impl TestContext {
 
         let status = response.status_code().as_u16();
         let session_cookie = extract_session_cookie(&response);
+        let retry_after = extract_retry_after(&response);
         let text = response.text();
         let body = serde_json::from_str::<Value>(&text)
             .unwrap_or_else(|_| Value::Object(Default::default()));
@@ -650,6 +914,7 @@ impl TestContext {
             status,
             body,
             session_cookie,
+            retry_after,
         }
     }
 
@@ -672,6 +937,7 @@ impl TestContext {
 
         let status = response.status_code().as_u16();
         let session_cookie = extract_session_cookie(&response);
+        let retry_after = extract_retry_after(&response);
         let text = response.text();
         let body = serde_json::from_str::<Value>(&text)
             .unwrap_or_else(|_| Value::Object(Default::default()));
@@ -680,6 +946,7 @@ impl TestContext {
             status,
             body,
             session_cookie,
+            retry_after,
         }
     }
 
@@ -697,6 +964,7 @@ impl TestContext {
 
         let status = response.status_code().as_u16();
         let session_cookie = extract_session_cookie(&response);
+        let retry_after = extract_retry_after(&response);
         let text = response.text();
         let body = serde_json::from_str::<Value>(&text)
             .unwrap_or_else(|_| Value::Object(Default::default()));
@@ -705,6 +973,7 @@ impl TestContext {
             status,
             body,
             session_cookie,
+            retry_after,
         }
     }
 
@@ -722,6 +991,7 @@ impl TestContext {
 
         let status = response.status_code().as_u16();
         let session_cookie = extract_session_cookie(&response);
+        let retry_after = extract_retry_after(&response);
         let text = response.text();
         let body = serde_json::from_str::<Value>(&text)
             .unwrap_or_else(|_| Value::Object(Default::default()));
@@ -730,6 +1000,7 @@ impl TestContext {
             status,
             body,
             session_cookie,
+            retry_after,
         }
     }
 }
@@ -738,6 +1009,69 @@ impl Drop for TestContext {
     fn drop(&mut self) {
         // Note: async cleanup in Drop is tricky
         // Tests should call cleanup() explicitly
+    }
+}
+
+/// Run a test with automatic cleanup, even on panic.
+///
+/// This wrapper ensures that database cleanup always runs after the test,
+/// whether it succeeds, fails an assertion, or panics.
+///
+/// # Example
+/// ```ignore
+/// #[tokio::test]
+/// async fn test_something() {
+///     run_test(|mut ctx| async move {
+///         let user_id = ctx.create_user("test@example.com", "testuser", "password", true).await;
+///         // ... test logic ...
+///         // No need to call cleanup() - it's automatic!
+///     }).await;
+/// }
+/// ```
+pub async fn run_test<F, Fut>(test_fn: F)
+where
+    F: FnOnce(TestContext) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    let ctx = TestContext::new().await;
+    run_test_with_context(ctx, test_fn).await;
+}
+
+/// Run a test with rate limiting enabled and automatic cleanup.
+pub async fn run_test_with_rate_limiting<F, Fut>(test_fn: F)
+where
+    F: FnOnce(TestContext) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    let ctx = TestContext::new_with_rate_limiting().await;
+    run_test_with_context(ctx, test_fn).await;
+}
+
+/// Internal helper that runs the test with a given context and ensures cleanup.
+async fn run_test_with_context<F, Fut>(mut ctx: TestContext, test_fn: F)
+where
+    F: FnOnce(TestContext) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    // Create shared cleanup data with cloned db pool
+    let cleanup_data = CleanupData::new(ctx.db.clone());
+
+    // Store cleanup data in context for tracking
+    ctx.cleanup_data = Some(cleanup_data.clone());
+
+    // Run the test and capture any panic
+    let result = std::panic::AssertUnwindSafe(async {
+        test_fn(ctx).await;
+    })
+    .catch_unwind()
+    .await;
+
+    // Always run cleanup, even if test panicked
+    cleanup_data.cleanup().await;
+
+    // Re-panic if the test failed
+    if let Err(panic_payload) = result {
+        std::panic::resume_unwind(panic_payload);
     }
 }
 
@@ -758,11 +1092,22 @@ fn extract_session_cookie(response: &axum_test::TestResponse) -> Option<String> 
         })
 }
 
+/// Extract Retry-After header value
+fn extract_retry_after(response: &axum_test::TestResponse) -> Option<u64> {
+    response
+        .iter_headers_by_name("retry-after")
+        .next()
+        .and_then(|value| value.to_str().ok())
+        .and_then(|s| s.parse().ok())
+}
+
 /// API response wrapper
 pub struct ApiResponse {
     pub status: u16,
     pub body: Value,
     pub session_cookie: Option<String>,
+    /// Retry-After header value (for rate limiting)
+    pub retry_after: Option<u64>,
 }
 
 impl ApiResponse {
@@ -827,6 +1172,9 @@ impl TestContext {
     pub fn track_group(&mut self, group_id: Uuid) {
         if !self.created_groups.contains(&group_id) {
             self.created_groups.push(group_id);
+            if let Some(ref cleanup) = self.cleanup_data {
+                cleanup.track_group(group_id);
+            }
         }
     }
 
@@ -1041,6 +1389,7 @@ impl TestContext {
             .await;
 
         let status = response.status_code().as_u16();
+        let retry_after = extract_retry_after(&response);
         let text = response.text();
         let body = serde_json::from_str::<Value>(&text)
             .unwrap_or_else(|_| Value::Object(Default::default()));
@@ -1049,6 +1398,7 @@ impl TestContext {
             status,
             body,
             session_cookie: None,
+            retry_after,
         }
     }
 }
