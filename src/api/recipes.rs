@@ -7,7 +7,8 @@ use axum::{
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::middleware::{AuthUser, OptionalAuthUser};
+use crate::api::middleware::rate_limit::UploadRateLimitLayer;
+use crate::api::middleware::{AuthUser, OptionalAuthUser, RateLimiterState};
 use crate::core::error::{AppError, AppResult};
 use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::core::schema_org::SchemaOrgRecipe;
@@ -20,7 +21,7 @@ use crate::models::{GrantPermissionRequest, Permission, PermissionListResponse, 
 use crate::services::{ImageService, PermissionService, RecipeService, UserService};
 use crate::AppState;
 
-/// Recipe API routes
+/// Recipe API routes (without rate limiting, for tests)
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_recipes).post(create_recipe))
@@ -36,6 +37,36 @@ pub fn routes() -> Router<AppState> {
             get(list_permissions).post(grant_permission),
         )
         .route("/{id}/permissions/{perm_id}", delete(revoke_permission))
+}
+
+/// Recipe API routes with rate limiting applied
+///
+/// Rate limiting strategies:
+/// - Upload: 20 uploads per 5 minutes (to prevent storage abuse)
+pub fn routes_with_rate_limit(rate_limiter: RateLimiterState) -> Router<AppState> {
+    // Upload endpoints with rate limiting
+    let upload_routes = Router::new()
+        .route("/{id}/images", post(upload_image))
+        .layer(UploadRateLimitLayer::new(rate_limiter));
+
+    // Routes without special rate limiting
+    let standard_routes = Router::new()
+        .route("/", get(list_recipes).post(create_recipe))
+        .route(
+            "/{id}",
+            get(get_recipe).put(update_recipe).delete(delete_recipe),
+        )
+        .route("/{id}/images", get(list_images))
+        .route("/{id}/images/{image_id}", delete(delete_image))
+        .route("/{id}/images/{image_id}/primary", post(set_primary_image))
+        .route(
+            "/{id}/permissions",
+            get(list_permissions).post(grant_permission),
+        )
+        .route("/{id}/permissions/{perm_id}", delete(revoke_permission));
+
+    // Merge with upload routes taking precedence for POST
+    upload_routes.merge(standard_routes)
 }
 
 /// Request body for creating a recipe with ingredients and instructions

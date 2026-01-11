@@ -1,15 +1,14 @@
 //! Rate limiting middleware
 //!
-//! Provides rate limiting for API endpoints using tower_governor.
-//! Supports IP-based and user-based rate limiting with configurable thresholds.
+//! Provides rate limiting for API endpoints using a custom sliding window implementation.
+//! Supports IP-based and account-based rate limiting with configurable thresholds.
 
 use axum::{
     body::Body,
     extract::{ConnectInfo, Request},
-    http::{header::COOKIE, HeaderMap, HeaderValue, StatusCode},
-    middleware::Next,
+    http::{HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
-    Extension, Json,
+    Json,
 };
 use serde::Serialize;
 use sqlx::types::ipnetwork::IpNetwork;
@@ -20,8 +19,6 @@ use std::{
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
-
-use crate::api::middleware::auth::SESSION_COOKIE_NAME;
 
 /// Rate limit error response body
 #[derive(Debug, Serialize)]
@@ -104,12 +101,6 @@ impl RateLimitConfig {
         Self::new(30, 60, RateLimitType::Api)
     }
 
-    /// Default API rate limit for authenticated users: 100 requests per minute
-    #[allow(dead_code)]
-    pub fn default_api_authenticated() -> Self {
-        Self::new(100, 60, RateLimitType::Api)
-    }
-
     /// Default export rate limit: 1 per hour
     pub fn default_export() -> Self {
         Self::new(1, 60 * 60, RateLimitType::Export)
@@ -140,16 +131,6 @@ impl RateLimitConfig {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(30);
-        Self::new(limit, 60, RateLimitType::Api)
-    }
-
-    /// Create API authenticated config from environment
-    #[allow(dead_code)]
-    pub fn from_env_api_authenticated() -> Self {
-        let limit = std::env::var("RATE_LIMIT_API_AUTHENTICATED")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(100);
         Self::new(limit, 60, RateLimitType::Api)
     }
 
@@ -201,7 +182,12 @@ pub struct SimpleRateLimiter {
     window: Duration,
     /// Rate limit type
     limit_type: RateLimitType,
+    /// Counter for triggering cleanup (atomic to avoid lock contention)
+    request_count: Arc<std::sync::atomic::AtomicU64>,
 }
+
+/// How often to run cleanup (every N requests)
+const CLEANUP_INTERVAL: u64 = 100;
 
 impl SimpleRateLimiter {
     pub fn new(config: &RateLimitConfig) -> Self {
@@ -210,14 +196,17 @@ impl SimpleRateLimiter {
             limit: config.limit,
             window: Duration::from_secs(config.window_seconds),
             limit_type: config.limit_type,
+            request_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
-    /// Check if the request should be allowed
+    /// Check if the request should be allowed AND increment counter
     /// Returns Ok(()) if allowed, Err(seconds_until_reset) if rate limited
+    /// Use this for rate limiters where every request counts (e.g., API rate limits)
     pub fn check(&self, ip: IpAddr) -> Result<(), u64> {
-        let now = Instant::now();
+        self.maybe_cleanup();
 
+        let now = Instant::now();
         let mut entries = self.entries.write().unwrap();
         let entry = entries.entry(ip).or_insert_with(|| RateLimitEntry {
             count: 0,
@@ -244,6 +233,68 @@ impl SimpleRateLimiter {
         Err(remaining.as_secs() + 1)
     }
 
+    /// Check if IP is currently rate limited WITHOUT incrementing counter
+    /// Returns Ok(()) if under limit, Err(seconds_until_reset) if blocked
+    /// Use this for pre-checking before processing a request
+    pub fn is_limited(&self, ip: IpAddr) -> Result<(), u64> {
+        self.maybe_cleanup();
+
+        let now = Instant::now();
+        let entries = self.entries.read().unwrap();
+
+        if let Some(entry) = entries.get(&ip) {
+            // Check if window has expired
+            if now.duration_since(entry.window_start) >= self.window {
+                return Ok(()); // Window expired, not limited
+            }
+
+            // Check if at or over limit
+            if entry.count >= self.limit {
+                let elapsed = now.duration_since(entry.window_start);
+                let remaining = self.window.saturating_sub(elapsed);
+                return Err(remaining.as_secs() + 1);
+            }
+        }
+
+        Ok(()) // Not in map or under limit
+    }
+
+    /// Record a failed attempt for an IP (increment counter)
+    /// Use this after processing a request that failed (e.g., auth failure)
+    pub fn record_failure(&self, ip: IpAddr) {
+        let now = Instant::now();
+        let mut entries = self.entries.write().unwrap();
+        let entry = entries.entry(ip).or_insert_with(|| RateLimitEntry {
+            count: 0,
+            window_start: now,
+        });
+
+        // Check if window has expired
+        if now.duration_since(entry.window_start) >= self.window {
+            // Reset the window
+            entry.count = 1;
+            entry.window_start = now;
+        } else {
+            entry.count += 1;
+        }
+    }
+
+    /// Trigger cleanup occasionally to prevent memory growth
+    fn maybe_cleanup(&self) {
+        let count = self
+            .request_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if count % CLEANUP_INTERVAL == 0 {
+            self.cleanup_expired(Instant::now());
+        }
+    }
+
+    /// Remove expired entries to prevent memory growth
+    fn cleanup_expired(&self, now: Instant) {
+        let mut entries = self.entries.write().unwrap();
+        entries.retain(|_ip, entry| now.duration_since(entry.window_start) < self.window);
+    }
+
     /// Get the rate limit type
     pub fn limit_type(&self) -> RateLimitType {
         self.limit_type
@@ -260,11 +311,111 @@ impl SimpleRateLimiter {
     }
 }
 
+/// String-keyed rate limiter for account-based rate limiting
+/// Similar to SimpleRateLimiter but keyed by String (email/username) instead of IP
+#[derive(Clone)]
+pub struct AccountRateLimiter {
+    /// Map of account identifier -> rate limit entry
+    entries: Arc<RwLock<HashMap<String, RateLimitEntry>>>,
+    /// Maximum requests allowed
+    limit: u32,
+    /// Window duration
+    window: Duration,
+    /// Counter for triggering cleanup
+    request_count: Arc<std::sync::atomic::AtomicU64>,
+}
+
+impl AccountRateLimiter {
+    pub fn new(limit: u32, window_seconds: u64) -> Self {
+        Self {
+            entries: Arc::new(RwLock::new(HashMap::new())),
+            limit,
+            window: Duration::from_secs(window_seconds),
+            request_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        }
+    }
+
+    /// Create with default auth account limits (10 per hour per account)
+    pub fn default_auth_account() -> Self {
+        Self::new(10, 60 * 60)
+    }
+
+    /// Create from environment variable
+    pub fn from_env_auth_account() -> Self {
+        let limit = std::env::var("RATE_LIMIT_AUTH_ACCOUNT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(10);
+        Self::new(limit, 60 * 60)
+    }
+
+    /// Check if account is currently rate limited WITHOUT incrementing counter
+    pub fn is_limited(&self, account: &str) -> Result<(), u64> {
+        self.maybe_cleanup();
+
+        let now = Instant::now();
+        let entries = self.entries.read().unwrap();
+
+        if let Some(entry) = entries.get(account) {
+            if now.duration_since(entry.window_start) >= self.window {
+                return Ok(());
+            }
+            if entry.count >= self.limit {
+                let elapsed = now.duration_since(entry.window_start);
+                let remaining = self.window.saturating_sub(elapsed);
+                return Err(remaining.as_secs() + 1);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Record a failed attempt for an account
+    pub fn record_failure(&self, account: &str) {
+        let now = Instant::now();
+        let mut entries = self.entries.write().unwrap();
+        let entry = entries
+            .entry(account.to_lowercase())
+            .or_insert_with(|| RateLimitEntry {
+                count: 0,
+                window_start: now,
+            });
+
+        if now.duration_since(entry.window_start) >= self.window {
+            entry.count = 1;
+            entry.window_start = now;
+        } else {
+            entry.count += 1;
+        }
+    }
+
+    fn maybe_cleanup(&self) {
+        let count = self
+            .request_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if count % CLEANUP_INTERVAL == 0 {
+            let now = Instant::now();
+            let mut entries = self.entries.write().unwrap();
+            entries.retain(|_k, entry| now.duration_since(entry.window_start) < self.window);
+        }
+    }
+
+    pub fn limit(&self) -> u32 {
+        self.limit
+    }
+
+    pub fn window_seconds(&self) -> u64 {
+        self.window.as_secs()
+    }
+}
+
 /// Rate limiter state shared across requests
 #[derive(Clone)]
 pub struct RateLimiterState {
-    /// Auth endpoint rate limiter (per IP)
+    /// Auth endpoint rate limiter (per IP) - 5 failed attempts per 15 min
     pub auth: SimpleRateLimiter,
+    /// Auth endpoint rate limiter (per account) - 10 failed attempts per hour across all IPs
+    pub auth_account: AccountRateLimiter,
     /// General API rate limiter for unauthenticated requests (per IP)
     pub api_unauth: SimpleRateLimiter,
     /// Export rate limiter (per IP)
@@ -292,6 +443,7 @@ impl RateLimiterState {
 
         Self {
             auth: SimpleRateLimiter::new(&auth_config),
+            auth_account: AccountRateLimiter::default_auth_account(),
             api_unauth: SimpleRateLimiter::new(&api_unauth_config),
             export: SimpleRateLimiter::new(&export_config),
             search: SimpleRateLimiter::new(&search_config),
@@ -313,6 +465,7 @@ impl RateLimiterState {
 
         Self {
             auth: SimpleRateLimiter::new(&auth_config),
+            auth_account: AccountRateLimiter::from_env_auth_account(),
             api_unauth: SimpleRateLimiter::new(&api_unauth_config),
             export: SimpleRateLimiter::new(&export_config),
             search: SimpleRateLimiter::new(&search_config),
@@ -361,37 +514,37 @@ pub fn extract_client_ip(
 }
 
 /// Extract client IP from headers only (for middleware without ConnectInfo)
-/// This is used in production behind a reverse proxy
+/// This is used in production behind a reverse proxy.
+///
+/// Security: Only trusts X-Forwarded-For if the request came through a trusted proxy.
+/// If no trusted proxies are configured, headers are NOT trusted (prevents spoofing).
+/// Returns None if IP cannot be determined - caller should fail open.
 pub fn extract_client_ip_from_headers(
     headers: &HeaderMap,
-    _trusted_proxies: &[IpNetwork],
+    trusted_proxies: &[IpNetwork],
 ) -> Option<IpAddr> {
-    // In production behind a reverse proxy, use X-Forwarded-For
-    if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
-        // Take the first (leftmost) IP, which is the original client
-        if let Some(client_ip) = xff.split(',').next().and_then(|s| s.trim().parse().ok()) {
-            return Some(client_ip);
+    // Only trust forwarding headers if we have trusted proxies configured
+    // This prevents IP spoofing via X-Forwarded-For from untrusted sources
+    if !trusted_proxies.is_empty() {
+        // Try X-Forwarded-For header
+        if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+            // Take the first (leftmost) IP, which is the original client
+            if let Some(client_ip) = xff.split(',').next().and_then(|s| s.trim().parse().ok()) {
+                return Some(client_ip);
+            }
+        }
+
+        // Try X-Real-IP header (used by some proxies like nginx)
+        if let Some(real_ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+            if let Ok(ip) = real_ip.trim().parse() {
+                return Some(ip);
+            }
         }
     }
 
-    // Try X-Real-IP header (used by some proxies like nginx)
-    if let Some(real_ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
-        if let Ok(ip) = real_ip.trim().parse() {
-            return Some(ip);
-        }
-    }
-
-    // Default to localhost for development
-    Some(IpAddr::from([127, 0, 0, 1]))
-}
-
-/// Check if request has a valid session cookie (authenticated)
-pub fn is_authenticated(headers: &HeaderMap) -> bool {
-    headers
-        .get(COOKIE)
-        .and_then(|v| v.to_str().ok())
-        .map(|cookie| cookie.contains(&format!("{}=", SESSION_COOKIE_NAME)))
-        .unwrap_or(false)
+    // No IP could be determined from headers
+    // Caller should fail open (allow request) when this returns None
+    None
 }
 
 /// Create a 429 Too Many Requests response
@@ -506,7 +659,16 @@ where
 
         Box::pin(async move {
             let headers = request.headers();
-            let ip = extract_client_ip_from_headers(headers, &state.trusted_proxies);
+            let endpoint = request.uri().path().to_string();
+
+            // Try to extract ConnectInfo from request extensions (set by into_make_service_with_connect_info)
+            let connect_info = request
+                .extensions()
+                .get::<ConnectInfo<SocketAddr>>()
+                .cloned();
+
+            // Extract client IP using both headers and ConnectInfo
+            let ip = extract_client_ip(headers, connect_info.as_ref(), &state.trusted_proxies);
 
             // If we can't determine IP, fail open (allow request)
             let Some(client_ip) = ip else {
@@ -514,17 +676,150 @@ where
                 return inner.call(request).await;
             };
 
-            // Check rate limit
+            // Pre-check: Is this IP already rate limited?
+            // This prevents processing requests from already-blocked IPs
+            if let Err(retry_after) = state.auth.is_limited(client_ip) {
+                // Already at limit - block without incrementing counter
+                let db = state.db.clone();
+                let limit = state.auth.limit();
+                let window = state.auth.window_seconds();
+                let endpoint_clone = endpoint.clone();
+                tokio::spawn(async move {
+                    log_rate_limit_event(
+                        &db,
+                        Some(client_ip),
+                        None,
+                        &endpoint_clone,
+                        RateLimitType::Auth,
+                        retry_after,
+                        limit,
+                        window,
+                    )
+                    .await;
+                });
+
+                return Ok(rate_limit_response(RateLimitType::Auth, retry_after));
+            }
+
+            // Process the request
+            let response = inner.call(request).await?;
+
+            // Post-check: Did authentication fail?
+            // Only count failures (401 Unauthorized) against rate limit
+            // This implements FR-001: "rate limit FAILED authentication attempts"
+            let status = response.status();
+            if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
+                // Record this as a failed attempt
+                state.auth.record_failure(client_ip);
+
+                // Check if this failure pushed them over the limit
+                // (for logging purposes - the response is already generated)
+                if let Err(retry_after) = state.auth.is_limited(client_ip) {
+                    let db = state.db.clone();
+                    let limit = state.auth.limit();
+                    let window = state.auth.window_seconds();
+                    tokio::spawn(async move {
+                        log_rate_limit_event(
+                            &db,
+                            Some(client_ip),
+                            None,
+                            &endpoint,
+                            RateLimitType::Auth,
+                            retry_after,
+                            limit,
+                            window,
+                        )
+                        .await;
+                    });
+                }
+            }
+
+            Ok(response)
+        })
+    }
+}
+
+/// Rate limiting layer that counts ALL requests (not just failures)
+/// Use this for endpoints like registration and password reset where
+/// we want to prevent spam regardless of outcome
+#[derive(Clone)]
+pub struct AllRequestsRateLimitLayer {
+    state: RateLimiterState,
+}
+
+impl AllRequestsRateLimitLayer {
+    pub fn new(state: RateLimiterState) -> Self {
+        Self { state }
+    }
+}
+
+impl<S> tower::Layer<S> for AllRequestsRateLimitLayer {
+    type Service = AllRequestsRateLimitService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        AllRequestsRateLimitService {
+            inner,
+            state: self.state.clone(),
+        }
+    }
+}
+
+/// Rate limiting service that counts ALL requests
+#[derive(Clone)]
+pub struct AllRequestsRateLimitService<S> {
+    inner: S,
+    state: RateLimiterState,
+}
+
+impl<S> tower::Service<Request<Body>> for AllRequestsRateLimitService<S>
+where
+    S: tower::Service<Request<Body>, Response = Response> + Clone + Send + 'static,
+    S::Future: Send,
+{
+    type Response = Response;
+    type Error = S::Error;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, request: Request<Body>) -> Self::Future {
+        let state = self.state.clone();
+        let mut inner = self.inner.clone();
+
+        Box::pin(async move {
+            let headers = request.headers();
+            let endpoint = request.uri().path().to_string();
+
+            // Try to extract ConnectInfo from request extensions
+            let connect_info = request
+                .extensions()
+                .get::<ConnectInfo<SocketAddr>>()
+                .cloned();
+
+            // Extract client IP using both headers and ConnectInfo
+            let ip = extract_client_ip(headers, connect_info.as_ref(), &state.trusted_proxies);
+
+            // If we can't determine IP, fail open (allow request)
+            let Some(client_ip) = ip else {
+                tracing::warn!("Could not determine client IP for rate limiting, failing open");
+                return inner.call(request).await;
+            };
+
+            // Check rate limit AND increment counter (counts all requests)
             match state.auth.check(client_ip) {
                 Ok(()) => inner.call(request).await,
                 Err(retry_after) => {
-                    let endpoint = request.uri().path().to_string();
-                    let limiter = &state.auth;
-
                     // Log the rate limit event asynchronously
                     let db = state.db.clone();
-                    let limit = limiter.limit();
-                    let window = limiter.window_seconds();
+                    let limit = state.auth.limit();
+                    let window = state.auth.window_seconds();
                     tokio::spawn(async move {
                         log_rate_limit_event(
                             &db,
@@ -546,184 +841,286 @@ where
     }
 }
 
-/// Middleware for rate limiting general API endpoints (unauthenticated)
-pub async fn api_rate_limit_middleware(
-    Extension(state): Extension<RateLimiterState>,
-    connect_info: Option<ConnectInfo<SocketAddr>>,
-    request: Request<Body>,
-    next: Next,
-) -> Response {
-    let headers = request.headers();
+// =============================================================================
+// Tower Layers for specialized rate limiting
+// =============================================================================
 
-    // Skip rate limiting for authenticated users (they have higher limits)
-    if is_authenticated(headers) {
-        return next.run(request).await;
+/// Rate limiting layer for export operations (1/hour)
+#[derive(Clone)]
+pub struct ExportRateLimitLayer {
+    state: RateLimiterState,
+}
+
+impl ExportRateLimitLayer {
+    pub fn new(state: RateLimiterState) -> Self {
+        Self { state }
     }
+}
 
-    let ip = extract_client_ip(headers, connect_info.as_ref(), &state.trusted_proxies);
+impl<S> tower::Layer<S> for ExportRateLimitLayer {
+    type Service = ExportRateLimitService<S>;
 
-    // If we can't determine IP, fail open
-    let Some(client_ip) = ip else {
-        tracing::warn!("Could not determine client IP for rate limiting, failing open");
-        return next.run(request).await;
-    };
-
-    // Check rate limit
-    match state.api_unauth.check(client_ip) {
-        Ok(()) => next.run(request).await,
-        Err(retry_after) => {
-            let endpoint = request.uri().path().to_string();
-            let limiter = &state.api_unauth;
-
-            // Log the rate limit event
-            let db = state.db.clone();
-            let limit = limiter.limit();
-            let window = limiter.window_seconds();
-            tokio::spawn(async move {
-                log_rate_limit_event(
-                    &db,
-                    Some(client_ip),
-                    None,
-                    &endpoint,
-                    RateLimitType::Api,
-                    retry_after,
-                    limit,
-                    window,
-                )
-                .await;
-            });
-
-            rate_limit_response(RateLimitType::Api, retry_after)
+    fn layer(&self, inner: S) -> Self::Service {
+        ExportRateLimitService {
+            inner,
+            state: self.state.clone(),
         }
     }
 }
 
-/// Middleware for rate limiting export operations
-pub async fn export_rate_limit_middleware(
-    Extension(state): Extension<RateLimiterState>,
-    connect_info: Option<ConnectInfo<SocketAddr>>,
-    request: Request<Body>,
-    next: Next,
-) -> Response {
-    let headers = request.headers();
-    let ip = extract_client_ip(headers, connect_info.as_ref(), &state.trusted_proxies);
+#[derive(Clone)]
+pub struct ExportRateLimitService<S> {
+    inner: S,
+    state: RateLimiterState,
+}
 
-    let Some(client_ip) = ip else {
-        tracing::warn!("Could not determine client IP for rate limiting, failing open");
-        return next.run(request).await;
-    };
+impl<S> tower::Service<Request<Body>> for ExportRateLimitService<S>
+where
+    S: tower::Service<Request<Body>, Response = Response> + Clone + Send + 'static,
+    S::Future: Send,
+{
+    type Response = Response;
+    type Error = S::Error;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
-    match state.export.check(client_ip) {
-        Ok(()) => next.run(request).await,
-        Err(retry_after) => {
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, request: Request<Body>) -> Self::Future {
+        let state = self.state.clone();
+        let mut inner = self.inner.clone();
+
+        Box::pin(async move {
+            let headers = request.headers();
             let endpoint = request.uri().path().to_string();
-            let limiter = &state.export;
+            let connect_info = request
+                .extensions()
+                .get::<ConnectInfo<SocketAddr>>()
+                .cloned();
 
-            let db = state.db.clone();
-            let limit = limiter.limit();
-            let window = limiter.window_seconds();
-            tokio::spawn(async move {
-                log_rate_limit_event(
-                    &db,
-                    Some(client_ip),
-                    None,
-                    &endpoint,
-                    RateLimitType::Export,
-                    retry_after,
-                    limit,
-                    window,
-                )
-                .await;
-            });
+            let ip = extract_client_ip(headers, connect_info.as_ref(), &state.trusted_proxies);
 
-            rate_limit_response(RateLimitType::Export, retry_after)
+            let Some(client_ip) = ip else {
+                tracing::warn!("Could not determine client IP for rate limiting, failing open");
+                return inner.call(request).await;
+            };
+
+            match state.export.check(client_ip) {
+                Ok(()) => inner.call(request).await,
+                Err(retry_after) => {
+                    let db = state.db.clone();
+                    let limit = state.export.limit();
+                    let window = state.export.window_seconds();
+                    tokio::spawn(async move {
+                        log_rate_limit_event(
+                            &db,
+                            Some(client_ip),
+                            None,
+                            &endpoint,
+                            RateLimitType::Export,
+                            retry_after,
+                            limit,
+                            window,
+                        )
+                        .await;
+                    });
+
+                    Ok(rate_limit_response(RateLimitType::Export, retry_after))
+                }
+            }
+        })
+    }
+}
+
+/// Rate limiting layer for search operations (10/min)
+#[derive(Clone)]
+pub struct SearchRateLimitLayer {
+    state: RateLimiterState,
+}
+
+impl SearchRateLimitLayer {
+    pub fn new(state: RateLimiterState) -> Self {
+        Self { state }
+    }
+}
+
+impl<S> tower::Layer<S> for SearchRateLimitLayer {
+    type Service = SearchRateLimitService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        SearchRateLimitService {
+            inner,
+            state: self.state.clone(),
         }
     }
 }
 
-/// Middleware for rate limiting search operations
-pub async fn search_rate_limit_middleware(
-    Extension(state): Extension<RateLimiterState>,
-    connect_info: Option<ConnectInfo<SocketAddr>>,
-    request: Request<Body>,
-    next: Next,
-) -> Response {
-    let headers = request.headers();
-    let ip = extract_client_ip(headers, connect_info.as_ref(), &state.trusted_proxies);
+#[derive(Clone)]
+pub struct SearchRateLimitService<S> {
+    inner: S,
+    state: RateLimiterState,
+}
 
-    let Some(client_ip) = ip else {
-        tracing::warn!("Could not determine client IP for rate limiting, failing open");
-        return next.run(request).await;
-    };
+impl<S> tower::Service<Request<Body>> for SearchRateLimitService<S>
+where
+    S: tower::Service<Request<Body>, Response = Response> + Clone + Send + 'static,
+    S::Future: Send,
+{
+    type Response = Response;
+    type Error = S::Error;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
-    match state.search.check(client_ip) {
-        Ok(()) => next.run(request).await,
-        Err(retry_after) => {
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, request: Request<Body>) -> Self::Future {
+        let state = self.state.clone();
+        let mut inner = self.inner.clone();
+
+        Box::pin(async move {
+            let headers = request.headers();
             let endpoint = request.uri().path().to_string();
-            let limiter = &state.search;
+            let connect_info = request
+                .extensions()
+                .get::<ConnectInfo<SocketAddr>>()
+                .cloned();
 
-            let db = state.db.clone();
-            let limit = limiter.limit();
-            let window = limiter.window_seconds();
-            tokio::spawn(async move {
-                log_rate_limit_event(
-                    &db,
-                    Some(client_ip),
-                    None,
-                    &endpoint,
-                    RateLimitType::Search,
-                    retry_after,
-                    limit,
-                    window,
-                )
-                .await;
-            });
+            let ip = extract_client_ip(headers, connect_info.as_ref(), &state.trusted_proxies);
 
-            rate_limit_response(RateLimitType::Search, retry_after)
+            let Some(client_ip) = ip else {
+                tracing::warn!("Could not determine client IP for rate limiting, failing open");
+                return inner.call(request).await;
+            };
+
+            match state.search.check(client_ip) {
+                Ok(()) => inner.call(request).await,
+                Err(retry_after) => {
+                    let db = state.db.clone();
+                    let limit = state.search.limit();
+                    let window = state.search.window_seconds();
+                    tokio::spawn(async move {
+                        log_rate_limit_event(
+                            &db,
+                            Some(client_ip),
+                            None,
+                            &endpoint,
+                            RateLimitType::Search,
+                            retry_after,
+                            limit,
+                            window,
+                        )
+                        .await;
+                    });
+
+                    Ok(rate_limit_response(RateLimitType::Search, retry_after))
+                }
+            }
+        })
+    }
+}
+
+/// Rate limiting layer for upload operations (20/5min)
+#[derive(Clone)]
+pub struct UploadRateLimitLayer {
+    state: RateLimiterState,
+}
+
+impl UploadRateLimitLayer {
+    pub fn new(state: RateLimiterState) -> Self {
+        Self { state }
+    }
+}
+
+impl<S> tower::Layer<S> for UploadRateLimitLayer {
+    type Service = UploadRateLimitService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        UploadRateLimitService {
+            inner,
+            state: self.state.clone(),
         }
     }
 }
 
-/// Middleware for rate limiting upload operations
-pub async fn upload_rate_limit_middleware(
-    Extension(state): Extension<RateLimiterState>,
-    connect_info: Option<ConnectInfo<SocketAddr>>,
-    request: Request<Body>,
-    next: Next,
-) -> Response {
-    let headers = request.headers();
-    let ip = extract_client_ip(headers, connect_info.as_ref(), &state.trusted_proxies);
+#[derive(Clone)]
+pub struct UploadRateLimitService<S> {
+    inner: S,
+    state: RateLimiterState,
+}
 
-    let Some(client_ip) = ip else {
-        tracing::warn!("Could not determine client IP for rate limiting, failing open");
-        return next.run(request).await;
-    };
+impl<S> tower::Service<Request<Body>> for UploadRateLimitService<S>
+where
+    S: tower::Service<Request<Body>, Response = Response> + Clone + Send + 'static,
+    S::Future: Send,
+{
+    type Response = Response;
+    type Error = S::Error;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
-    match state.upload.check(client_ip) {
-        Ok(()) => next.run(request).await,
-        Err(retry_after) => {
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, request: Request<Body>) -> Self::Future {
+        let state = self.state.clone();
+        let mut inner = self.inner.clone();
+
+        Box::pin(async move {
+            let headers = request.headers();
             let endpoint = request.uri().path().to_string();
-            let limiter = &state.upload;
+            let connect_info = request
+                .extensions()
+                .get::<ConnectInfo<SocketAddr>>()
+                .cloned();
 
-            let db = state.db.clone();
-            let limit = limiter.limit();
-            let window = limiter.window_seconds();
-            tokio::spawn(async move {
-                log_rate_limit_event(
-                    &db,
-                    Some(client_ip),
-                    None,
-                    &endpoint,
-                    RateLimitType::Upload,
-                    retry_after,
-                    limit,
-                    window,
-                )
-                .await;
-            });
+            let ip = extract_client_ip(headers, connect_info.as_ref(), &state.trusted_proxies);
 
-            rate_limit_response(RateLimitType::Upload, retry_after)
-        }
+            let Some(client_ip) = ip else {
+                tracing::warn!("Could not determine client IP for rate limiting, failing open");
+                return inner.call(request).await;
+            };
+
+            match state.upload.check(client_ip) {
+                Ok(()) => inner.call(request).await,
+                Err(retry_after) => {
+                    let db = state.db.clone();
+                    let limit = state.upload.limit();
+                    let window = state.upload.window_seconds();
+                    tokio::spawn(async move {
+                        log_rate_limit_event(
+                            &db,
+                            Some(client_ip),
+                            None,
+                            &endpoint,
+                            RateLimitType::Upload,
+                            retry_after,
+                            limit,
+                            window,
+                        )
+                        .await;
+                    });
+
+                    Ok(rate_limit_response(RateLimitType::Upload, retry_after))
+                }
+            }
+        })
     }
 }
 
@@ -800,15 +1197,6 @@ mod tests {
         let ip = extract_client_ip(&headers, Some(&connect_info), &[]);
         // Should use direct IP since proxy is not trusted
         assert_eq!(ip, Some(IpAddr::from([192, 168, 1, 100])));
-    }
-
-    #[test]
-    fn test_is_authenticated() {
-        let mut headers = HeaderMap::new();
-        assert!(!is_authenticated(&headers));
-
-        headers.insert(COOKIE, "oppskrift_session=abc123def456".parse().unwrap());
-        assert!(is_authenticated(&headers));
     }
 
     #[test]

@@ -6,39 +6,13 @@ use axum::{
     Router,
 };
 
-use crate::core::config::SmtpConfig;
 use crate::core::error::{AppError, AppResult};
-use crate::services::{AuthService, EmailService, PasswordService};
+use crate::services::ServiceFactory;
 use crate::AppState;
 
-// Session expiry in days
-const SESSION_EXPIRY_DAYS: u32 = 30;
-
 /// Create an AuthService instance from AppState
-fn create_auth_service(state: &AppState) -> AuthService {
-    let base_url =
-        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-
-    let is_production = std::env::var("APP_ENV")
-        .map(|v| v == "production")
-        .unwrap_or(false);
-
-    let password_service = PasswordService::new(
-        std::env::var("HIBP_ENABLED")
-            .map(|v| v == "true")
-            .unwrap_or(false), // Disable HIBP check for email confirmation
-    );
-
-    let smtp_config = SmtpConfig::from_env(is_production);
-    let email_service = EmailService::new(smtp_config, base_url.clone());
-
-    AuthService::new(
-        state.db.clone(),
-        password_service,
-        email_service,
-        base_url,
-        SESSION_EXPIRY_DAYS,
-    )
+fn create_auth_service(state: &AppState) -> crate::services::AuthService {
+    ServiceFactory::create_auth_service(state.db.clone())
 }
 
 /// Auth page routes

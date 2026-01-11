@@ -13,7 +13,6 @@ use validator::Validate;
 
 use crate::api::middleware::AuthUser;
 use crate::core::audit::AuditEvent;
-use crate::core::config::SmtpConfig;
 use crate::core::error::AppError;
 use crate::core::{RequestContext, RequestId};
 use crate::models::{
@@ -24,12 +23,10 @@ use crate::models::{
 };
 use crate::models::{DisableTwoFactorRequest, EnableTwoFactorRequest};
 use crate::services::{
-    AuthError, AuthService, EmailService, PasswordService, TotpError, TotpService, UserService,
+    AuthError, SecurityEvent, SecurityEventService, ServiceFactory, TotpError, UserService,
+    SESSION_EXPIRY_DAYS,
 };
 use crate::AppState;
-
-/// Session expiry in days (should match middleware)
-const SESSION_EXPIRY_DAYS: u32 = 7;
 
 /// Account routes - all require authentication
 pub fn routes() -> Router<AppState> {
@@ -142,17 +139,6 @@ async fn get_security_info(
         locked_until,
         email_notifications_enabled,
     }))
-}
-
-/// Security event record for API responses (T083)
-#[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
-pub struct SecurityEvent {
-    pub id: uuid::Uuid,
-    pub event_type: String,
-    pub ip_address: Option<String>,
-    pub user_agent: Option<String>,
-    pub metadata: Option<serde_json::Value>,
-    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// Security event view for template display (T004)
@@ -313,23 +299,7 @@ async fn get_security_events(
     // Cap limit between 1 and 100
     let limit = query.limit.clamp(1, 100);
 
-    let events = sqlx::query_as::<_, SecurityEvent>(
-        r#"
-        SELECT id, event_type::text as event_type, ip_address::text as ip_address, user_agent, metadata, created_at
-        FROM security_events
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT $2
-        "#,
-    )
-    .bind(auth_user.id)
-    .bind(limit)
-    .fetch_all(&state.db)
-    .await
-    .map_err(|e| {
-        tracing::error!(error = %e, "Failed to get security events");
-        AppError::Internal("Failed to get security events".to_string())
-    })?;
+    let events = SecurityEventService::get_recent(&state.db, auth_user.id, limit).await?;
 
     let total = events.len();
     Ok(Json(SecurityEventsResponse { events, total }))
@@ -917,51 +887,18 @@ fn create_request_context(
 }
 
 /// Create an AuthService instance from AppState
-fn create_auth_service(state: &AppState) -> AuthService {
-    let base_url =
-        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-
-    let is_production = std::env::var("APP_ENV")
-        .map(|v| v == "production")
-        .unwrap_or(false);
-
-    let password_service = PasswordService::new(
-        std::env::var("HIBP_ENABLED")
-            .map(|v| v == "true")
-            .unwrap_or(true),
-    );
-
-    let smtp_config = SmtpConfig::from_env(is_production);
-    let email_service = EmailService::new(smtp_config, base_url.clone());
-
-    AuthService::new(
-        state.db.clone(),
-        password_service,
-        email_service,
-        base_url,
-        SESSION_EXPIRY_DAYS,
-    )
+fn create_auth_service(state: &AppState) -> crate::services::AuthService {
+    ServiceFactory::create_auth_service(state.db.clone())
 }
 
 /// Create a TotpService instance from AppState
-fn create_totp_service(state: &AppState) -> Result<TotpService, AppError> {
-    TotpService::from_env(state.db.clone()).map_err(|e| {
-        tracing::error!(error = %e, "Failed to create TOTP service");
-        AppError::Internal("2FA service unavailable".to_string())
-    })
+fn create_totp_service(state: &AppState) -> Result<crate::services::TotpService, AppError> {
+    ServiceFactory::create_totp_service(state.db.clone())
 }
 
 /// Create an EmailService instance
-fn create_email_service() -> EmailService {
-    let base_url =
-        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-
-    let is_production = std::env::var("APP_ENV")
-        .map(|v| v == "production")
-        .unwrap_or(false);
-
-    let smtp_config = SmtpConfig::from_env(is_production);
-    EmailService::new(smtp_config, base_url)
+fn create_email_service() -> crate::services::EmailService {
+    ServiceFactory::create_email_service()
 }
 
 #[cfg(test)]

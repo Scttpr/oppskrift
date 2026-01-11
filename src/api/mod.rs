@@ -36,8 +36,11 @@ pub fn routes_with_rate_limit(rate_limiter: RateLimiterState) -> Router<AppState
     Router::new()
         .nest("/auth", auth::routes_with_rate_limit(rate_limiter.clone()))
         .nest("/account", account::routes())
-        .nest("/users", users::routes())
-        .nest("/recipes", recipes::routes())
+        .nest(
+            "/users",
+            users::routes_with_rate_limit(rate_limiter.clone()),
+        )
+        .nest("/recipes", recipes::routes_with_rate_limit(rate_limiter))
         .nest("/books", books::routes())
         .nest("/groups", groups::routes())
         .merge(social::routes())

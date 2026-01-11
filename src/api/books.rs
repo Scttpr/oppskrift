@@ -154,13 +154,7 @@ async fn get_book(
     let book = BookService::get_by_id_authorized(&state.db, id, viewer_id).await?;
 
     // Get recipe count
-    let recipe_count: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM book_recipe_entries WHERE book_id = $1",
-        id
-    )
-    .fetch_one(&state.db)
-    .await?
-    .unwrap_or(0);
+    let recipe_count = BookService::get_recipe_count(&state.db, id).await?;
 
     Ok(Json(BookResponse { book, recipe_count }))
 }

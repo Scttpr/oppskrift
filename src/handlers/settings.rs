@@ -25,45 +25,19 @@ use validator::Validate;
 
 use crate::api::middleware::AuthUser;
 use crate::core::audit::AuditEvent;
-use crate::core::config::SmtpConfig;
 use crate::core::csrf::{generate_csrf_token, validate_csrf_token};
 use crate::core::error::{AppError, AppResult};
 use crate::core::helpers::mask_email;
 use crate::core::request_id::{RequestContext, RequestId};
 use crate::models::{DeletionContentChoice, MeasurementPref, UpdateUser, User};
 use crate::services::{
-    AuthService, EmailService, PasswordService, SessionService, TotpError, TotpService, UserService,
+    ServiceFactory, SessionService, TotpError, UserService, SESSION_EXPIRY_DAYS,
 };
 use crate::AppState;
 
-// Session expiry in days (matches api/account.rs)
-const SESSION_EXPIRY_DAYS: u32 = 30;
-
 /// Create an AuthService instance from AppState
-fn create_auth_service(state: &AppState) -> AuthService {
-    let base_url =
-        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-
-    let is_production = std::env::var("APP_ENV")
-        .map(|v| v == "production")
-        .unwrap_or(false);
-
-    let password_service = PasswordService::new(
-        std::env::var("HIBP_ENABLED")
-            .map(|v| v == "true")
-            .unwrap_or(true),
-    );
-
-    let smtp_config = SmtpConfig::from_env(is_production);
-    let email_service = EmailService::new(smtp_config, base_url.clone());
-
-    AuthService::new(
-        state.db.clone(),
-        password_service,
-        email_service,
-        base_url,
-        SESSION_EXPIRY_DAYS,
-    )
+fn create_auth_service(state: &AppState) -> crate::services::AuthService {
+    ServiceFactory::create_auth_service(state.db.clone())
 }
 
 /// Create a RequestContext from request components
@@ -79,11 +53,8 @@ fn create_request_context(
 }
 
 /// Create a TotpService instance from AppState
-fn create_totp_service(state: &AppState) -> Result<TotpService, AppError> {
-    TotpService::from_env(state.db.clone()).map_err(|e| {
-        tracing::error!(error = %e, "Failed to create TOTP service");
-        AppError::Internal("2FA service unavailable".to_string())
-    })
+fn create_totp_service(state: &AppState) -> Result<crate::services::TotpService, AppError> {
+    ServiceFactory::create_totp_service(state.db.clone())
 }
 
 /// Create settings page routes
@@ -777,8 +748,9 @@ async fn password_change(
 // Sessions Management (Phase 3 - User Story 1)
 // =============================================================================
 
-use crate::api::account::{SecurityEvent, SecurityEventView};
+use crate::api::account::SecurityEventView;
 use crate::models::session::SessionItemView;
+use crate::services::SecurityEventService;
 
 /// Sessions page template (T009)
 #[derive(Template)]
@@ -992,54 +964,13 @@ async fn security_events_page(
         .unwrap_or(1)
         .max(1);
     let per_page: u32 = 20; // FR-007: 20 events per page
-    let offset = (page - 1) * per_page;
 
     // Get total count for pagination
-    let total_count: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM security_events WHERE user_id = $1",
-        auth.id
-    )
-    .fetch_one(&state.db)
-    .await?
-    .unwrap_or(0);
-
+    let total_count = SecurityEventService::count_for_user(&state.db, auth.id).await?;
     let total_pages = ((total_count as u32).saturating_sub(1) / per_page) + 1;
 
     // Get events for current page (FR-005: reverse chronological order)
-    // Cast event_type enum to text and ip_address to text
-    let event_rows = sqlx::query!(
-        r#"
-        SELECT
-            id,
-            event_type::text as "event_type!",
-            ip_address::text as ip_address,
-            user_agent,
-            metadata,
-            created_at
-        FROM security_events
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT $2 OFFSET $3
-        "#,
-        auth.id,
-        per_page as i64,
-        offset as i64
-    )
-    .fetch_all(&state.db)
-    .await?;
-
-    // Convert to SecurityEvent structs
-    let events: Vec<SecurityEvent> = event_rows
-        .into_iter()
-        .map(|row| SecurityEvent {
-            id: row.id,
-            event_type: row.event_type,
-            ip_address: row.ip_address,
-            user_agent: row.user_agent,
-            metadata: row.metadata,
-            created_at: row.created_at,
-        })
-        .collect();
+    let events = SecurityEventService::list_for_user(&state.db, auth.id, page, per_page).await?;
 
     // Convert to view models
     let events: Vec<SecurityEventView> = events.iter().map(SecurityEventView::from_event).collect();
@@ -2035,19 +1966,15 @@ async fn export_data(
     auth: AuthUser,
     Form(form): Form<CsrfOnlyForm>,
 ) -> Result<Response, AppError> {
+    use crate::services::{ExportRateLimitResult, ExportService};
+
     // Validate CSRF token
     validate_csrf(&state, &form.csrf_token, auth.session_id)?;
 
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
 
     // Use advisory lock to prevent TOCTOU race condition on rate limit
-    // Lock key is based on user_id to allow concurrent exports by different users
-    let lock_key = auth.id.as_u128() as i64; // Use lower 64 bits of UUID
-    let lock_acquired: bool = sqlx::query_scalar!("SELECT pg_try_advisory_xact_lock($1)", lock_key)
-        .fetch_one(&state.db)
-        .await?
-        .unwrap_or(false);
-
+    let lock_acquired = ExportService::try_acquire_lock(&state.db, auth.id).await?;
     if !lock_acquired {
         return Err(AppError::BadRequest(
             "Export already in progress. Please wait and try again.".to_string(),
@@ -2055,38 +1982,21 @@ async fn export_data(
     }
 
     // Check rate limit (T028): 1 export per hour
-    let last_export: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar!(
-        r#"
-        SELECT created_at FROM security_events
-        WHERE user_id = $1 AND event_type::text = 'account_export'
-        ORDER BY created_at DESC
-        LIMIT 1
-        "#,
-        auth.id
-    )
-    .fetch_optional(&state.db)
-    .await?;
-
-    if let Some(last) = last_export {
-        let one_hour_ago = chrono::Utc::now() - chrono::Duration::hours(1);
-        if last > one_hour_ago {
-            let wait_mins = ((last - one_hour_ago).num_minutes() + 1).max(1);
+    match ExportService::check_rate_limit(&state.db, auth.id).await? {
+        ExportRateLimitResult::RateLimited(wait_mins) => {
             return Err(AppError::BadRequest(format!(
                 "Export rate limit exceeded. Please wait {} more minute(s).",
                 wait_mins
             )));
         }
+        ExportRateLimitResult::Allowed => {}
     }
 
     // Get user data
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
     // Check recipe count for async threshold (FR-015: >50 recipes = async)
-    let recipe_count: i64 =
-        sqlx::query_scalar!("SELECT COUNT(*) FROM recipes WHERE author_id = $1", auth.id)
-            .fetch_one(&state.db)
-            .await?
-            .unwrap_or(0);
+    let recipe_count = ExportService::count_user_recipes(&state.db, auth.id).await?;
 
     // For now, we only implement sync export (T026)
     // TODO: Implement async export for >50 recipes in future iteration
@@ -2097,99 +2007,8 @@ async fn export_data(
         ));
     }
 
-    // Build export data (FR-013)
-    let mut export_data = serde_json::json!({
-        "@context": "https://www.w3.org/ns/activitystreams",
-        "type": "OrderedCollection",
-        "generator": "Oppskrift",
-        "exported_at": chrono::Utc::now().to_rfc3339(),
-    });
-
-    // Profile info
-    export_data["profile"] = serde_json::json!({
-        "id": user.id,
-        "username": user.username,
-        "display_name": user.display_name,
-        "bio": user.bio,
-        "avatar_url": user.avatar_url,
-        "measurement_pref": format!("{:?}", user.measurement_pref),
-        "federation_enabled": user.federation_enabled,
-        "created_at": user.created_at.to_rfc3339(),
-    });
-
-    // Recipes
-    let recipes: Vec<serde_json::Value> = sqlx::query!(
-        r#"
-        SELECT id, title, description, prep_time_min, cook_time_min,
-               servings, visibility::text as visibility, created_at
-        FROM recipes WHERE author_id = $1
-        ORDER BY created_at DESC
-        "#,
-        auth.id
-    )
-    .fetch_all(&state.db)
-    .await?
-    .into_iter()
-    .map(|r| {
-        serde_json::json!({
-            "id": r.id,
-            "title": r.title,
-            "description": r.description,
-            "prep_time_min": r.prep_time_min,
-            "cook_time_min": r.cook_time_min,
-            "servings": r.servings,
-            "visibility": r.visibility,
-            "created_at": r.created_at.to_rfc3339(),
-        })
-    })
-    .collect();
-    export_data["recipes"] = serde_json::json!(recipes);
-
-    // Books (recipe_books table)
-    let books: Vec<serde_json::Value> = sqlx::query!(
-        r#"
-        SELECT id, title, description, visibility::text as visibility, created_at
-        FROM recipe_books WHERE owner_id = $1
-        ORDER BY created_at DESC
-        "#,
-        auth.id
-    )
-    .fetch_all(&state.db)
-    .await?
-    .into_iter()
-    .map(|b| {
-        serde_json::json!({
-            "id": b.id,
-            "title": b.title,
-            "description": b.description,
-            "visibility": b.visibility,
-            "created_at": b.created_at.to_rfc3339(),
-        })
-    })
-    .collect();
-    export_data["books"] = serde_json::json!(books);
-
-    // Followers (just counts for privacy)
-    let follower_count: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM follows WHERE following_id = $1",
-        auth.id
-    )
-    .fetch_one(&state.db)
-    .await?
-    .unwrap_or(0);
-
-    let following_count: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM follows WHERE follower_id = $1",
-        auth.id
-    )
-    .fetch_one(&state.db)
-    .await?
-    .unwrap_or(0);
-
-    export_data["social"] = serde_json::json!({
-        "follower_count": follower_count,
-        "following_count": following_count,
-    });
+    // Build export data using ExportService
+    let export = ExportService::build_export(&state.db, &user).await?;
 
     // Log export event
     AuditEvent::new("account_export")
@@ -2199,7 +2018,7 @@ async fn export_data(
         .await;
 
     // Build JSON response with download headers
-    let json = serde_json::to_string_pretty(&export_data)
+    let json = serde_json::to_string_pretty(&export)
         .map_err(|e| AppError::Internal(format!("JSON serialization failed: {}", e)))?;
 
     let filename = format!(
