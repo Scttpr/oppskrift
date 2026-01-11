@@ -200,14 +200,14 @@ mod tests {
 
     #[test]
     fn test_export_rate_limit_result() {
-        match ExportRateLimitResult::Allowed {
-            ExportRateLimitResult::Allowed => assert!(true),
-            _ => panic!("Expected Allowed"),
-        }
-
-        match ExportRateLimitResult::RateLimited(30) {
-            ExportRateLimitResult::RateLimited(mins) => assert_eq!(mins, 30),
-            _ => panic!("Expected RateLimited"),
-        }
+        // Verify enum variants work as expected
+        assert!(matches!(
+            ExportRateLimitResult::Allowed,
+            ExportRateLimitResult::Allowed
+        ));
+        assert!(matches!(
+            ExportRateLimitResult::RateLimited(30),
+            ExportRateLimitResult::RateLimited(30)
+        ));
     }
 }
