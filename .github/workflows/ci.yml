@@ -51,7 +51,7 @@ jobs:
         with:
           toolchain: stable
           components: clippy
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       - name: Cache sqlx-cli
         id: cache-sqlx
         uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
