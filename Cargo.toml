@@ -89,7 +89,7 @@ totp-rs = { version = "5", features = ["qr", "otpauth", "serde_support", "gen_se
 lettre = { version = "0.11", features = ["tokio1-native-tls"] }
 aes-gcm = "0.10"
 sha1 = "0.10"
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 lazy_static = "1"
 regex = "1"
