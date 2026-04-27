@@ -76,7 +76,7 @@ reqwest = { version = "0.12", features = ["json"] }
 tower_governor = "0.8"
 
 # JWT (auth middleware stub)
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 
 # RSA key generation for ActivityPub signatures
 rsa = { version = "0.9", features = ["sha2"] }
