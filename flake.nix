@@ -60,6 +60,7 @@
           packages = with pkgs; [
             rustToolchain
             sqlx-cli # `sqlx migrate run`, database create/drop
+            cargo-audit # mirrors the CI security gate (cargo audit)
             cargo-watch # `make dev` -> cargo watch -x run
             tailwindcss_3 # `make css` — project pins Tailwind v3 (matches Dockerfile)
             postgresql # psql / pg_isready client tools
