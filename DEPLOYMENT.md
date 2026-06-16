@@ -26,8 +26,11 @@ Copy `.env.example` to `.env` and configure:
 # Required
 DATABASE_URL=postgres://oppskrift:oppskrift@localhost:5432/oppskrift
 JWT_SECRET=your-secret-minimum-32-characters
-TOTP_ENCRYPTION_KEY=64-hex-chars-for-2fa  # openssl rand -hex 32
 S3_BUCKET=oppskrift
+
+# Required in production (set RUST_ENV=production to enforce validation)
+RUST_ENV=production
+TOTP_ENCRYPTION_KEY=64-hex-chars-for-2fa  # openssl rand -hex 32
 
 # Optional (have defaults)
 S3_ENDPOINT=http://localhost:9000
@@ -50,9 +53,9 @@ SMTP_PORT=587
 SMTP_USER=noreply@example.com
 SMTP_PASSWORD=your-smtp-password
 
-# Federation
-INSTANCE_DOMAIN=localhost:3000
-INSTANCE_NAME=Oppskrift Dev
+# Application
+APP_NAME=Oppskrift          # display name + TOTP issuer
+# (the federation domain is derived from BASE_URL)
 ```
 
 ## Docker Compose
@@ -80,6 +83,7 @@ podman logs oppskrift_db_1
 | app | 3000 | Oppskrift application |
 | db | 5432 | PostgreSQL database |
 | minio | 9000/9001 | S3-compatible storage |
+| mailpit | 1025/8025 | SMTP capture + web UI (dev email testing) |
 
 ### Security Features
 
@@ -94,7 +98,8 @@ podman logs oppskrift_db_1
 ### 1. Build Release Binary
 
 ```bash
-cargo build --release
+# Builds offline using the committed .sqlx cache (no database needed)
+SQLX_OFFLINE=true cargo build --release
 ```
 
 ### 2. Database Setup
@@ -209,7 +214,7 @@ psql $DATABASE_URL -c "SELECT 1"
 
 ```bash
 # Clean up and restart
-make down
+podman-compose down
 podman system prune -f
-make up
+podman-compose up -d db
 ```

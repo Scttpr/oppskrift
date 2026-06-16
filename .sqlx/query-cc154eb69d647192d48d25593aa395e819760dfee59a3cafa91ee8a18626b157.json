@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, title, description, prep_time_min, cook_time_min,\n                   servings, visibility::text as visibility, created_at\n            FROM recipes WHERE author_id = $1\n            ORDER BY created_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "prep_time_min",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "cook_time_min",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "servings",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "visibility",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      null,
+      false
+    ]
+  },
+  "hash": "cc154eb69d647192d48d25593aa395e819760dfee59a3cafa91ee8a18626b157"
+}

@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                bc.id, bc.book_id, bc.recipe_id, bc.contributor_id, bc.added_at,\n                bc.status, bc.rejection_reason,\n                u.display_name as contributor_display_name\n            FROM book_contributions bc\n            JOIN users u ON u.id = bc.contributor_id\n            WHERE bc.book_id = $1 AND bc.status = 'pending'\n            ORDER BY bc.added_at ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "book_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "recipe_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "contributor_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "added_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "rejection_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "contributor_display_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "147df67aca648159d689c329a389f28fa7af9492103e09c61c50993067ce4f54"
+}

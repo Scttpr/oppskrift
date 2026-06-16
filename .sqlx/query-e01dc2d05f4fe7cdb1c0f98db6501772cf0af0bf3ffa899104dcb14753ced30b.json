@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO book_recipe_entries (book_id, recipe_id, position)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (book_id, recipe_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e01dc2d05f4fe7cdb1c0f98db6501772cf0af0bf3ffa899104dcb14753ced30b"
+}

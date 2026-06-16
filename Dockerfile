@@ -41,7 +41,7 @@ COPY static ./static
 
 RUN ./tailwindcss-linux-x64 -i static/css/input.css -o static/css/main.css --minify
 
-# Runtime stage - same base as builder for glibc compatibility
+# Runtime stage - slim Debian; glibc is forward-compatible with the rust:latest builder
 FROM debian:trixie-slim
 
 WORKDIR /app

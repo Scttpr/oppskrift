@@ -4,7 +4,7 @@
 
 ### Prerequisites
 
-- Rust 1.75+ (stable)
+- Rust 1.85+ (stable) — some dependencies require edition 2024
 - Docker or Podman with Compose
 - Tailwind CSS CLI (for CSS changes)
 
@@ -78,13 +78,16 @@ make clean       # Clean build artifacts and stop containers
 
 ## SQLx and Database
 
-This project requires a running PostgreSQL database for compilation because SQLx verifies queries at compile time. The `make` commands handle this automatically.
+SQLx verifies queries at compile time. A query cache is committed under `.sqlx/`,
+so builds work offline (`SQLX_OFFLINE=true`, as used by the Docker/buildpack builds)
+without a database. When you add or change a `sqlx::query!` macro, regenerate the
+cache against a running database and commit the result:
 
 ```bash
 # Start database and run migrations
 make setup
 
-# Regenerate SQLx query cache (rarely needed)
+# Regenerate and commit the SQLx query cache after changing queries
 cargo sqlx prepare
 ```
 
@@ -128,24 +131,15 @@ Types:
 
 ```
 src/
-├── api/          # REST API endpoints
-│   ├── auth.rs       # Authentication (register, login, logout)
-│   ├── account.rs    # Account management
-│   ├── recipes.rs    # Recipe CRUD
-│   ├── books.rs      # Recipe books
-│   ├── social.rs     # Follow, save, share
-│   ├── activitypub.rs# Federation
-│   ├── feeds.rs      # RSS/Atom
-│   ├── webfinger.rs  # Discovery
-│   └── oembed.rs     # Embeds
+├── api/          # REST API endpoints (auth, account, users, recipes,
+│                 #   books, groups, social, activitypub, feeds, webfinger,
+│                 #   oembed, openapi) + middleware/
 ├── handlers/     # HTML page handlers
-├── services/     # Business logic
-│   ├── auth_service.rs    # Registration, login, sessions
-│   ├── password_service.rs# Password hashing
-│   └── session_service.rs # Session management
+├── services/     # Business logic (auth, password, session, email,
+│                 #   recipe, book, group, permission, totp, image, export, ...)
 ├── models/       # Database models
-├── jobs/         # Background jobs
-└── lib/          # Shared utilities
+└── core/         # Shared utilities (config, db, error, crypto, csrf,
+                  #   pagination, audit, activitypub/, seeds/)
 
 templates/        # Askama HTML templates
 static/           # CSS, JS (HTMX vendored)
@@ -169,7 +163,7 @@ RUST_LOG=debug cargo test
 cargo test models::recipe
 
 # Run auth tests only
-cargo test --test login_test --test registration_test
+cargo test --test auth_test --test security_auth_test
 ```
 
 ## Adding New Features

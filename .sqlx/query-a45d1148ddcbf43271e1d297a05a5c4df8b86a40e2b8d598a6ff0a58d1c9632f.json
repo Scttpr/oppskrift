@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT permission_level as \"permission_level: PermissionLevel\"\n            FROM permissions\n            WHERE resource_type = $1\n              AND resource_id = $2\n              AND subject_type = 'user'\n              AND subject_id = $3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "permission_level: PermissionLevel",
+        "type_info": {
+          "Custom": {
+            "name": "permission_level",
+            "kind": {
+              "Enum": [
+                "view",
+                "edit",
+                "contributor"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a45d1148ddcbf43271e1d297a05a5c4df8b86a40e2b8d598a6ff0a58d1c9632f"
+}

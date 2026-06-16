@@ -11,6 +11,22 @@ async fn main() -> anyhow::Result<()> {
     // Load environment variables from .env file
     dotenvy::dotenv().ok();
 
+    // Health-check probe (used by the container HEALTHCHECK): query the running
+    // server's /health endpoint and exit 0/1 without starting a second server.
+    if args.iter().any(|a| a == "--health-check") {
+        let port = std::env::var("LISTEN_PORT")
+            .or_else(|_| std::env::var("PORT"))
+            .unwrap_or_else(|_| "3000".to_string());
+        let healthy = reqwest::get(format!("http://127.0.0.1:{port}/health"))
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false);
+        if healthy {
+            return Ok(());
+        }
+        std::process::exit(1);
+    }
+
     // Validate configuration (panics if required vars missing)
     core::Config::from_env();
 

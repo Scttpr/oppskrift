@@ -20,6 +20,9 @@ release/
 .env.*
 !.env.example
 
+# direnv / nix-direnv
+.direnv/
+
 # Logs
 *.log
 logs/
@@ -40,8 +43,9 @@ coverage/
 *.profraw
 *.profdata
 
-# SQLx offline cache - regenerate with: cargo sqlx prepare
-.sqlx/
+# SQLx offline cache - intentionally COMMITTED so Docker/buildpack/CI builds work
+# without a database (SQLX_OFFLINE=true). Regenerate after changing queries with:
+#   cargo sqlx prepare
 
 # Build artifacts
 *.exe

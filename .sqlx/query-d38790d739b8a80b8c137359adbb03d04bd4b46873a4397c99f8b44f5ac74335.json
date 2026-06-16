@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM permissions p\n            WHERE p.subject_type = 'group'\n            AND NOT EXISTS (SELECT 1 FROM groups g WHERE g.id = p.subject_id)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d38790d739b8a80b8c137359adbb03d04bd4b46873a4397c99f8b44f5ac74335"
+}
