@@ -1,10 +1,20 @@
+# cargo-audit configuration — RustSec advisory exceptions.
+#
+# Each ignored advisory is a TRANSITIVE/no-fix dependency issue with no upstream
+# fix available (verified 2026-06: direct parents are already at latest versions).
+# Re-run `cargo audit` and remove entries here once fixes are released upstream.
 [advisories]
 ignore = [
-    # lru 0.12.5 unsound - waiting for aws-sdk-s3 to update dependency
-    # https://rustsec.org/advisories/RUSTSEC-2026-0002
-    "RUSTSEC-2026-0002",
-
-    # rsa 0.9.9 timing sidechannel - no fix available upstream
-    # https://rustsec.org/advisories/RUSTSEC-2023-0071
+    # rustls-webpki 0.101.7 — pulled only by the AWS SDK's default TLS connector
+    # (aws-sdk-s3 -> aws-smithy-http-client 1.1.13 [latest] -> rustls 0.21 -> hyper-rustls 0.24).
+    # Affects only TLS to the configured S3/MinIO endpoint; no newer aws-smithy drops it yet.
+    "RUSTSEC-2026-0098", # name constraints for URI names incorrectly accepted
+    "RUSTSEC-2026-0099", # name constraints accepted for wildcard-asserting certs
+    "RUSTSEC-2026-0104", # reachable panic in CRL parsing
+    # proc-macro-error2 — unmaintained, build-time proc-macro pulled by validator_derive 0.20
+    # (validator is at its latest, 0.20.0). Not a runtime vulnerability.
+    "RUSTSEC-2026-0173",
+    # rsa 0.9.10 — Marvin timing side-channel. The rsa crate has no patched release yet;
+    # used here for ActivityPub HTTP-signature RSA key handling.
     "RUSTSEC-2023-0071",
 ]
