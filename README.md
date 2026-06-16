@@ -5,13 +5,18 @@ A federated recipe sharing platform built with Rust and ActivityPub.
 ## Features
 
 - **User Authentication**: Secure registration, login, and session management with email verification
+- **Two-Factor Authentication**: TOTP-based 2FA with recovery codes
 - **Recipe Management**: Create, edit, and organize recipes with ingredients, instructions, and images
 - **Recipe Books**: Organize recipes into collections
+- **Groups & Sharing**: Attribute-based access control (ABAC) for sharing recipes and books with groups
+- **Account Settings**: Manage profile, security, and account preferences
+- **Recipe Export**: Export recipes and books
 - **Social Features**: Follow users, save recipes, share with activity feed
 - **Federation**: ActivityPub support for cross-instance recipe sharing
 - **RSS/Atom Feeds**: Subscribe to user recipes via feed readers
 - **WebFinger**: Discover users across federated instances
 - **oEmbed**: Rich embeds for recipes shared on other platforms
+- **Rate Limiting**: Per-IP / per-account sliding-window limits on auth, uploads, search, and exports
 
 ## Tech Stack
 
@@ -26,7 +31,7 @@ A federated recipe sharing platform built with Rust and ActivityPub.
 
 ### Prerequisites
 
-- Rust 1.75+ (stable)
+- Rust 1.85+ (stable) — some dependencies require edition 2024
 - Docker/Podman with Compose
 - Tailwind CSS CLI (optional, for CSS changes)
 
@@ -77,33 +82,39 @@ make clean       # Clean build artifacts and stop containers
 ```
 src/
 ├── api/          # REST/JSON API endpoints
-│   ├── auth.rs       # Authentication (register, login, logout)
+│   ├── auth.rs       # Authentication (register, login, logout, 2FA)
 │   ├── account.rs    # Account management (profile)
+│   ├── users.rs      # User endpoints
 │   ├── recipes.rs    # Recipe CRUD
 │   ├── books.rs      # Recipe book management
+│   ├── groups.rs     # Groups & ABAC sharing
 │   ├── social.rs     # Follow, save, share
-│   ├── activitypub.rs # Federation endpoints
+│   ├── activitypub.rs# Federation endpoints
 │   ├── feeds.rs      # RSS/Atom feeds
 │   ├── webfinger.rs  # WebFinger discovery
-│   └── oembed.rs     # oEmbed provider
-├── handlers/     # HTML page handlers
-├── services/     # Business logic layer
-│   ├── auth_service.rs    # Registration, login, sessions
-│   ├── password_service.rs # Argon2id hashing, validation
-│   ├── session_service.rs  # Session management
-│   └── email_service.rs    # Email notifications
+│   ├── oembed.rs     # oEmbed provider
+│   ├── openapi.rs    # OpenAPI / Swagger UI
+│   └── middleware/   # Security headers, rate limiting
+├── handlers/     # HTML page handlers (recipes, books, groups,
+│                 #   permissions, settings, feed, legal, users)
+├── services/     # Business logic (auth, password, session, email,
+│                 #   recipe, book, group, permission, totp, image, export, ...)
 ├── models/       # Database models
-├── jobs/         # Background job processing
-└── lib/          # Shared utilities
+└── core/         # Shared utilities
     ├── activitypub/  # AP protocol implementation
-    ├── audit.rs      # Security audit logging
-    ├── config.rs     # Configuration
+    ├── config.rs     # Configuration validation
+    ├── db.rs         # Database pool
+    ├── crypto.rs     # Encryption helpers
+    ├── csrf.rs       # CSRF protection
     ├── error.rs      # Error types
-    └── pagination.rs # Pagination helpers
+    ├── pagination.rs # Pagination helpers
+    ├── audit.rs      # Security audit logging
+    └── seeds/        # Database seed data
 
 templates/        # Askama HTML templates
 static/           # CSS, JS (HTMX vendored)
 migrations/       # SQLx database migrations
+tests/            # Integration and security tests
 ```
 
 ## API Endpoints
@@ -123,6 +134,7 @@ migrations/       # SQLx database migrations
 #### Content
 - `GET/POST/PUT/DELETE /recipes` - Recipe CRUD
 - `GET/POST/PUT/DELETE /books` - Recipe book CRUD
+- `GET/POST/PUT/DELETE /groups` - Groups & ABAC sharing
 - `POST /users/{id}/follow` - Follow a user
 - `POST /recipes/{id}/save` - Save a recipe
 - `GET /feed` - Activity feed
@@ -149,8 +161,12 @@ See `.env.example` for all options. Required:
 ```bash
 DATABASE_URL=postgres://user:pass@localhost:5432/oppskrift
 JWT_SECRET=your-secret-min-32-chars
-TOTP_ENCRYPTION_KEY=your-64-hex-chars  # For 2FA (openssl rand -hex 32)
 S3_BUCKET=oppskrift
+```
+
+Required in production (set `RUST_ENV=production` to enforce):
+```bash
+TOTP_ENCRYPTION_KEY=your-64-hex-chars  # For 2FA (openssl rand -hex 32)
 ```
 
 Optional auth settings:

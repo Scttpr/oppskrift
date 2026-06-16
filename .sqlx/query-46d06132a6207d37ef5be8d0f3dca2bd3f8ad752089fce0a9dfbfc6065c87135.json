@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM permissions WHERE subject_type = 'user' AND subject_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "46d06132a6207d37ef5be8d0f3dca2bd3f8ad752089fce0a9dfbfc6065c87135"
+}

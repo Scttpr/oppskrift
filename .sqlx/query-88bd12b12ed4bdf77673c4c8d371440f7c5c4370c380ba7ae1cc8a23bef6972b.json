@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT p.permission_level as \"permission_level: PermissionLevel\"\n            FROM permissions p\n            JOIN group_members gm ON p.subject_id = gm.group_id\n            WHERE p.resource_type = $1\n              AND p.resource_id = $2\n              AND p.subject_type = 'group'\n              AND gm.user_id = $3\n            ORDER BY\n                CASE p.permission_level\n                    WHEN 'edit' THEN 3\n                    WHEN 'contributor' THEN 2\n                    WHEN 'view' THEN 1\n                END DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "permission_level: PermissionLevel",
+        "type_info": {
+          "Custom": {
+            "name": "permission_level",
+            "kind": {
+              "Enum": [
+                "view",
+                "edit",
+                "contributor"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "88bd12b12ed4bdf77673c4c8d371440f7c5c4370c380ba7ae1cc8a23bef6972b"
+}

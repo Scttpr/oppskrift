@@ -63,6 +63,21 @@ impl StorageClient {
             aws_config = aws_config.endpoint_url(endpoint);
         }
 
+        // Honor explicit S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY (e.g. MinIO);
+        // otherwise fall back to the default AWS credential provider chain.
+        if let (Ok(access_key), Ok(secret_key)) = (
+            std::env::var("S3_ACCESS_KEY_ID"),
+            std::env::var("S3_SECRET_ACCESS_KEY"),
+        ) {
+            aws_config = aws_config.credentials_provider(aws_sdk_s3::config::Credentials::new(
+                access_key,
+                secret_key,
+                None,
+                None,
+                "oppskrift-env",
+            ));
+        }
+
         let aws_config = aws_config.load().await;
         let client = Client::new(&aws_config);
 

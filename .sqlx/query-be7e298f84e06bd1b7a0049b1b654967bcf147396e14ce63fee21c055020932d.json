@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT author_id, visibility as \"visibility: Visibility\"\n                    FROM recipes WHERE id = $1\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "author_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "visibility: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility_type",
+            "kind": {
+              "Enum": [
+                "public",
+                "private",
+                "followers_only"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "be7e298f84e06bd1b7a0049b1b654967bcf147396e14ce63fee21c055020932d"
+}

@@ -20,8 +20,7 @@ services:
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production-min32}
       BASE_URL: ${BASE_URL:-http://localhost:3000}
-      INSTANCE_DOMAIN: ${INSTANCE_DOMAIN:-localhost:3000}
-      INSTANCE_NAME: ${INSTANCE_NAME:-Oppskrift Dev}
+      APP_NAME: ${APP_NAME:-Oppskrift Dev}
       # Email (Mailpit for dev)
       SMTP_HOST: mailpit
       SMTP_PORT: 1025

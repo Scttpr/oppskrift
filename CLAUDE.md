@@ -16,7 +16,7 @@ Auto-generated from all feature plans. Last updated: 2025-12-25
 - Rust 1.75+ (2021 edition) + Axum 0.8, tower_governor 0.8, tower 0.5 (007-rate-limiting)
 - PostgreSQL (for security event logging), In-memory (for rate limit counters) (007-rate-limiting)
 
-- **Language**: Rust 1.75+
+- **Language**: Rust 1.85+ (2021 edition; some dependencies require edition 2024)
 - **Framework**: Axum 0.8
 - **Database**: PostgreSQL 15+ with SQLx
 - **Templates**: Askama (compile-time checked)
@@ -29,9 +29,9 @@ Auto-generated from all feature plans. Last updated: 2025-12-25
 src/
 ├── models/              # Data models (unit tests inline with #[cfg(test)])
 ├── services/            # Business logic
-├── api/                 # REST/JSON API endpoints
+├── api/                 # REST/JSON API endpoints (+ middleware/, openapi)
 ├── handlers/            # HTML page handlers
-└── lib/                 # Shared utilities
+└── core/                # Shared utilities (config, db, error, crypto, csrf, activitypub, ...)
 
 templates/               # Askama templates (.html)
 ├── layouts/
