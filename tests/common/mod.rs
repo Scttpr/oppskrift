@@ -1340,7 +1340,7 @@ impl TestContext {
     /// Generate a valid CSRF token for a session
     pub async fn generate_csrf_token(&self, session_token: &str) -> String {
         use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-        use hmac::{Hmac, Mac};
+        use hmac::{digest::KeyInit, Hmac, Mac};
         use rand::RngCore;
         use sha2::Sha256 as HmacSha256Digest;
 
