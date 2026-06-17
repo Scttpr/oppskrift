@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::api::middleware::{AuthUser, OptionalAuthUser};
 use crate::core::error::AppResult;
-use crate::core::pagination::{PaginationMeta, PaginationParams};
+use crate::core::pagination::{PaginatedResponse, PaginationMeta, PaginationParams};
 use crate::core::schema_org::SchemaOrgRecipe;
 use crate::models::{
     Ingredient, InstructionStep, Recipe, RecipeBookSummary, RecipeImage, RecipeSummary, User,
@@ -22,6 +22,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_recipes_page))
         .route("/new", get(new_recipe_page))
+        .route("/search", get(search_recipes_page))
         .route("/{id}", get(view_recipe_page))
         .route("/{id}/edit", get(edit_recipe_page))
 }
@@ -53,6 +54,46 @@ async fn list_recipes_page(
         recipes: recipes_page.data,
         pagination: recipes_page.pagination,
         user,
+    };
+
+    crate::core::render(&template)
+}
+
+/// Recipe search page template
+#[derive(Template)]
+#[template(path = "recipes/search.html")]
+struct RecipeSearchTemplate {
+    query: String,
+    recipes: Vec<RecipeSummary>,
+    pagination: PaginationMeta,
+}
+
+/// Query parameters for the search page (term + page)
+#[derive(serde::Deserialize)]
+struct SearchPageParams {
+    #[serde(default)]
+    q: String,
+    #[serde(flatten)]
+    pagination: PaginationParams,
+}
+
+/// Recipe search page handler
+async fn search_recipes_page(
+    State(state): State<AppState>,
+    Query(params): Query<SearchPageParams>,
+) -> AppResult<Html<String>> {
+    let query = params.q.trim().to_string();
+
+    let results = if query.is_empty() {
+        PaginatedResponse::new(vec![], params.pagination.page, params.pagination.limit(), 0)
+    } else {
+        RecipeService::search_public(&state.db, &query, &params.pagination).await?
+    };
+
+    let template = RecipeSearchTemplate {
+        query,
+        recipes: results.data,
+        pagination: results.pagination,
     };
 
     crate::core::render(&template)
