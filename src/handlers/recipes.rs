@@ -12,9 +12,11 @@ use crate::core::error::AppResult;
 use crate::core::pagination::{PaginatedResponse, PaginationMeta, PaginationParams};
 use crate::core::schema_org::SchemaOrgRecipe;
 use crate::models::{
-    Ingredient, InstructionStep, Recipe, RecipeBookSummary, RecipeImage, RecipeSummary, User,
+    Ingredient, InstructionStep, Recipe, RecipeBookSummary, RecipeImage, RecipeSummary, Tag, User,
 };
-use crate::services::{BookService, ImageService, RecipeService, SavedRecipeService, UserService};
+use crate::services::{
+    BookService, ImageService, RecipeService, SavedRecipeService, TagService, UserService,
+};
 use crate::AppState;
 
 /// Recipe page routes
@@ -104,11 +106,15 @@ async fn search_recipes_page(
 #[template(path = "recipes/form.html")]
 struct NewRecipeTemplate {
     recipe: Option<Recipe>,
+    tags: String,
 }
 
 /// New recipe page handler
 async fn new_recipe_page() -> AppResult<Html<String>> {
-    let template = NewRecipeTemplate { recipe: None };
+    let template = NewRecipeTemplate {
+        recipe: None,
+        tags: String::new(),
+    };
 
     crate::core::render(&template)
 }
@@ -129,6 +135,7 @@ struct RecipeViewTemplate {
     user_books: Vec<RecipeBookSummary>,
     recipe_in_book_ids: Vec<Uuid>,
     is_saved: bool,
+    tags: Vec<Tag>,
 }
 
 /// View recipe page handler
@@ -145,6 +152,7 @@ async fn view_recipe_page(
     let ingredients = RecipeService::get_ingredients(&state.db, id).await?;
     let instructions = RecipeService::get_instructions(&state.db, id).await?;
     let images = ImageService::get_images(&state.db, id).await?;
+    let tags = TagService::get_recipe_tags(&state.db, id).await?;
     let primary_image = images.iter().find(|i| i.is_primary).cloned();
 
     // Generate Schema.org JSON-LD
@@ -188,6 +196,7 @@ async fn view_recipe_page(
         user_books,
         recipe_in_book_ids,
         is_saved,
+        tags,
     };
 
     crate::core::render(&template)
@@ -198,6 +207,7 @@ async fn view_recipe_page(
 #[template(path = "recipes/form.html")]
 struct EditRecipeTemplate {
     recipe: Option<Recipe>,
+    tags: String,
 }
 
 /// Edit recipe page handler
@@ -208,9 +218,16 @@ async fn edit_recipe_page(
 ) -> AppResult<Html<String>> {
     RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
     let recipe = RecipeService::get_by_id(&state.db, id).await?;
+    let tags = TagService::get_recipe_tags(&state.db, id)
+        .await?
+        .into_iter()
+        .map(|t| t.name)
+        .collect::<Vec<_>>()
+        .join(", ");
 
     let template = EditRecipeTemplate {
         recipe: Some(recipe),
+        tags,
     };
 
     crate::core::render(&template)
@@ -258,7 +275,10 @@ mod tests {
 
     #[test]
     fn test_new_recipe_template_renders() {
-        let template = NewRecipeTemplate { recipe: None };
+        let template = NewRecipeTemplate {
+            recipe: None,
+            tags: String::new(),
+        };
         let result = template.render();
         assert!(result.is_ok());
         let html = result.unwrap();
@@ -286,6 +306,7 @@ mod tests {
 
         let template = EditRecipeTemplate {
             recipe: Some(recipe),
+            tags: "dessert, quick".to_string(),
         };
         let result = template.render();
         assert!(result.is_ok());
@@ -323,6 +344,7 @@ mod tests {
             user_books: vec![],
             recipe_in_book_ids: vec![],
             is_saved: false,
+            tags: vec![],
         };
         let result = template.render();
         assert!(result.is_ok());
@@ -422,6 +444,7 @@ mod tests {
             user_books: vec![],
             recipe_in_book_ids: vec![],
             is_saved: false,
+            tags: vec![],
         };
         assert!(owner_template.render().is_ok());
 
@@ -439,6 +462,7 @@ mod tests {
             user_books: vec![],
             recipe_in_book_ids: vec![],
             is_saved: false,
+            tags: vec![],
         };
         assert!(guest_template.render().is_ok());
     }

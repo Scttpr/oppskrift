@@ -139,6 +139,24 @@
                     class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 />
             </div>
+
+            <div>
+                <label for="tags" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Tags
+                </label>
+                <input
+                    type="text"
+                    id="tags"
+                    name="tags"
+                    placeholder="e.g., dessert, vegetarian, quick"
+                    value="{{ tags }}"
+                    class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    aria-describedby="tags-help"
+                />
+                <p id="tags-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Comma-separated. Helps people find your recipe.
+                </p>
+            </div>
         </section>
 
         {# Visibility #}
@@ -244,6 +262,12 @@ document.getElementById('recipe-form').addEventListener('submit', async (e) => {
     const url = isEdit ? `/api/v1/recipes/${recipeId}` : '/api/v1/recipes';
     const method = isEdit ? 'PUT' : 'POST';
 
+    // Parse comma-separated tags into a trimmed, non-empty list
+    const tags = (formData.get('tags') || '')
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+
     // Build JSON payload
     const data = {
         title: formData.get('title'),
@@ -252,7 +276,8 @@ document.getElementById('recipe-form').addEventListener('submit', async (e) => {
         cook_time_min: formData.get('cook_time_min') ? parseInt(formData.get('cook_time_min')) : null,
         servings: formData.get('servings') || null,
         difficulty: formData.get('difficulty') || null,
-        visibility: formData.get('visibility') || 'public'
+        visibility: formData.get('visibility') || 'public',
+        tags: tags
     };
 
     try {

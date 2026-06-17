@@ -205,6 +205,20 @@
             {{ desc }}
         </p>
         {% endif %}
+
+        {# Tags #}
+        {% if !tags.is_empty() %}
+        <div class="mt-4 flex flex-wrap gap-2">
+            {% for tag in tags %}
+            <a
+                href="/tags/{{ tag.slug }}"
+                class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-primary-100 hover:text-primary-700 dark:hover:bg-primary-900 dark:hover:text-primary-200"
+            >
+                #{{ tag.name }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
     </header>
 
     {# Primary Image #}

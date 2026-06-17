@@ -1,0 +1,61 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}{{ tag_name }} Recipes - Oppskrift{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    {# Header #}
+    <div class="mb-8">
+        <a href="/tags" class="text-sm text-primary-600 dark:text-primary-400 hover:underline">&larr; All tags</a>
+        <h1 class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+            Recipes tagged &ldquo;{{ tag_name }}&rdquo;
+        </h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {{ pagination.total_items }} recipe{% if pagination.total_items != 1 %}s{% endif %}
+        </p>
+    </div>
+
+    {# Recipe Grid #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {% for recipe in recipes %}
+        {% include "components/recipe_card.html" %}
+        {% endfor %}
+    </div>
+
+    {# Empty State #}
+    {% if recipes.is_empty() %}
+    <div class="text-center py-12">
+        <p class="text-gray-500 dark:text-gray-400">No recipes with this tag yet.</p>
+    </div>
+    {% endif %}
+
+    {# Pagination #}
+    {% if pagination.total_pages > 1 %}
+    <nav class="mt-8 flex items-center justify-center gap-2" aria-label="Pagination">
+        {% if pagination.has_prev %}
+        <a
+            href="?page={{ pagination.page - 1 }}"
+            class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+            aria-label="Previous page"
+        >
+            Previous
+        </a>
+        {% endif %}
+
+        <span class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+            Page {{ pagination.page }} of {{ pagination.total_pages }}
+        </span>
+
+        {% if pagination.has_next %}
+        <a
+            href="?page={{ pagination.page + 1 }}"
+            class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+            aria-label="Next page"
+        >
+            Next
+        </a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

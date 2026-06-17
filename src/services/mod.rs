@@ -16,6 +16,7 @@ pub mod saved_recipe_service;
 pub mod security_event_service;
 pub mod service_factory;
 pub mod session_service;
+pub mod tag_service;
 pub mod totp_service;
 pub mod user_service;
 
@@ -35,5 +36,6 @@ pub use saved_recipe_service::SavedRecipeService;
 pub use security_event_service::{SecurityEvent, SecurityEventService};
 pub use service_factory::{ServiceFactory, SESSION_EXPIRY_DAYS};
 pub use session_service::SessionService;
+pub use tag_service::TagService;
 pub use totp_service::{TotpError, TotpService};
 pub use user_service::UserService;
