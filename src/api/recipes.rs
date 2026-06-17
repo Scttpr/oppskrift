@@ -33,6 +33,7 @@ pub fn routes() -> Router<AppState> {
 
     let standard_routes = Router::new()
         .route("/", get(list_recipes).post(create_recipe))
+        .route("/search", get(search_recipes))
         .route(
             "/{id}",
             get(get_recipe).put(update_recipe).delete(delete_recipe),
@@ -63,6 +64,7 @@ pub fn routes_with_rate_limit(rate_limiter: RateLimiterState) -> Router<AppState
     // Routes without special rate limiting
     let standard_routes = Router::new()
         .route("/", get(list_recipes).post(create_recipe))
+        .route("/search", get(search_recipes))
         .route(
             "/{id}",
             get(get_recipe).put(update_recipe).delete(delete_recipe),
@@ -295,6 +297,36 @@ async fn list_recipes(
     Query(params): Query<PaginationParams>,
 ) -> AppResult<Json<PaginatedResponse<RecipeSummary>>> {
     let recipes = RecipeService::list_public(&state.db, &params).await?;
+    Ok(Json(recipes))
+}
+
+/// Query parameters for recipe search (search term + pagination)
+#[derive(Debug, Deserialize)]
+pub struct SearchParams {
+    /// Full-text search query
+    #[serde(default)]
+    pub q: String,
+    #[serde(flatten)]
+    pub pagination: PaginationParams,
+}
+
+/// GET /api/v1/recipes/search?q=...
+/// Search public recipes by title and description
+async fn search_recipes(
+    State(state): State<AppState>,
+    Query(params): Query<SearchParams>,
+) -> AppResult<Json<PaginatedResponse<RecipeSummary>>> {
+    let query = params.q.trim();
+    if query.is_empty() {
+        return Ok(Json(PaginatedResponse::new(
+            vec![],
+            params.pagination.page,
+            params.pagination.limit(),
+            0,
+        )));
+    }
+
+    let recipes = RecipeService::search_public(&state.db, query, &params.pagination).await?;
     Ok(Json(recipes))
 }
 
