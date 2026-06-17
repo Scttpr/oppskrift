@@ -7,7 +7,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::api::middleware::OptionalAuthUser;
+use crate::api::middleware::{AuthUser, OptionalAuthUser};
 use crate::core::error::AppResult;
 use crate::core::pagination::{PaginationMeta, PaginationParams};
 use crate::core::schema_org::SchemaOrgRecipe;
@@ -100,7 +100,8 @@ async fn view_recipe_page(
     Path(id): Path<Uuid>,
     auth: OptionalAuthUser,
 ) -> AppResult<Html<String>> {
-    let recipe = RecipeService::get_by_id(&state.db, id).await?;
+    let viewer_id = auth.0.as_ref().map(|u| u.id);
+    let recipe = RecipeService::get_by_id_authorized(&state.db, id, viewer_id).await?;
     let author = UserService::get_by_id(&state.db, recipe.author_id)
         .await
         .ok();
@@ -119,7 +120,7 @@ async fn view_recipe_page(
     );
     let schema_json = serde_json::to_string_pretty(&schema).unwrap_or_default();
 
-    let is_owner = auth.0.as_ref().map(|u| u.id) == Some(recipe.author_id);
+    let is_owner = viewer_id == Some(recipe.author_id);
 
     // Fetch current user, their books, and saved status
     let (user, user_books, recipe_in_book_ids, is_saved) = if let Some(auth_user) = auth.0.as_ref()
@@ -168,7 +169,9 @@ struct EditRecipeTemplate {
 async fn edit_recipe_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    auth: AuthUser,
 ) -> AppResult<Html<String>> {
+    RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
     let recipe = RecipeService::get_by_id(&state.db, id).await?;
 
     let template = EditRecipeTemplate {

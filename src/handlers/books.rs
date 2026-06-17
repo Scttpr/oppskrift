@@ -144,11 +144,12 @@ async fn view_book_page(
     Query(params): Query<PaginationParams>,
     auth: OptionalAuthUser,
 ) -> AppResult<Html<String>> {
-    let book = BookService::get_by_id(&state.db, id).await?;
+    let viewer_id = auth.0.as_ref().map(|u| u.id);
+    let book = BookService::get_by_id_authorized(&state.db, id, viewer_id).await?;
     let owner = UserService::get_by_id(&state.db, book.owner_id).await.ok();
     let recipes_page = BookService::get_recipes_in_book(&state.db, id, &params).await?;
 
-    let is_owner = auth.0.as_ref().map(|u| u.id) == Some(book.owner_id);
+    let is_owner = viewer_id == Some(book.owner_id);
 
     // Generate CSRF token if logged in
     let csrf_token = if let Some(ref auth_user) = auth.0 {
@@ -221,7 +222,9 @@ struct EditBookTemplate {
 async fn edit_book_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    auth: AuthUser,
 ) -> AppResult<Html<String>> {
+    BookService::require_edit_permission(&state.db, id, auth.id).await?;
     let book = BookService::get_by_id(&state.db, id).await?;
 
     let template = EditBookTemplate { book: Some(book) };

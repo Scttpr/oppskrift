@@ -92,7 +92,7 @@ async fn oembed(
     let recipe_id = parse_recipe_url(&query.url, &base_url).ok_or(StatusCode::NOT_FOUND)?;
 
     // Get recipe
-    let recipe = RecipeService::get_by_id(&state.db, recipe_id)
+    let recipe = RecipeService::get_by_id_authorized(&state.db, recipe_id, None)
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 

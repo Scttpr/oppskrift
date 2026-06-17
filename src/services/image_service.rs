@@ -187,13 +187,15 @@ impl ImageService {
     pub async fn delete_image(
         pool: &PgPool,
         storage: &StorageClient,
+        recipe_id: Uuid,
         image_id: Uuid,
     ) -> AppResult<()> {
-        // Get the image to find its URL
+        // Look up the image scoped to its recipe to prevent cross-recipe IDOR
         let image = sqlx::query_as!(
             RecipeImage,
-            "SELECT id, recipe_id, url, alt_text, position, is_primary FROM recipe_images WHERE id = $1",
-            image_id
+            "SELECT id, recipe_id, url, alt_text, position, is_primary FROM recipe_images WHERE id = $1 AND recipe_id = $2",
+            image_id,
+            recipe_id
         )
         .fetch_optional(pool)
         .await?
@@ -214,20 +216,29 @@ impl ImageService {
         storage.delete(&key).await?;
 
         // Delete from database
-        sqlx::query!("DELETE FROM recipe_images WHERE id = $1", image_id)
-            .execute(pool)
-            .await?;
+        sqlx::query!(
+            "DELETE FROM recipe_images WHERE id = $1 AND recipe_id = $2",
+            image_id,
+            recipe_id
+        )
+        .execute(pool)
+        .await?;
 
         Ok(())
     }
 
     /// Set an image as primary
-    pub async fn set_primary(pool: &PgPool, image_id: Uuid) -> AppResult<RecipeImage> {
-        // Get the image to find recipe_id
+    pub async fn set_primary(
+        pool: &PgPool,
+        recipe_id: Uuid,
+        image_id: Uuid,
+    ) -> AppResult<RecipeImage> {
+        // Look up the image scoped to its recipe to prevent cross-recipe IDOR
         let image = sqlx::query_as!(
             RecipeImage,
-            "SELECT id, recipe_id, url, alt_text, position, is_primary FROM recipe_images WHERE id = $1",
-            image_id
+            "SELECT id, recipe_id, url, alt_text, position, is_primary FROM recipe_images WHERE id = $1 AND recipe_id = $2",
+            image_id,
+            recipe_id
         )
         .fetch_optional(pool)
         .await?

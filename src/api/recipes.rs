@@ -325,9 +325,11 @@ async fn upload_image(
 async fn list_images(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    auth: OptionalAuthUser,
 ) -> AppResult<Json<Vec<RecipeImage>>> {
-    // Verify recipe exists
-    let _ = RecipeService::get_by_id(&state.db, id).await?;
+    // Verify the recipe exists and the viewer is allowed to see it
+    let viewer_id = auth.0.as_ref().map(|u| u.id);
+    let _ = RecipeService::get_by_id_authorized(&state.db, id, viewer_id).await?;
 
     let images = ImageService::get_images(&state.db, id).await?;
     Ok(Json(images))
@@ -345,7 +347,7 @@ async fn delete_image(
 
     // Delete the image
     let storage = StorageClient::from_env().await?;
-    ImageService::delete_image(&state.db, &storage, image_id).await?;
+    ImageService::delete_image(&state.db, &storage, id, image_id).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -361,7 +363,7 @@ async fn set_primary_image(
     RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
 
     // Set as primary
-    let image = ImageService::set_primary(&state.db, image_id).await?;
+    let image = ImageService::set_primary(&state.db, id, image_id).await?;
     Ok(Json(image))
 }
 
