@@ -1,37 +1,67 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Source files for class detection */
-@source "../../templates/**/*.html";
-@source "../../src/**/*.rs";
+/* =========================================================================
+   Instance theming — "Traiteurs Engagés" warm palette
+   Brand: navy #1A3A52 + coral #C4714A on a cream page, Fraunces serif display.
+   The primary-* scale (coral) is consumed by tailwind.config.js.
+   ========================================================================= */
+:root {
+  /* Primary = coral ramp */
+  --color-primary-50: #fbf3ef;
+  --color-primary-100: #f6e2d8;
+  --color-primary-200: #ecc4b1;
+  --color-primary-300: #e0a185;
+  --color-primary-400: #d2825f;
+  --color-primary-500: #c4714a;
+  --color-primary-600: #ae5c39;
+  --color-primary-700: #8f4a2e;
+  --color-primary-800: #743d27;
+  --color-primary-900: #5f3422;
+  --color-primary-950: #341a10;
 
-/* Custom theme - primary colors via CSS variables for instance theming */
-@theme {
-  --color-primary-50: var(--color-primary-50, #fef2f2);
-  --color-primary-100: var(--color-primary-100, #fee2e2);
-  --color-primary-200: var(--color-primary-200, #fecaca);
-  --color-primary-300: var(--color-primary-300, #fca5a5);
-  --color-primary-400: var(--color-primary-400, #f87171);
-  --color-primary-500: var(--color-primary-500, #ef4444);
-  --color-primary-600: var(--color-primary-600, #dc2626);
-  --color-primary-700: var(--color-primary-700, #b91c1c);
-  --color-primary-800: var(--color-primary-800, #991b1b);
-  --color-primary-900: var(--color-primary-900, #7f1d1d);
-  --color-primary-950: var(--color-primary-950, #450a0a);
+  /* Brand accents (also mirrored in tailwind.config.js as named colors) */
+  --color-navy: #1a3a52;
+  --color-navy-soft: #f0f4f7;
+  --color-cream: #faf7f2;
+  --color-cream-panel: #f5f1e8;
+  --color-coral: #c4714a;
+  --color-coral-strong: #e84b3a;
+
+  --font-display: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
 }
 
-/* Instance theming - default colors (can be overridden per-instance) */
-:root {
-  --color-primary-50: #fef2f2;
-  --color-primary-100: #fee2e2;
-  --color-primary-200: #fecaca;
-  --color-primary-300: #fca5a5;
-  --color-primary-400: #f87171;
-  --color-primary-500: #ef4444;
-  --color-primary-600: #dc2626;
-  --color-primary-700: #b91c1c;
-  --color-primary-800: #991b1b;
-  --color-primary-900: #7f1d1d;
-  --color-primary-950: #450a0a;
+/* Base element styling driven by the brand */
+@layer base {
+  html {
+    background-color: var(--color-cream);
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: var(--font-display);
+    font-variation-settings: 'SOFT' 0, 'WONK' 1;
+  }
+
+  /* Warm, coral-tinted scrollbars to match the source theme */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(196, 113, 74, 0.25) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(196, 113, 74, 0.25);
+    border-radius: 3px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(196, 113, 74, 0.5);
+  }
 }
 
 /* High contrast mode support (T139: system preference) */
