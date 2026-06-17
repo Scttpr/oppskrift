@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, recipe_id, url, alt_text, position, is_primary FROM recipe_images WHERE id = $1",
+  "query": "SELECT id, recipe_id, url, alt_text, position, is_primary FROM recipe_images WHERE id = $1 AND recipe_id = $2",
   "describe": {
     "columns": [
       {
@@ -36,6 +36,7 @@
     ],
     "parameters": {
       "Left": [
+        "Uuid",
         "Uuid"
       ]
     },
@@ -48,5 +49,5 @@
       false
     ]
   },
-  "hash": "a2876a0466bda7a980a6a65138f9cf6aa1d0200a009717357221dbd40a85f233"
+  "hash": "e565796260c65c758c83fd40f69e2b50061b64b8d05e3d7f2c6c14f2c6096e4b"
 }

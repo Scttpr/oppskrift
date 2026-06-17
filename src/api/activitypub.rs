@@ -348,7 +348,7 @@ async fn get_recipe_object(
         return Err(StatusCode::NOT_ACCEPTABLE);
     }
 
-    let recipe = RecipeService::get_by_id(&state.db, id)
+    let recipe = RecipeService::get_by_id_authorized(&state.db, id, None)
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
@@ -400,7 +400,7 @@ async fn get_book_object(
         return Err(StatusCode::NOT_ACCEPTABLE);
     }
 
-    let book = BookService::get_by_id(&state.db, id)
+    let book = BookService::get_by_id_authorized(&state.db, id, None)
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
