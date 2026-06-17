@@ -338,6 +338,15 @@ async fn reject_contribution(
     // Validate CSRF token
     validate_csrf_token(&form.csrf_token, auth.session_id, &state.csrf_secret)?;
 
+    // Bound the rejection reason length (it is echoed back into HTML)
+    if let Some(ref reason) = form.reason {
+        if reason.len() > 500 {
+            return Err(AppError::BadRequest(
+                "Rejection reason must be at most 500 characters".to_string(),
+            ));
+        }
+    }
+
     // Verify user owns the book (authorization check)
     let book = BookService::get_by_id(&state.db, book_id).await?;
     if book.owner_id != auth.id {
@@ -377,7 +386,7 @@ async fn reject_contribution(
     let reason_display = form
         .reason
         .as_ref()
-        .map(|r| format!(" - {}", r))
+        .map(|r| format!(" - {}", html_escape::encode_text(r)))
         .unwrap_or_default();
     let html = format!(
         r#"<div id="contribution-{}" class="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
@@ -386,7 +395,9 @@ async fn reject_contribution(
                 <span class="ml-2 text-xs text-red-600 dark:text-red-400">Rejected{}</span>
             </div>
         </div>"#,
-        contribution_id, title, reason_display
+        contribution_id,
+        html_escape::encode_text(&title),
+        reason_display
     );
 
     Ok(Html(html).into_response())

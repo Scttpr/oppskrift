@@ -1,7 +1,7 @@
 use axum::{
-    extract::{Multipart, Path, Query, State},
+    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     http::StatusCode,
-    routing::{delete, get},
+    routing::{delete, get, post},
     Json, Router,
 };
 use uuid::Uuid;
@@ -18,10 +18,22 @@ use crate::models::{
 use crate::services::{BookContributionService, BookService, PermissionService};
 use crate::AppState;
 
+/// Maximum upload size for book cover images (8 MB)
+const MAX_UPLOAD_SIZE: usize = 8 * 1024 * 1024;
+
 /// Book API routes
 pub fn routes() -> Router<AppState> {
+    // Cover image upload limited to MAX_UPLOAD_SIZE
+    let create_route = Router::new()
+        .route("/", post(create_book))
+        .layer(DefaultBodyLimit::max(MAX_UPLOAD_SIZE));
+
+    create_route.merge(book_standard_routes())
+}
+
+fn book_standard_routes() -> Router<AppState> {
     Router::new()
-        .route("/", get(list_books).post(create_book))
+        .route("/", get(list_books))
         .route("/{id}", get(get_book).put(update_book).delete(delete_book))
         .route(
             "/{id}/recipes",
@@ -121,8 +133,14 @@ async fn create_book(
     let title = title.ok_or_else(|| AppError::BadRequest("Title is required".to_string()))?;
 
     let visibility_enum = match visibility.as_deref() {
+        Some("public") | None => Some(crate::models::Visibility::Public),
         Some("private") => Some(crate::models::Visibility::Private),
-        _ => Some(crate::models::Visibility::Public),
+        Some(other) => {
+            return Err(AppError::BadRequest(format!(
+                "Invalid visibility: {}",
+                other
+            )))
+        }
     };
 
     let input = CreateRecipeBook {

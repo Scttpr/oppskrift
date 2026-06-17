@@ -37,9 +37,9 @@ impl Default for PaginationParams {
 }
 
 impl PaginationParams {
-    /// Calculate the offset for SQL queries
+    /// Calculate the offset for SQL queries (using the capped page size)
     pub fn offset(&self) -> u32 {
-        (self.page.saturating_sub(1)) * self.page_size
+        (self.page.saturating_sub(1)) * self.limit()
     }
 
     /// Get the limit, capped at MAX_PAGE_SIZE
