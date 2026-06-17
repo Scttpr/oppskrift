@@ -12,7 +12,7 @@ use axum::{
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::services::SessionService;
+use crate::services::ServiceFactory;
 
 /// Session cookie name
 pub const SESSION_COOKIE_NAME: &str = "oppskrift_session";
@@ -99,7 +99,7 @@ impl FromRequestParts<crate::AppState> for AuthUser {
             .ok_or_else(|| AuthError::unauthorized("Authentication required", "AUTH_REQUIRED"))?;
 
         // Validate session
-        let session_service = SessionService::new(state.db.clone(), SESSION_EXPIRY_DAYS);
+        let session_service = ServiceFactory::create_session_service(state.db.clone());
 
         let (session_id, user_id) = session_service.validate(token).await.map_err(|e| {
             tracing::debug!("Session validation failed: {:?}", e);

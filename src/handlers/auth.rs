@@ -6,7 +6,7 @@ use axum::{
     Router,
 };
 
-use crate::core::error::{AppError, AppResult};
+use crate::core::error::AppResult;
 use crate::services::ServiceFactory;
 use crate::AppState;
 
@@ -56,33 +56,25 @@ struct EmailConfirmedTemplate {
 /// Login page handler
 async fn login_page() -> AppResult<Html<String>> {
     let template = LoginTemplate;
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Register page handler
 async fn register_page() -> AppResult<Html<String>> {
     let template = RegisterTemplate;
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Forgot password page handler
 async fn forgot_password_page() -> AppResult<Html<String>> {
     let template = ForgotPasswordTemplate;
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Reset password page handler
 async fn reset_password_page() -> AppResult<Html<String>> {
     let template = ResetPasswordTemplate;
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Email confirmation page handler
@@ -123,9 +115,7 @@ async fn confirm_email_page(
         error_message,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 #[cfg(test)]

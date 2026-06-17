@@ -14,7 +14,7 @@ use askama::Template;
 use axum::{extract::State, response::Html, routing::get, Router};
 
 use crate::api::middleware::OptionalAuthUser;
-use crate::core::error::{AppError, AppResult};
+use crate::core::error::AppResult;
 use crate::core::pagination::PaginationParams;
 use crate::models::RecipeSummary;
 use crate::services::{RecipeService, UserService};
@@ -75,9 +75,7 @@ async fn user_menu_partial(
 
     let template = UserMenuTemplate { current_user };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Home page template
@@ -99,7 +97,5 @@ async fn home_page(State(state): State<AppState>) -> AppResult<Html<String>> {
         recent_recipes: recipes_page.data,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }

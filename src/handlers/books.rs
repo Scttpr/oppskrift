@@ -68,9 +68,7 @@ async fn list_books_page(
         user,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// New book form template
@@ -84,9 +82,7 @@ struct NewBookTemplate {
 async fn new_book_page() -> AppResult<Html<String>> {
     let template = NewBookTemplate { book: None };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Contribution view for template display (T029)
@@ -206,9 +202,7 @@ async fn view_book_page(
         csrf_token,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Edit book form template
@@ -229,9 +223,7 @@ async fn edit_book_page(
 
     let template = EditBookTemplate { book: Some(book) };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 // =============================================================================
@@ -244,11 +236,7 @@ fn create_request_context(
     request_id: Option<&RequestId>,
     session_id: Uuid,
 ) -> RequestContext {
-    RequestContext {
-        session_id: Some(session_id),
-        request_id: request_id.map(|r| r.0),
-        ip: Some(addr.ip()),
-    }
+    RequestContext::from_request(addr, request_id, Some(session_id))
 }
 
 /// CSRF-only form for simple actions

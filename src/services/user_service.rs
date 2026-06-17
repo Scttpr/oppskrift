@@ -252,6 +252,41 @@ impl UserService {
         Ok(key)
     }
 
+    /// Persist the user's chosen content handling preference for account deletion
+    pub async fn set_deletion_content_choice(
+        pool: &PgPool,
+        user_id: Uuid,
+        choice: crate::models::DeletionContentChoice,
+    ) -> AppResult<()> {
+        sqlx::query(
+            "UPDATE users SET deletion_content_choice = $1, updated_at = NOW() WHERE id = $2",
+        )
+        .bind(choice)
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to save content choice: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// Update only the federation_enabled flag for a user
+    pub async fn update_federation_enabled(
+        pool: &PgPool,
+        user_id: Uuid,
+        enabled: bool,
+    ) -> AppResult<()> {
+        sqlx::query!(
+            "UPDATE users SET federation_enabled = $1, updated_at = NOW() WHERE id = $2",
+            enabled,
+            user_id
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+
     /// Toggle federation for a user
     /// Returns the updated user and optionally a Delete activity to federate
     pub async fn set_federation_enabled(

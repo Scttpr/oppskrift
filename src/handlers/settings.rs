@@ -30,9 +30,7 @@ use crate::core::error::{AppError, AppResult};
 use crate::core::helpers::mask_email;
 use crate::core::request_id::{RequestContext, RequestId};
 use crate::models::{DeletionContentChoice, MeasurementPref, UpdateUser, User};
-use crate::services::{
-    ServiceFactory, SessionService, TotpError, UserService, SESSION_EXPIRY_DAYS,
-};
+use crate::services::{ServiceFactory, TotpError, UserService};
 use crate::AppState;
 
 /// Create an AuthService instance from AppState
@@ -46,10 +44,7 @@ fn create_request_context(
     request_id: Option<&RequestId>,
     session_id: uuid::Uuid,
 ) -> RequestContext {
-    RequestContext::new()
-        .with_ip(addr.ip())
-        .maybe_request_id(request_id.map(|r| r.0))
-        .with_session_id(session_id)
+    RequestContext::from_request(addr, request_id, Some(session_id))
 }
 
 /// Create a TotpService instance from AppState
@@ -189,9 +184,7 @@ async fn profile_page(State(state): State<AppState>, auth: AuthUser) -> AppResul
         profile: ProfileView::from_user(&user),
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 // =============================================================================
@@ -329,9 +322,7 @@ async fn profile_edit_page(
         csrf_token,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Profile update handler (POST) (T026)
@@ -407,9 +398,7 @@ async fn profile_update(
             csrf_token,
         };
 
-        return Ok(Html(template.render().map_err(|e| {
-            AppError::Internal(format!("Template error: {}", e))
-        })?));
+        return crate::core::render(&template);
     }
 
     // Update user profile
@@ -448,9 +437,7 @@ async fn profile_update(
         profile: ProfileView::from_user(&updated_user),
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Generate a CSRF token for forms
@@ -505,9 +492,7 @@ async fn security_page(State(state): State<AppState>, auth: AuthUser) -> AppResu
         totp_enabled: user.totp_enabled,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 // =============================================================================
@@ -556,9 +541,7 @@ async fn account_page(State(state): State<AppState>, auth: AuthUser) -> AppResul
         csrf_token: generate_csrf(&state, auth.session_id),
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 // =============================================================================
@@ -617,9 +600,7 @@ async fn password_change_page(
         csrf_token,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Password change handler (POST) (T043)
@@ -669,9 +650,7 @@ async fn password_change(
             csrf_token,
         };
 
-        return Ok(Html(template.render().map_err(|e| {
-            AppError::Internal(format!("Template error: {}", e))
-        })?));
+        return crate::core::render(&template);
     }
 
     // Call auth service to change password
@@ -714,9 +693,7 @@ async fn password_change(
                 totp_enabled: user.totp_enabled,
             };
 
-            Ok(Html(template.render().map_err(|e| {
-                AppError::Internal(format!("Template error: {}", e))
-            })?))
+            crate::core::render(&template)
         }
         Err(e) => {
             let csrf_token = generate_csrf(&state, auth.session_id);
@@ -737,9 +714,7 @@ async fn password_change(
                 csrf_token,
             };
 
-            Ok(Html(template.render().map_err(|e| {
-                AppError::Internal(format!("Template error: {}", e))
-            })?))
+            crate::core::render(&template)
         }
     }
 }
@@ -772,7 +747,7 @@ async fn sessions_page(State(state): State<AppState>, auth: AuthUser) -> AppResu
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     // Get all active sessions with details
-    let session_service = SessionService::new(state.db.clone(), SESSION_EXPIRY_DAYS);
+    let session_service = ServiceFactory::create_session_service(state.db.clone());
     let session_infos = session_service
         .list_for_user(auth.id, Some(auth.session_id))
         .await
@@ -818,9 +793,7 @@ async fn sessions_page(State(state): State<AppState>, auth: AuthUser) -> AppResu
         csrf_token,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Simple form with just CSRF token (for button-only forms)
@@ -843,7 +816,7 @@ async fn revoke_other_sessions(
 
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
 
-    let session_service = SessionService::new(state.db.clone(), 30);
+    let session_service = ServiceFactory::create_session_service(state.db.clone());
     session_service
         .revoke_others_for_user(auth.id, auth.session_id)
         .await
@@ -884,7 +857,7 @@ async fn revoke_single_session(
     let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
 
     // Verify session belongs to user before revoking
-    let session_service = SessionService::new(state.db.clone(), SESSION_EXPIRY_DAYS);
+    let session_service = ServiceFactory::create_session_service(state.db.clone());
     let sessions = session_service
         .list_for_user(auth.id, None)
         .await
@@ -1001,9 +974,7 @@ async fn security_events_page(
         pagination,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 // =============================================================================
@@ -1063,9 +1034,7 @@ async fn twofa_setup_page(
             already_enabled: true,
         };
 
-        return Ok(Html(template.render().map_err(|e| {
-            AppError::Internal(format!("Template error: {}", e))
-        })?));
+        return crate::core::render(&template);
     }
 
     // Generate 2FA setup (QR code and secret)
@@ -1100,9 +1069,7 @@ async fn twofa_setup_page(
         already_enabled: false,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// 2FA enable handler (POST) - Verifies TOTP code and enables 2FA
@@ -1146,9 +1113,7 @@ async fn twofa_enable(
             already_enabled: false,
         };
 
-        return Ok(Html(template.render().map_err(|e| {
-            AppError::Internal(format!("Template error: {}", e))
-        })?));
+        return crate::core::render(&template);
     }
 
     let totp_service = create_totp_service(&state)?;
@@ -1168,9 +1133,7 @@ async fn twofa_enable(
                 recovery_codes,
             };
 
-            Ok(Html(template.render().map_err(|e| {
-                AppError::Internal(format!("Template error: {}", e))
-            })?))
+            crate::core::render(&template)
         }
         Err(e) => {
             let error_msg = match e {
@@ -1197,9 +1160,7 @@ async fn twofa_enable(
                 already_enabled: false,
             };
 
-            Ok(Html(template.render().map_err(|e| {
-                AppError::Internal(format!("Template error: {}", e))
-            })?))
+            crate::core::render(&template)
         }
     }
 }
@@ -1277,9 +1238,7 @@ async fn twofa_recovery_page(
         new_codes: None,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// 2FA regenerate recovery codes form
@@ -1348,9 +1307,7 @@ async fn twofa_regenerate_codes(
             new_codes: None,
         };
 
-        return Ok(Html(template.render().map_err(|e| {
-            AppError::Internal(format!("Template error: {}", e))
-        })?));
+        return crate::core::render(&template);
     }
 
     // Regenerate codes
@@ -1380,9 +1337,7 @@ async fn twofa_regenerate_codes(
         new_codes: Some(response.codes),
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// 2FA disable page template
@@ -1437,9 +1392,7 @@ async fn twofa_disable_page(
         csrf_token,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// 2FA disable handler (POST)
@@ -1490,10 +1443,7 @@ async fn twofa_disable(
             csrf_token,
         };
 
-        let html = template
-            .render()
-            .map_err(|e| AppError::Internal(format!("Template error: {}", e)))?;
-        return Ok(Html(html).into_response());
+        return Ok(crate::core::render(&template)?.into_response());
     }
 
     // Verify TOTP/recovery code and disable
@@ -1522,10 +1472,7 @@ async fn twofa_disable(
                 csrf_token,
             };
 
-            let html = template
-                .render()
-                .map_err(|e| AppError::Internal(format!("Template error: {}", e)))?;
-            Ok(Html(html).into_response())
+            Ok(crate::core::render(&template)?.into_response())
         }
     }
 }
@@ -1586,9 +1533,7 @@ async fn email_change_page(
         csrf_token,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Email change handler (POST) (T035)
@@ -1637,9 +1582,7 @@ async fn email_change(
             csrf_token,
         };
 
-        return Ok(Html(template.render().map_err(|e| {
-            AppError::Internal(format!("Template error: {}", e))
-        })?));
+        return crate::core::render(&template);
     }
 
     // Call auth service - use generic message to prevent enumeration (T036)
@@ -1670,9 +1613,7 @@ async fn email_change(
         csrf_token,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 // =============================================================================
@@ -1726,9 +1667,7 @@ async fn delete_account_page(
         csrf_token,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Delete account handler (POST) (T070)
@@ -1750,12 +1689,7 @@ async fn delete_account(
     };
 
     // Store the content choice preference
-    sqlx::query("UPDATE users SET deletion_content_choice = $1, updated_at = NOW() WHERE id = $2")
-        .bind(content_choice)
-        .bind(auth.id)
-        .execute(&state.db)
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to save content choice: {}", e)))?;
+    UserService::set_deletion_content_choice(&state.db, auth.id, content_choice).await?;
 
     let auth_service = create_auth_service(&state);
     match auth_service
@@ -1786,9 +1720,7 @@ async fn delete_account(
                 csrf_token: generate_csrf(&state, auth.session_id),
             };
 
-            Ok(Html(template.render().map_err(|e| {
-                AppError::Internal(format!("Template error: {}", e))
-            })?))
+            crate::core::render(&template)
         }
         Err(e) => {
             let csrf_token = generate_csrf(&state, auth.session_id);
@@ -1801,9 +1733,7 @@ async fn delete_account(
                 csrf_token,
             };
 
-            Ok(Html(template.render().map_err(|e| {
-                AppError::Internal(format!("Template error: {}", e))
-            })?))
+            crate::core::render(&template)
         }
     }
 }
@@ -1873,9 +1803,7 @@ async fn privacy_page(State(state): State<AppState>, auth: AuthUser) -> AppResul
         csrf_token,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Federation toggle handler (POST) (T021)
@@ -1898,13 +1826,7 @@ async fn toggle_federation(
     let new_state = !user.federation_enabled;
 
     // Update federation status
-    sqlx::query!(
-        "UPDATE users SET federation_enabled = $1, updated_at = NOW() WHERE id = $2",
-        new_state,
-        auth.id
-    )
-    .execute(&state.db)
-    .await?;
+    UserService::update_federation_enabled(&state.db, auth.id, new_state).await?;
 
     // Log the change
     let event_type = if new_state {
