@@ -19,6 +19,7 @@ use std::{
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
+use tokio::sync::Semaphore;
 
 /// Rate limit error response body
 #[derive(Debug, Serialize)]
@@ -207,7 +208,7 @@ impl SimpleRateLimiter {
         self.maybe_cleanup();
 
         let now = Instant::now();
-        let mut entries = self.entries.write().unwrap();
+        let mut entries = self.entries.write().unwrap_or_else(|e| e.into_inner());
         let entry = entries.entry(ip).or_insert_with(|| RateLimitEntry {
             count: 0,
             window_start: now,
@@ -240,7 +241,7 @@ impl SimpleRateLimiter {
         self.maybe_cleanup();
 
         let now = Instant::now();
-        let entries = self.entries.read().unwrap();
+        let entries = self.entries.read().unwrap_or_else(|e| e.into_inner());
 
         if let Some(entry) = entries.get(&ip) {
             // Check if window has expired
@@ -263,7 +264,7 @@ impl SimpleRateLimiter {
     /// Use this after processing a request that failed (e.g., auth failure)
     pub fn record_failure(&self, ip: IpAddr) {
         let now = Instant::now();
-        let mut entries = self.entries.write().unwrap();
+        let mut entries = self.entries.write().unwrap_or_else(|e| e.into_inner());
         let entry = entries.entry(ip).or_insert_with(|| RateLimitEntry {
             count: 0,
             window_start: now,
@@ -291,7 +292,7 @@ impl SimpleRateLimiter {
 
     /// Remove expired entries to prevent memory growth
     fn cleanup_expired(&self, now: Instant) {
-        let mut entries = self.entries.write().unwrap();
+        let mut entries = self.entries.write().unwrap_or_else(|e| e.into_inner());
         entries.retain(|_ip, entry| now.duration_since(entry.window_start) < self.window);
     }
 
@@ -354,7 +355,7 @@ impl AccountRateLimiter {
         self.maybe_cleanup();
 
         let now = Instant::now();
-        let entries = self.entries.read().unwrap();
+        let entries = self.entries.read().unwrap_or_else(|e| e.into_inner());
 
         if let Some(entry) = entries.get(account) {
             if now.duration_since(entry.window_start) >= self.window {
@@ -373,7 +374,7 @@ impl AccountRateLimiter {
     /// Record a failed attempt for an account
     pub fn record_failure(&self, account: &str) {
         let now = Instant::now();
-        let mut entries = self.entries.write().unwrap();
+        let mut entries = self.entries.write().unwrap_or_else(|e| e.into_inner());
         let entry = entries
             .entry(account.to_lowercase())
             .or_insert_with(|| RateLimitEntry {
@@ -395,7 +396,7 @@ impl AccountRateLimiter {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if count % CLEANUP_INTERVAL == 0 {
             let now = Instant::now();
-            let mut entries = self.entries.write().unwrap();
+            let mut entries = self.entries.write().unwrap_or_else(|e| e.into_inner());
             entries.retain(|_k, entry| now.duration_since(entry.window_start) < self.window);
         }
     }
@@ -565,6 +566,42 @@ pub fn rate_limit_response(limit_type: RateLimitType, retry_after_seconds: u64) 
     response
 }
 
+/// Caps in-flight best-effort rate-limit log writes so a request flood cannot
+/// spawn unbounded DB-writing tasks.
+static LOG_PERMITS: Semaphore = Semaphore::const_new(128);
+
+/// Spawn a best-effort, non-blocking rate-limit log write, bounded by `LOG_PERMITS`.
+/// Events are dropped (not logged) once the in-flight cap is reached.
+#[allow(clippy::too_many_arguments)]
+fn spawn_log_event(
+    db: PgPool,
+    ip: Option<IpAddr>,
+    user_id: Option<uuid::Uuid>,
+    endpoint: String,
+    limit_type: RateLimitType,
+    retry_after: u64,
+    limit: u32,
+    window_seconds: u64,
+) {
+    let Ok(permit) = LOG_PERMITS.try_acquire() else {
+        return;
+    };
+    tokio::spawn(async move {
+        let _permit = permit;
+        log_rate_limit_event(
+            &db,
+            ip,
+            user_id,
+            &endpoint,
+            limit_type,
+            retry_after,
+            limit,
+            window_seconds,
+        )
+        .await;
+    });
+}
+
 /// Log a rate limit event to the security_events table
 #[allow(clippy::too_many_arguments)]
 pub async fn log_rate_limit_event(
@@ -680,23 +717,16 @@ where
             // This prevents processing requests from already-blocked IPs
             if let Err(retry_after) = state.auth.is_limited(client_ip) {
                 // Already at limit - block without incrementing counter
-                let db = state.db.clone();
-                let limit = state.auth.limit();
-                let window = state.auth.window_seconds();
-                let endpoint_clone = endpoint.clone();
-                tokio::spawn(async move {
-                    log_rate_limit_event(
-                        &db,
-                        Some(client_ip),
-                        None,
-                        &endpoint_clone,
-                        RateLimitType::Auth,
-                        retry_after,
-                        limit,
-                        window,
-                    )
-                    .await;
-                });
+                spawn_log_event(
+                    state.db.clone(),
+                    Some(client_ip),
+                    None,
+                    endpoint.clone(),
+                    RateLimitType::Auth,
+                    retry_after,
+                    state.auth.limit(),
+                    state.auth.window_seconds(),
+                );
 
                 return Ok(rate_limit_response(RateLimitType::Auth, retry_after));
             }
@@ -715,22 +745,16 @@ where
                 // Check if this failure pushed them over the limit
                 // (for logging purposes - the response is already generated)
                 if let Err(retry_after) = state.auth.is_limited(client_ip) {
-                    let db = state.db.clone();
-                    let limit = state.auth.limit();
-                    let window = state.auth.window_seconds();
-                    tokio::spawn(async move {
-                        log_rate_limit_event(
-                            &db,
-                            Some(client_ip),
-                            None,
-                            &endpoint,
-                            RateLimitType::Auth,
-                            retry_after,
-                            limit,
-                            window,
-                        )
-                        .await;
-                    });
+                    spawn_log_event(
+                        state.db.clone(),
+                        Some(client_ip),
+                        None,
+                        endpoint.clone(),
+                        RateLimitType::Auth,
+                        retry_after,
+                        state.auth.limit(),
+                        state.auth.window_seconds(),
+                    );
                 }
             }
 
@@ -817,22 +841,16 @@ where
                 Ok(()) => inner.call(request).await,
                 Err(retry_after) => {
                     // Log the rate limit event asynchronously
-                    let db = state.db.clone();
-                    let limit = state.auth.limit();
-                    let window = state.auth.window_seconds();
-                    tokio::spawn(async move {
-                        log_rate_limit_event(
-                            &db,
-                            Some(client_ip),
-                            None,
-                            &endpoint,
-                            RateLimitType::Auth,
-                            retry_after,
-                            limit,
-                            window,
-                        )
-                        .await;
-                    });
+                    spawn_log_event(
+                        state.db.clone(),
+                        Some(client_ip),
+                        None,
+                        endpoint.clone(),
+                        RateLimitType::Auth,
+                        retry_after,
+                        state.auth.limit(),
+                        state.auth.window_seconds(),
+                    );
 
                     Ok(rate_limit_response(RateLimitType::Auth, retry_after))
                 }
@@ -914,22 +932,16 @@ where
             match state.export.check(client_ip) {
                 Ok(()) => inner.call(request).await,
                 Err(retry_after) => {
-                    let db = state.db.clone();
-                    let limit = state.export.limit();
-                    let window = state.export.window_seconds();
-                    tokio::spawn(async move {
-                        log_rate_limit_event(
-                            &db,
-                            Some(client_ip),
-                            None,
-                            &endpoint,
-                            RateLimitType::Export,
-                            retry_after,
-                            limit,
-                            window,
-                        )
-                        .await;
-                    });
+                    spawn_log_event(
+                        state.db.clone(),
+                        Some(client_ip),
+                        None,
+                        endpoint.clone(),
+                        RateLimitType::Export,
+                        retry_after,
+                        state.export.limit(),
+                        state.export.window_seconds(),
+                    );
 
                     Ok(rate_limit_response(RateLimitType::Export, retry_after))
                 }
@@ -1007,22 +1019,16 @@ where
             match state.search.check(client_ip) {
                 Ok(()) => inner.call(request).await,
                 Err(retry_after) => {
-                    let db = state.db.clone();
-                    let limit = state.search.limit();
-                    let window = state.search.window_seconds();
-                    tokio::spawn(async move {
-                        log_rate_limit_event(
-                            &db,
-                            Some(client_ip),
-                            None,
-                            &endpoint,
-                            RateLimitType::Search,
-                            retry_after,
-                            limit,
-                            window,
-                        )
-                        .await;
-                    });
+                    spawn_log_event(
+                        state.db.clone(),
+                        Some(client_ip),
+                        None,
+                        endpoint.clone(),
+                        RateLimitType::Search,
+                        retry_after,
+                        state.search.limit(),
+                        state.search.window_seconds(),
+                    );
 
                     Ok(rate_limit_response(RateLimitType::Search, retry_after))
                 }
@@ -1100,22 +1106,16 @@ where
             match state.upload.check(client_ip) {
                 Ok(()) => inner.call(request).await,
                 Err(retry_after) => {
-                    let db = state.db.clone();
-                    let limit = state.upload.limit();
-                    let window = state.upload.window_seconds();
-                    tokio::spawn(async move {
-                        log_rate_limit_event(
-                            &db,
-                            Some(client_ip),
-                            None,
-                            &endpoint,
-                            RateLimitType::Upload,
-                            retry_after,
-                            limit,
-                            window,
-                        )
-                        .await;
-                    });
+                    spawn_log_event(
+                        state.db.clone(),
+                        Some(client_ip),
+                        None,
+                        endpoint.clone(),
+                        RateLimitType::Upload,
+                        retry_after,
+                        state.upload.limit(),
+                        state.upload.window_seconds(),
+                    );
 
                     Ok(rate_limit_response(RateLimitType::Upload, retry_after))
                 }
