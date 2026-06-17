@@ -50,7 +50,8 @@ async fn test_set_primary_image_is_scoped_to_recipe() {
         .expect("insert image");
 
         // Cross-recipe call (image_b does not belong to recipe_a) must fail.
-        let cross = oppskrift::services::ImageService::set_primary(&ctx.db, recipe_a, image_b).await;
+        let cross =
+            oppskrift::services::ImageService::set_primary(&ctx.db, recipe_a, image_b).await;
         assert!(
             cross.is_err(),
             "set_primary across recipes must not succeed (IDOR)"
@@ -64,11 +65,17 @@ async fn test_set_primary_image_is_scoped_to_recipe() {
                 .await
                 .expect("image still exists");
         assert!(still_primary, "image B must be unchanged");
-        assert_eq!(owner_recipe, recipe_b, "image B must still belong to recipe B");
+        assert_eq!(
+            owner_recipe, recipe_b,
+            "image B must still belong to recipe B"
+        );
 
         // The legitimate owner's call (correct recipe) succeeds.
         let ok = oppskrift::services::ImageService::set_primary(&ctx.db, recipe_b, image_b).await;
-        assert!(ok.is_ok(), "owner setting primary on their own image should work");
+        assert!(
+            ok.is_ok(),
+            "owner setting primary on their own image should work"
+        );
     })
     .await;
 }
