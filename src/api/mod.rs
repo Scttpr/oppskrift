@@ -4,6 +4,7 @@ pub mod account;
 pub mod activitypub;
 pub mod auth;
 pub mod books;
+pub mod engagement;
 pub mod feeds;
 pub mod groups;
 pub mod middleware;

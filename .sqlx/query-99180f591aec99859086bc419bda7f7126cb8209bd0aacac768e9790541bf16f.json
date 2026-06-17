@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO recipe_ratings (recipe_id, user_id, value)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (recipe_id, user_id)\n            DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "99180f591aec99859086bc419bda7f7126cb8209bd0aacac768e9790541bf16f"
+}

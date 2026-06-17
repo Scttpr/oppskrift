@@ -45,7 +45,8 @@ pub fn routes() -> Router<AppState> {
             "/{id}/permissions",
             get(list_permissions).post(grant_permission),
         )
-        .route("/{id}/permissions/{perm_id}", delete(revoke_permission));
+        .route("/{id}/permissions/{perm_id}", delete(revoke_permission))
+        .merge(crate::api::engagement::routes());
 
     upload_routes.merge(standard_routes)
 }
@@ -76,7 +77,8 @@ pub fn routes_with_rate_limit(rate_limiter: RateLimiterState) -> Router<AppState
             "/{id}/permissions",
             get(list_permissions).post(grant_permission),
         )
-        .route("/{id}/permissions/{perm_id}", delete(revoke_permission));
+        .route("/{id}/permissions/{perm_id}", delete(revoke_permission))
+        .merge(crate::api::engagement::routes());
 
     // Merge with upload routes taking precedence for POST
     upload_routes.merge(standard_routes)
