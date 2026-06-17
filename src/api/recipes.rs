@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Multipart, Path, Query, State},
+    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     routing::{delete, get, post},
     Json, Router,
@@ -21,22 +21,32 @@ use crate::models::{GrantPermissionRequest, Permission, PermissionListResponse, 
 use crate::services::{ImageService, PermissionService, RecipeService, UserService};
 use crate::AppState;
 
+/// Maximum upload size for recipe images (8 MB)
+const MAX_UPLOAD_SIZE: usize = 8 * 1024 * 1024;
+
 /// Recipe API routes (without rate limiting, for tests)
 pub fn routes() -> Router<AppState> {
-    Router::new()
+    // Image upload limited to MAX_UPLOAD_SIZE
+    let upload_routes = Router::new()
+        .route("/{id}/images", post(upload_image))
+        .layer(DefaultBodyLimit::max(MAX_UPLOAD_SIZE));
+
+    let standard_routes = Router::new()
         .route("/", get(list_recipes).post(create_recipe))
         .route(
             "/{id}",
             get(get_recipe).put(update_recipe).delete(delete_recipe),
         )
-        .route("/{id}/images", get(list_images).post(upload_image))
+        .route("/{id}/images", get(list_images))
         .route("/{id}/images/{image_id}", delete(delete_image))
         .route("/{id}/images/{image_id}/primary", post(set_primary_image))
         .route(
             "/{id}/permissions",
             get(list_permissions).post(grant_permission),
         )
-        .route("/{id}/permissions/{perm_id}", delete(revoke_permission))
+        .route("/{id}/permissions/{perm_id}", delete(revoke_permission));
+
+    upload_routes.merge(standard_routes)
 }
 
 /// Recipe API routes with rate limiting applied
@@ -47,6 +57,7 @@ pub fn routes_with_rate_limit(rate_limiter: RateLimiterState) -> Router<AppState
     // Upload endpoints with rate limiting
     let upload_routes = Router::new()
         .route("/{id}/images", post(upload_image))
+        .layer(DefaultBodyLimit::max(MAX_UPLOAD_SIZE))
         .layer(UploadRateLimitLayer::new(rate_limiter));
 
     // Routes without special rate limiting
@@ -105,7 +116,13 @@ async fn create_recipe(
     auth: AuthUser,
     Json(input): Json<CreateRecipeRequest>,
 ) -> AppResult<(StatusCode, Json<RecipeResponse>)> {
-    // Validate ingredients and instructions
+    use validator::Validate;
+
+    // Validate recipe fields (title length, etc.), ingredients and instructions
+    input
+        .recipe
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
     RecipeService::validate_ingredients(&input.ingredients)?;
     RecipeService::validate_instructions(&input.instructions)?;
 
@@ -113,24 +130,26 @@ async fn create_recipe(
     let base_url =
         std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
-    // Create the recipe
-    let recipe = RecipeService::create(&state.db, auth.id, input.recipe, &base_url).await?;
+    // Persist recipe, ingredients, and instructions atomically
+    let mut tx = state.db.begin().await?;
 
-    // Add ingredients
+    let recipe = RecipeService::create(&mut tx, auth.id, input.recipe, &base_url).await?;
+
     let ingredients = if !input.ingredients.is_empty() {
-        RecipeService::add_ingredients(&state.db, recipe.id, input.ingredients).await?
+        RecipeService::add_ingredients(&mut tx, recipe.id, input.ingredients).await?
     } else {
         vec![]
     };
 
-    // Add instructions
     let instructions = if !input.instructions.is_empty() {
-        RecipeService::add_instructions(&state.db, recipe.id, input.instructions).await?
+        RecipeService::add_instructions(&mut tx, recipe.id, input.instructions).await?
     } else {
         vec![]
     };
 
-    // Create ActivityPub activity for federation
+    tx.commit().await?;
+
+    // Create ActivityPub activity for federation (after commit)
     let _ = crate::services::ActivityService::create_recipe_activity(
         &state.db, auth.id, recipe.id, &base_url,
     )
@@ -202,26 +221,50 @@ async fn update_recipe(
     auth: AuthUser,
     Json(input): Json<UpdateRecipeRequest>,
 ) -> AppResult<Json<RecipeResponse>> {
+    use validator::Validate;
+
     // Check edit permission (returns 404 if not authorized)
     RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
 
-    // Update recipe
-    let recipe = RecipeService::update(&state.db, id, input.recipe).await?;
+    // Validate recipe fields and any provided ingredients/instructions before the tx
+    input
+        .recipe
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    if let Some(ref new_ingredients) = input.ingredients {
+        RecipeService::validate_ingredients(new_ingredients)?;
+    }
+    if let Some(ref new_instructions) = input.instructions {
+        RecipeService::validate_instructions(new_instructions)?;
+    }
 
-    // Update ingredients if provided
+    // Update recipe + replace provided child collections atomically
+    let mut tx = state.db.begin().await?;
+
+    let recipe = RecipeService::update(&mut tx, id, input.recipe).await?;
+
     let ingredients = if let Some(new_ingredients) = input.ingredients {
-        RecipeService::validate_ingredients(&new_ingredients)?;
-        RecipeService::replace_ingredients(&state.db, id, new_ingredients).await?
+        Some(RecipeService::replace_ingredients(&mut tx, id, new_ingredients).await?)
     } else {
-        RecipeService::get_ingredients(&state.db, id).await?
+        None
     };
 
-    // Update instructions if provided
     let instructions = if let Some(new_instructions) = input.instructions {
-        RecipeService::validate_instructions(&new_instructions)?;
-        RecipeService::replace_instructions(&state.db, id, new_instructions).await?
+        Some(RecipeService::replace_instructions(&mut tx, id, new_instructions).await?)
     } else {
-        RecipeService::get_instructions(&state.db, id).await?
+        None
+    };
+
+    tx.commit().await?;
+
+    // For collections that weren't replaced, read the current state after commit
+    let ingredients = match ingredients {
+        Some(ingredients) => ingredients,
+        None => RecipeService::get_ingredients(&state.db, id).await?,
+    };
+    let instructions = match instructions {
+        Some(instructions) => instructions,
+        None => RecipeService::get_instructions(&state.db, id).await?,
     };
 
     Ok(Json(RecipeResponse {
@@ -294,9 +337,16 @@ async fn upload_image(
                 );
             }
             "alt_text" => {
-                alt_text = Some(field.text().await.map_err(|e| {
-                    AppError::BadRequest(format!("Failed to read alt_text: {}", e))
-                })?);
+                let value = field
+                    .text()
+                    .await
+                    .map_err(|e| AppError::BadRequest(format!("Failed to read alt_text: {}", e)))?;
+                if value.len() > 1000 {
+                    return Err(AppError::BadRequest(
+                        "alt_text must be at most 1000 characters".to_string(),
+                    ));
+                }
+                alt_text = Some(value);
             }
             "is_primary" => {
                 let value = field.text().await.unwrap_or_default();

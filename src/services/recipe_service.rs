@@ -46,7 +46,7 @@ impl RecipeService {
 
     /// Create a new recipe
     pub async fn create(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
         author_id: Uuid,
         input: CreateRecipe,
         base_url: &str,
@@ -78,7 +78,7 @@ impl RecipeService {
             input.difficulty as Option<Difficulty>,
             ap_id
         )
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await
         .map_err(AppError::from)?;
 
@@ -185,7 +185,11 @@ impl RecipeService {
     }
 
     /// Update a recipe
-    pub async fn update(pool: &PgPool, id: Uuid, input: UpdateRecipe) -> AppResult<Recipe> {
+    pub async fn update(
+        conn: &mut sqlx::PgConnection,
+        id: Uuid,
+        input: UpdateRecipe,
+    ) -> AppResult<Recipe> {
         let recipe = sqlx::query_as!(
             Recipe,
             r#"
@@ -216,7 +220,7 @@ impl RecipeService {
             input.servings,
             input.difficulty as Option<Difficulty>
         )
-        .fetch_optional(pool)
+        .fetch_optional(&mut *conn)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("Recipe {} not found", id)))?;
 
@@ -379,7 +383,7 @@ impl RecipeService {
 
     /// Add ingredients to a recipe (batch)
     pub async fn add_ingredients(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
         recipe_id: Uuid,
         ingredients: Vec<CreateIngredient>,
     ) -> AppResult<Vec<Ingredient>> {
@@ -402,7 +406,7 @@ impl RecipeService {
                 ingredient.name,
                 ingredient.notes
             )
-            .fetch_one(pool)
+            .fetch_one(&mut *conn)
             .await?;
 
             result.push(created);
@@ -413,7 +417,7 @@ impl RecipeService {
 
     /// Add instruction steps to a recipe (batch)
     pub async fn add_instructions(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
         recipe_id: Uuid,
         steps: Vec<CreateInstructionStep>,
     ) -> AppResult<Vec<InstructionStep>> {
@@ -435,7 +439,7 @@ impl RecipeService {
                 step.image_url,
                 step.duration_min
             )
-            .fetch_one(pool)
+            .fetch_one(&mut *conn)
             .await?;
 
             result.push(created);
@@ -446,22 +450,22 @@ impl RecipeService {
 
     /// Replace all ingredients for a recipe
     pub async fn replace_ingredients(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
         recipe_id: Uuid,
         ingredients: Vec<CreateIngredient>,
     ) -> AppResult<Vec<Ingredient>> {
         // Delete existing ingredients
         sqlx::query!("DELETE FROM ingredients WHERE recipe_id = $1", recipe_id)
-            .execute(pool)
+            .execute(&mut *conn)
             .await?;
 
         // Add new ingredients
-        Self::add_ingredients(pool, recipe_id, ingredients).await
+        Self::add_ingredients(&mut *conn, recipe_id, ingredients).await
     }
 
     /// Replace all instruction steps for a recipe
     pub async fn replace_instructions(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
         recipe_id: Uuid,
         steps: Vec<CreateInstructionStep>,
     ) -> AppResult<Vec<InstructionStep>> {
@@ -470,11 +474,11 @@ impl RecipeService {
             "DELETE FROM instruction_steps WHERE recipe_id = $1",
             recipe_id
         )
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
 
         // Add new steps
-        Self::add_instructions(pool, recipe_id, steps).await
+        Self::add_instructions(&mut *conn, recipe_id, steps).await
     }
 }
 
