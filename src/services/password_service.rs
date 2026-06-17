@@ -294,7 +294,10 @@ mod tests {
         let service = PasswordService::new(false);
         let password = "SecurePassword123";
 
-        let hash = service.hash(password).await.expect("Hashing should succeed");
+        let hash = service
+            .hash(password)
+            .await
+            .expect("Hashing should succeed");
         assert!(hash.starts_with("$argon2id$"));
 
         assert!(service
