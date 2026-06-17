@@ -36,6 +36,7 @@
 @layer base {
   html {
     background-color: var(--color-cream);
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6, .font-display {
@@ -95,11 +96,20 @@
     @apply absolute left-0 bottom-0 h-[3px] w-12 rounded-full bg-primary-500;
   }
 
-  /* Warm decorative gradient for hero / feature backdrops */
+  /* Warm decorative gradient for the hero — a soft, symmetric coral glow at
+     the top that fades smoothly into the cream page. */
   .hero-warm {
     background:
-      radial-gradient(55rem 28rem at 78% -12%, rgba(196, 113, 74, 0.18), transparent 60%),
-      radial-gradient(40rem 24rem at -5% 8%, rgba(26, 58, 82, 0.10), transparent 55%);
+      radial-gradient(70rem 30rem at 50% -28%, rgba(196, 113, 74, 0.20), transparent 62%),
+      linear-gradient(180deg, rgba(245, 241, 232, 0.9), rgba(250, 247, 242, 0) 75%);
+  }
+
+  /* Full-bleed: break a section out of the centered container to span the
+     viewport width without causing horizontal overflow. */
+  .full-bleed {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
   }
 }
 
