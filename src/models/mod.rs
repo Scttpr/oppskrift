@@ -21,6 +21,7 @@ pub mod recipe_image;
 pub mod recovery_code;
 pub mod saved_recipe;
 pub mod session;
+pub mod tag;
 pub mod two_factor;
 pub mod user;
 
@@ -48,6 +49,7 @@ pub use recovery_code::{
 };
 pub use saved_recipe::SavedRecipe;
 pub use session::{SessionInfo, SessionListResponse};
+pub use tag::{slugify, Tag, TagWithCount, MAX_TAGS_PER_RECIPE, MAX_TAG_NAME_LEN};
 pub use two_factor::{
     Complete2FALoginRequest, DisableTwoFactorRequest, EnableTwoFactorRequest,
     TwoFactorEnabledResponse, TwoFactorSetupResponse, TwoFactorStatusResponse,

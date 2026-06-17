@@ -12,6 +12,7 @@ pub mod oembed;
 pub mod openapi;
 pub mod recipes;
 pub mod social;
+pub mod tags;
 pub mod users;
 pub mod webfinger;
 
@@ -29,6 +30,7 @@ pub fn routes() -> Router<AppState> {
         .nest("/recipes", recipes::routes())
         .nest("/books", books::routes())
         .nest("/groups", groups::routes())
+        .nest("/tags", tags::routes())
         .merge(social::routes())
 }
 
@@ -44,6 +46,7 @@ pub fn routes_with_rate_limit(rate_limiter: RateLimiterState) -> Router<AppState
         .nest("/recipes", recipes::routes_with_rate_limit(rate_limiter))
         .nest("/books", books::routes())
         .nest("/groups", groups::routes())
+        .nest("/tags", tags::routes())
         .merge(social::routes())
 }
 

@@ -17,7 +17,7 @@
             </span>
             <span>
                 {% if let Some(qty) = ingredient.quantity %}
-                <span class="font-medium">{{ qty }}</span>
+                <span class="ingredient-qty font-medium" data-base-qty="{{ qty }}">{{ qty }}</span>
                 {% endif %}
 
                 {% if let Some(unit) = ingredient.unit %}

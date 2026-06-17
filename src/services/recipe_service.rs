@@ -342,6 +342,65 @@ impl RecipeService {
         ))
     }
 
+    /// Search public recipes by title and description (full-text)
+    ///
+    /// Uses the `search_vector` GIN index. The query is parsed with
+    /// `websearch_to_tsquery`, which tolerates arbitrary user input (quotes,
+    /// `or`, `-`) without raising syntax errors. Results are ordered by
+    /// relevance, then recency.
+    pub async fn search_public(
+        pool: &PgPool,
+        query: &str,
+        params: &PaginationParams,
+    ) -> AppResult<PaginatedResponse<RecipeSummary>> {
+        let limit = params.limit();
+        let offset = params.offset();
+
+        let recipes = sqlx::query_as!(
+            RecipeSummary,
+            r#"
+            SELECT
+                r.id, r.author_id, r.title, r.description,
+                r.prep_time_min, r.cook_time_min,
+                r.difficulty as "difficulty: Difficulty",
+                r.created_at,
+                ri.url as "primary_image_url?"
+            FROM recipes r
+            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
+            WHERE r.visibility = 'public'
+              AND r.search_vector @@ websearch_to_tsquery('english', $1)
+            ORDER BY ts_rank(r.search_vector, websearch_to_tsquery('english', $1)) DESC,
+                     r.created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+            query,
+            limit as i64,
+            offset as i64
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let total: i64 = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*)
+            FROM recipes
+            WHERE visibility = 'public'
+              AND search_vector @@ websearch_to_tsquery('english', $1)
+            "#,
+            query
+        )
+        .fetch_one(pool)
+        .await?
+        .unwrap_or(0);
+
+        Ok(PaginatedResponse::new(
+            recipes,
+            params.page,
+            limit,
+            total as u64,
+        ))
+    }
+
     /// Get ingredients for a recipe
     pub async fn get_ingredients(pool: &PgPool, recipe_id: Uuid) -> AppResult<Vec<Ingredient>> {
         let ingredients = sqlx::query_as!(

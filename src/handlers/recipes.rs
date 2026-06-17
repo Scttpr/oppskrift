@@ -9,15 +9,15 @@ use uuid::Uuid;
 
 use crate::api::middleware::{AuthUser, OptionalAuthUser};
 use crate::core::error::AppResult;
-use crate::core::pagination::{PaginationMeta, PaginationParams};
+use crate::core::pagination::{PaginatedResponse, PaginationMeta, PaginationParams};
 use crate::core::schema_org::SchemaOrgRecipe;
 use crate::models::{
     CommentWithAuthor, Ingredient, InstructionStep, RatingSummary, Recipe, RecipeBookSummary,
-    RecipeImage, RecipeSummary, User,
+    RecipeImage, RecipeSummary, Tag, User,
 };
 use crate::services::{
     BookService, CommentService, ImageService, RatingService, RecipeService, SavedRecipeService,
-    UserService,
+    TagService, UserService,
 };
 use crate::AppState;
 
@@ -26,6 +26,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_recipes_page))
         .route("/new", get(new_recipe_page))
+        .route("/search", get(search_recipes_page))
         .route("/{id}", get(view_recipe_page))
         .route("/{id}/edit", get(edit_recipe_page))
 }
@@ -62,16 +63,60 @@ async fn list_recipes_page(
     crate::core::render(&template)
 }
 
+/// Recipe search page template
+#[derive(Template)]
+#[template(path = "recipes/search.html")]
+struct RecipeSearchTemplate {
+    query: String,
+    recipes: Vec<RecipeSummary>,
+    pagination: PaginationMeta,
+}
+
+/// Query parameters for the search page (term + page)
+#[derive(serde::Deserialize)]
+struct SearchPageParams {
+    #[serde(default)]
+    q: String,
+    #[serde(flatten)]
+    pagination: PaginationParams,
+}
+
+/// Recipe search page handler
+async fn search_recipes_page(
+    State(state): State<AppState>,
+    Query(params): Query<SearchPageParams>,
+) -> AppResult<Html<String>> {
+    let query = params.q.trim().to_string();
+
+    let results = if query.is_empty() {
+        PaginatedResponse::new(vec![], params.pagination.page, params.pagination.limit(), 0)
+    } else {
+        RecipeService::search_public(&state.db, &query, &params.pagination).await?
+    };
+
+    let template = RecipeSearchTemplate {
+        query,
+        recipes: results.data,
+        pagination: results.pagination,
+    };
+
+    crate::core::render(&template)
+}
+
 /// New recipe form template
 #[derive(Template)]
 #[template(path = "recipes/form.html")]
 struct NewRecipeTemplate {
     recipe: Option<Recipe>,
+    tags: String,
 }
 
 /// New recipe page handler
 async fn new_recipe_page() -> AppResult<Html<String>> {
-    let template = NewRecipeTemplate { recipe: None };
+    let template = NewRecipeTemplate {
+        recipe: None,
+        tags: String::new(),
+    };
 
     crate::core::render(&template)
 }
@@ -94,6 +139,7 @@ struct RecipeViewTemplate {
     is_saved: bool,
     rating: RatingSummary,
     comments: Vec<CommentWithAuthor>,
+    tags: Vec<Tag>,
 }
 
 /// View recipe page handler
@@ -110,6 +156,7 @@ async fn view_recipe_page(
     let ingredients = RecipeService::get_ingredients(&state.db, id).await?;
     let instructions = RecipeService::get_instructions(&state.db, id).await?;
     let images = ImageService::get_images(&state.db, id).await?;
+    let tags = TagService::get_recipe_tags(&state.db, id).await?;
     let primary_image = images.iter().find(|i| i.is_primary).cloned();
     let rating = RatingService::get_summary(&state.db, id, viewer_id).await?;
     let comments = CommentService::list_comments(&state.db, id).await?;
@@ -157,6 +204,7 @@ async fn view_recipe_page(
         is_saved,
         rating,
         comments,
+        tags,
     };
 
     crate::core::render(&template)
@@ -167,6 +215,7 @@ async fn view_recipe_page(
 #[template(path = "recipes/form.html")]
 struct EditRecipeTemplate {
     recipe: Option<Recipe>,
+    tags: String,
 }
 
 /// Edit recipe page handler
@@ -177,9 +226,16 @@ async fn edit_recipe_page(
 ) -> AppResult<Html<String>> {
     RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
     let recipe = RecipeService::get_by_id(&state.db, id).await?;
+    let tags = TagService::get_recipe_tags(&state.db, id)
+        .await?
+        .into_iter()
+        .map(|t| t.name)
+        .collect::<Vec<_>>()
+        .join(", ");
 
     let template = EditRecipeTemplate {
         recipe: Some(recipe),
+        tags,
     };
 
     crate::core::render(&template)
@@ -227,7 +283,10 @@ mod tests {
 
     #[test]
     fn test_new_recipe_template_renders() {
-        let template = NewRecipeTemplate { recipe: None };
+        let template = NewRecipeTemplate {
+            recipe: None,
+            tags: String::new(),
+        };
         let result = template.render();
         assert!(result.is_ok());
         let html = result.unwrap();
@@ -255,6 +314,7 @@ mod tests {
 
         let template = EditRecipeTemplate {
             recipe: Some(recipe),
+            tags: "dessert, quick".to_string(),
         };
         let result = template.render();
         assert!(result.is_ok());
@@ -298,6 +358,7 @@ mod tests {
                 user_rating: None,
             },
             comments: vec![],
+            tags: vec![],
         };
         let result = template.render();
         assert!(result.is_ok());
@@ -403,6 +464,7 @@ mod tests {
                 user_rating: None,
             },
             comments: vec![],
+            tags: vec![],
         };
         assert!(owner_template.render().is_ok());
 
@@ -426,6 +488,7 @@ mod tests {
                 user_rating: None,
             },
             comments: vec![],
+            tags: vec![],
         };
         assert!(guest_template.render().is_ok());
     }

@@ -194,7 +194,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                {{ servings }}
+                <span id="servings-display" data-base-servings="{{ servings }}">{{ servings }}</span>
             </span>
             {% endif %}
         </div>
@@ -204,6 +204,20 @@
         <p class="mt-4 text-lg text-gray-700 dark:text-gray-300">
             {{ desc }}
         </p>
+        {% endif %}
+
+        {# Tags #}
+        {% if !tags.is_empty() %}
+        <div class="mt-4 flex flex-wrap gap-2">
+            {% for tag in tags %}
+            <a
+                href="/tags/{{ tag.slug }}"
+                class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-primary-100 hover:text-primary-700 dark:hover:bg-primary-900 dark:hover:text-primary-200"
+            >
+                #{{ tag.name }}
+            </a>
+            {% endfor %}
+        </div>
         {% endif %}
     </header>
 
@@ -222,6 +236,27 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {# Ingredients Sidebar #}
         <aside class="lg:col-span-1">
+            {# Serving scaler #}
+            <div id="recipe-scaler" class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" role="group" aria-label="Scale ingredient quantities">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Adjust quantities</p>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" class="scale-btn px-2.5 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-factor="0.5">½×</button>
+                    <button type="button" class="scale-btn px-2.5 py-1 text-sm rounded-md border border-primary-500 bg-primary-50 dark:bg-primary-900 text-primary-700 dark:text-primary-200 font-medium" data-factor="1" aria-pressed="true">1×</button>
+                    <button type="button" class="scale-btn px-2.5 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-factor="2">2×</button>
+                    <button type="button" class="scale-btn px-2.5 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-factor="3">3×</button>
+                    <label class="sr-only" for="scale-custom">Custom multiplier</label>
+                    <input
+                        type="number"
+                        id="scale-custom"
+                        min="0.1"
+                        max="100"
+                        step="0.5"
+                        placeholder="custom ×"
+                        class="w-24 px-2 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    />
+                </div>
+            </div>
+
             {% include "components/ingredient_list.html" %}
         </aside>
 
@@ -572,6 +607,93 @@ async function removeFromBook(btn, bookId, recipeId, title) {
             } catch (e) { console.error(e); }
         });
     });
+})();
+
+// ---- Ingredient scaling ----
+(function () {
+    const scaler = document.getElementById('recipe-scaler');
+    if (!scaler) return;
+
+    const qtyEls = Array.from(document.querySelectorAll('.ingredient-qty'));
+    const servingsEl = document.getElementById('servings-display');
+    const buttons = Array.from(scaler.querySelectorAll('.scale-btn'));
+    const custom = document.getElementById('scale-custom');
+
+    // Common decimal -> unicode fraction map for tidy display.
+    const FRACTIONS = [
+        [0.125, '⅛'], [0.25, '¼'], [0.333, '⅓'], [0.375, '⅜'],
+        [0.5, '½'], [0.625, '⅝'], [0.667, '⅔'], [0.75, '¾'], [0.875, '⅞'],
+    ];
+
+    function formatQty(value) {
+        if (!isFinite(value)) return '';
+        const whole = Math.floor(value + 1e-9);
+        const frac = value - whole;
+        // Snap to a known fraction if close.
+        for (const [dec, glyph] of FRACTIONS) {
+            if (Math.abs(frac - dec) < 0.02) {
+                return whole > 0 ? `${whole} ${glyph}` : glyph;
+            }
+        }
+        // Otherwise round to 2 decimals and strip trailing zeros.
+        const rounded = Math.round(value * 100) / 100;
+        return String(rounded);
+    }
+
+    function applyFactor(factor) {
+        qtyEls.forEach((el) => {
+            const base = parseFloat(el.dataset.baseQty);
+            if (!isNaN(base)) {
+                el.textContent = formatQty(base * factor);
+            }
+        });
+        if (servingsEl) {
+            const baseStr = servingsEl.dataset.baseServings || '';
+            const match = baseStr.match(/[\d]+(?:\.[\d]+)?/);
+            if (match) {
+                const scaled = formatQty(parseFloat(match[0]) * factor);
+                servingsEl.textContent = baseStr.replace(match[0], scaled);
+            }
+        }
+    }
+
+    function setActive(activeBtn) {
+        buttons.forEach((b) => {
+            const on = b === activeBtn;
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            b.classList.toggle('border-primary-500', on);
+            b.classList.toggle('bg-primary-50', on);
+            b.classList.toggle('dark:bg-primary-900', on);
+            b.classList.toggle('text-primary-700', on);
+            b.classList.toggle('dark:text-primary-200', on);
+            b.classList.toggle('font-medium', on);
+            b.classList.toggle('border-gray-300', !on);
+            b.classList.toggle('dark:border-gray-600', !on);
+            b.classList.toggle('bg-white', !on);
+            b.classList.toggle('dark:bg-gray-700', !on);
+            b.classList.toggle('text-gray-700', !on);
+            b.classList.toggle('dark:text-gray-300', !on);
+        });
+    }
+
+    buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const factor = parseFloat(btn.dataset.factor);
+            if (custom) custom.value = '';
+            setActive(btn);
+            applyFactor(factor);
+        });
+    });
+
+    if (custom) {
+        custom.addEventListener('input', () => {
+            const factor = parseFloat(custom.value);
+            if (!isNaN(factor) && factor > 0) {
+                setActive(null);
+                applyFactor(factor);
+            }
+        });
+    }
 })();
 </script>
 {% endblock %}
