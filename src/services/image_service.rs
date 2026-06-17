@@ -65,30 +65,37 @@ impl ImageService {
     }
 
     /// Process and resize image if needed
-    pub fn process_image(data: &[u8]) -> AppResult<(Vec<u8>, String)> {
-        let img = image::load_from_memory(data)
-            .map_err(|e| AppError::Validation(format!("Invalid image: {}", e)))?;
+    pub async fn process_image(data: &[u8]) -> AppResult<(Vec<u8>, String)> {
+        let data = data.to_vec();
 
-        let (width, height) = (img.width(), img.height());
+        // Image decode/resize/encode is CPU-bound; run off the async runtime.
+        tokio::task::spawn_blocking(move || {
+            let img = image::load_from_memory(&data)
+                .map_err(|e| AppError::Validation(format!("Invalid image: {}", e)))?;
 
-        // Resize if too large
-        let processed = if width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION {
-            img.resize(
-                MAX_IMAGE_DIMENSION,
-                MAX_IMAGE_DIMENSION,
-                FilterType::Lanczos3,
-            )
-        } else {
-            img
-        };
+            let (width, height) = (img.width(), img.height());
 
-        // Encode as WebP for optimal size
-        let mut output = Vec::new();
-        processed
-            .write_to(&mut Cursor::new(&mut output), ImageFormat::WebP)
-            .map_err(|e| AppError::Internal(format!("Failed to encode image: {}", e)))?;
+            // Resize if too large
+            let processed = if width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION {
+                img.resize(
+                    MAX_IMAGE_DIMENSION,
+                    MAX_IMAGE_DIMENSION,
+                    FilterType::Lanczos3,
+                )
+            } else {
+                img
+            };
 
-        Ok((output, "image/webp".to_string()))
+            // Encode as WebP for optimal size
+            let mut output = Vec::new();
+            processed
+                .write_to(&mut Cursor::new(&mut output), ImageFormat::WebP)
+                .map_err(|e| AppError::Internal(format!("Failed to encode image: {}", e)))?;
+
+            Ok((output, "image/webp".to_string()))
+        })
+        .await
+        .map_err(|e| AppError::Internal(format!("Image processing task failed: {}", e)))?
     }
 
     /// Upload an image for a recipe
@@ -104,7 +111,7 @@ impl ImageService {
         Self::validate_image_count(pool, recipe_id).await?;
 
         // Process the image
-        let (processed_data, content_type) = Self::process_image(&data)?;
+        let (processed_data, content_type) = Self::process_image(&data).await?;
 
         // Generate storage key
         let key = StorageClient::generate_image_key(recipe_id, "webp");

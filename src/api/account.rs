@@ -636,6 +636,7 @@ async fn disable_2fa(
     let password_valid = auth_service
         .password_service()
         .verify(&input.password, password_hash)
+        .await
         .map_err(|e| {
             tracing::error!(error = %e, "Password verification failed");
             AppError::Internal("Failed to verify password".to_string())
@@ -760,6 +761,7 @@ async fn regenerate_recovery_codes(
     let password_valid = auth_service
         .password_service()
         .verify(&input.password, password_hash)
+        .await
         .map_err(|e| {
             tracing::error!(error = %e, "Password verification failed");
             AppError::Internal("Failed to verify password".to_string())

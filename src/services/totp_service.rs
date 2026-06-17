@@ -196,7 +196,7 @@ impl TotpService {
         }
 
         // Generate recovery codes
-        let (codes, code_hashes) = self.generate_recovery_codes()?;
+        let (codes, code_hashes) = self.generate_recovery_codes().await?;
 
         // Start transaction
         let mut tx = self.pool.begin().await?;
@@ -363,34 +363,41 @@ impl TotpService {
         .fetch_all(&self.pool)
         .await?;
 
-        // Try to match against each code
-        for stored_code in codes {
-            if bcrypt::verify(&code, &stored_code.code_hash).unwrap_or(false) {
-                // Mark as used
-                sqlx::query("UPDATE recovery_codes SET used_at = NOW() WHERE id = $1")
-                    .bind(stored_code.id)
-                    .execute(&self.pool)
-                    .await?;
+        // bcrypt verification is CPU-bound; run the matching loop off the async runtime.
+        let matched_id = tokio::task::spawn_blocking(move || {
+            codes
+                .into_iter()
+                .find(|stored_code| bcrypt::verify(&code, &stored_code.code_hash).unwrap_or(false))
+                .map(|stored_code| stored_code.id)
+        })
+        .await
+        .map_err(|e| TotpError::Encryption(e.to_string()))?;
 
-                // Count remaining codes
-                let remaining: i64 = sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM recovery_codes WHERE user_id = $1 AND used_at IS NULL",
-                )
-                .bind(user_id)
-                .fetch_one(&self.pool)
+        if let Some(id) = matched_id {
+            // Mark as used
+            sqlx::query("UPDATE recovery_codes SET used_at = NOW() WHERE id = $1")
+                .bind(id)
+                .execute(&self.pool)
                 .await?;
 
-                // Log security event
-                AuditEvent::new("auth.2fa.recovery.used")
-                    .with_user(user_id)
-                    .with_context(ctx)
-                    .with_metadata("codes_remaining", &remaining.to_string())
-                    .warn()
-                    .persist(&self.pool)
-                    .await;
+            // Count remaining codes
+            let remaining: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM recovery_codes WHERE user_id = $1 AND used_at IS NULL",
+            )
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
 
-                return Ok(true);
-            }
+            // Log security event
+            AuditEvent::new("auth.2fa.recovery.used")
+                .with_user(user_id)
+                .with_context(ctx)
+                .with_metadata("codes_remaining", &remaining.to_string())
+                .warn()
+                .persist(&self.pool)
+                .await;
+
+            return Ok(true);
         }
 
         // No matching recovery code found
@@ -443,7 +450,7 @@ impl TotpService {
         }
 
         // Generate new codes
-        let (codes, code_hashes) = self.generate_recovery_codes()?;
+        let (codes, code_hashes) = self.generate_recovery_codes().await?;
 
         // Start transaction
         let mut tx = self.pool.begin().await?;
@@ -554,22 +561,27 @@ impl TotpService {
     /// Generate recovery codes
     ///
     /// Returns (plaintext_codes, bcrypt_hashes)
-    fn generate_recovery_codes(&self) -> Result<(Vec<String>, Vec<String>), TotpError> {
+    async fn generate_recovery_codes(&self) -> Result<(Vec<String>, Vec<String>), TotpError> {
         let mut codes = Vec::with_capacity(RECOVERY_CODE_COUNT);
-        let mut hashes = Vec::with_capacity(RECOVERY_CODE_COUNT);
+        let mut raw_codes = Vec::with_capacity(RECOVERY_CODE_COUNT);
 
         for _ in 0..RECOVERY_CODE_COUNT {
             // Generate random code
             let code = self.generate_recovery_code();
-            let display_code = format!("{}-{}", &code[0..4], &code[4..8]);
-
-            // Hash with bcrypt
-            let hash = bcrypt::hash(&code, bcrypt::DEFAULT_COST)
-                .map_err(|e| TotpError::Encryption(e.to_string()))?;
-
-            codes.push(display_code);
-            hashes.push(hash);
+            codes.push(format!("{}-{}", &code[0..4], &code[4..8]));
+            raw_codes.push(code);
         }
+
+        // bcrypt hashing is CPU-bound; run the hashing loop off the async runtime.
+        let hashes = tokio::task::spawn_blocking(move || {
+            raw_codes
+                .into_iter()
+                .map(|code| bcrypt::hash(&code, bcrypt::DEFAULT_COST))
+                .collect::<Result<Vec<String>, _>>()
+        })
+        .await
+        .map_err(|e| TotpError::Encryption(e.to_string()))?
+        .map_err(|e| TotpError::Encryption(e.to_string()))?;
 
         Ok((codes, hashes))
     }

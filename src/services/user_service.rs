@@ -75,7 +75,10 @@ impl UserService {
         let measurement_pref = input.measurement_pref.unwrap_or_default();
 
         // Generate RSA keypair for ActivityPub HTTP Signatures
-        let keypair = generate_rsa_keypair()?;
+        // RSA-2048 keygen is CPU-bound; run off the async runtime.
+        let keypair = tokio::task::spawn_blocking(generate_rsa_keypair)
+            .await
+            .map_err(|e| AppError::Internal(format!("RSA keygen task failed: {}", e)))??;
 
         // Create user with auth fields
         let user = sqlx::query_as::<_, User>(

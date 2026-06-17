@@ -47,6 +47,7 @@ pub async fn seed(pool: &PgPool) -> Result<Vec<Uuid>, SeedError> {
     for (username, email, password, display_name, bio, measurement_pref) in TEST_USERS {
         let password_hash = password_service
             .hash(password)
+            .await
             .map_err(|e| SeedError::Password(e.to_string()))?;
 
         let ap_id = format!("{}/users/{}", base_url, username);
