@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::api::middleware::{AuthUser, OptionalAuthUser};
 use crate::core::error::{AppError, AppResult};
 use crate::core::pagination::{PaginatedResponse, PaginationParams};
-use crate::core::storage::StorageClient;
+use crate::core::storage::shared_storage;
 use crate::models::{
     AddContributionRequest, AddRecipeToBook, BookContribution, BookRecipeEntry, CreateRecipeBook,
     GrantPermissionRequest, Permission, PermissionListResponse, RecipeBook, RecipeBookSummary,
@@ -105,7 +105,7 @@ async fn create_book(
                         crate::services::ImageService::validate_mime_type(mime)?;
                     }
 
-                    let storage = StorageClient::from_env().await?;
+                    let storage = shared_storage().await?;
                     let book_id = Uuid::new_v4();
                     let key = format!("books/{}/cover.webp", book_id);
 
