@@ -87,9 +87,10 @@ impl EmailService {
                 .build()
         };
 
-        mailer
-            .send(email)
+        // Bound the SMTP send so a slow/hung relay can't stall the request indefinitely.
+        tokio::time::timeout(std::time::Duration::from_secs(30), mailer.send(email))
             .await
+            .map_err(|_| EmailError::SendError("SMTP send timed out".to_string()))?
             .map_err(|e| EmailError::SendError(e.to_string()))?;
 
         tracing::info!(to = to, subject = subject, "Email sent successfully");

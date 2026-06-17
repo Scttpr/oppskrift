@@ -4,9 +4,22 @@
 
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::{config::Region, primitives::ByteStream, Client};
+use tokio::sync::OnceCell;
 use uuid::Uuid;
 
 use crate::core::error::{AppError, AppResult};
+
+/// Process-wide shared S3 client, built once on first use.
+static SHARED_STORAGE: OnceCell<StorageClient> = OnceCell::const_new();
+
+/// Returns the shared S3 client, initializing it from the environment on first
+/// call. Avoids reloading the AWS credential chain on every upload/delete request.
+pub async fn shared_storage() -> AppResult<StorageClient> {
+    SHARED_STORAGE
+        .get_or_try_init(StorageClient::from_env)
+        .await
+        .cloned()
+}
 
 /// Storage configuration
 #[derive(Debug, Clone)]

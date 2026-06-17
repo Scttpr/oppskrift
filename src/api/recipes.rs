@@ -12,7 +12,7 @@ use crate::api::middleware::{AuthUser, OptionalAuthUser, RateLimiterState};
 use crate::core::error::{AppError, AppResult};
 use crate::core::pagination::{PaginatedResponse, PaginationParams};
 use crate::core::schema_org::SchemaOrgRecipe;
-use crate::core::storage::StorageClient;
+use crate::core::storage::shared_storage;
 use crate::models::{
     CreateIngredient, CreateInstructionStep, CreateRecipe, Ingredient, InstructionStep, Recipe,
     RecipeImage, RecipeSummary, UpdateRecipe,
@@ -267,7 +267,7 @@ async fn upload_image(
     RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
 
     // Create storage client
-    let storage = StorageClient::from_env().await?;
+    let storage = shared_storage().await?;
 
     let mut image_data: Option<Vec<u8>> = None;
     let mut alt_text: Option<String> = None;
@@ -346,7 +346,7 @@ async fn delete_image(
     RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
 
     // Delete the image
-    let storage = StorageClient::from_env().await?;
+    let storage = shared_storage().await?;
     ImageService::delete_image(&state.db, &storage, id, image_id).await?;
 
     Ok(StatusCode::NO_CONTENT)
