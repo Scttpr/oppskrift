@@ -251,6 +251,117 @@
         </div>
     </section>
     {% endif %}
+
+    {# Ratings & Reviews #}
+    <section class="mt-12 border-t border-gray-200 dark:border-gray-700 pt-8" aria-labelledby="reviews-heading">
+        <h2 id="reviews-heading" class="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
+            Ratings &amp; Reviews
+        </h2>
+
+        {# Average rating #}
+        <div class="flex items-center gap-3 mb-6">
+            {% if let Some(avg) = rating.average %}
+            <span class="text-3xl font-bold text-gray-900 dark:text-white">{{ "{:.1}"|format(avg) }}</span>
+            <span class="text-yellow-500 text-xl" aria-hidden="true">★</span>
+            <span class="text-gray-500 dark:text-gray-400">
+                ({{ rating.count }} rating{% if rating.count != 1 %}s{% endif %})
+            </span>
+            {% else %}
+            <span class="text-gray-500 dark:text-gray-400">No ratings yet</span>
+            {% endif %}
+        </div>
+
+        {# Rating widget (logged-in users) #}
+        {% if let Some(_) = user %}
+        <div class="mb-8">
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Your rating</p>
+            <div id="rating-stars" class="inline-flex items-center gap-1" data-recipe-id="{{ recipe.id }}">
+                {% for star in [1, 2, 3, 4, 5] %}
+                <button
+                    type="button"
+                    class="rating-star text-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+                    data-value="{{ star }}"
+                    aria-label="Rate {{ star }} out of 5"
+                >
+                    <span class="star-glyph {% if let Some(ur) = rating.user_rating %}{% if star <= ur %}text-yellow-500{% else %}text-gray-300 dark:text-gray-600{% endif %}{% else %}text-gray-300 dark:text-gray-600{% endif %}">★</span>
+                </button>
+                {% endfor %}
+                {% if let Some(_) = rating.user_rating %}
+                <button
+                    type="button"
+                    id="clear-rating"
+                    class="ml-3 text-sm text-gray-500 dark:text-gray-400 hover:underline"
+                >
+                    Clear
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Comment form (logged-in users) #}
+        {% if let Some(_) = user %}
+        <form id="comment-form" class="mb-8" data-recipe-id="{{ recipe.id }}">
+            <label for="comment-body" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Leave a comment
+            </label>
+            <textarea
+                id="comment-body"
+                name="body"
+                rows="3"
+                maxlength="2000"
+                required
+                class="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            ></textarea>
+            <div class="mt-2 flex items-center gap-3">
+                <button
+                    type="submit"
+                    class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                >
+                    Post Comment
+                </button>
+                <span id="comment-error" class="text-sm text-red-600 dark:text-red-400 hidden"></span>
+            </div>
+        </form>
+        {% else %}
+        <p class="mb-8 text-sm text-gray-500 dark:text-gray-400">
+            <a href="/login" class="text-primary-600 dark:text-primary-400 hover:underline">Sign in</a> to rate or comment.
+        </p>
+        {% endif %}
+
+        {# Comment list #}
+        <div id="comment-list" class="space-y-6">
+            {% if comments.is_empty() %}
+            <p class="text-gray-500 dark:text-gray-400">No comments yet.</p>
+            {% else %}
+            {% for comment in comments %}
+            <article class="flex gap-3">
+                <div class="flex-grow">
+                    <div class="flex items-center gap-2">
+                        <a href="/users/{{ comment.author_id }}" class="font-medium text-gray-900 dark:text-white hover:underline">
+                            {{ comment.author_name }}
+                        </a>
+                        <span class="text-xs text-gray-400 dark:text-gray-500">{{ comment.created_at.format("%Y-%m-%d") }}</span>
+                    </div>
+                    <p class="mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ comment.body }}</p>
+                </div>
+                {% if let Some(u) = user %}
+                {% if comment.author_id == u.id || is_owner %}
+                <button
+                    type="button"
+                    class="delete-comment text-sm text-red-600 dark:text-red-400 hover:underline self-start"
+                    data-recipe-id="{{ recipe.id }}"
+                    data-comment-id="{{ comment.id }}"
+                >
+                    Delete
+                </button>
+                {% endif %}
+                {% endif %}
+            </article>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </section>
 </article>
 
 <script>
@@ -366,5 +477,101 @@ async function removeFromBook(btn, bookId, recipeId, title) {
         btn.disabled = false;
     }
 }
+
+// ---- Ratings ----
+(function () {
+    const container = document.getElementById('rating-stars');
+    if (!container) return;
+    const recipeId = container.dataset.recipeId;
+
+    function paint(value) {
+        container.querySelectorAll('.rating-star').forEach((btn) => {
+            const v = parseInt(btn.dataset.value, 10);
+            const glyph = btn.querySelector('.star-glyph');
+            glyph.classList.toggle('text-yellow-500', v <= value);
+            glyph.classList.toggle('text-gray-300', v > value);
+            glyph.classList.toggle('dark:text-gray-600', v > value);
+        });
+    }
+
+    container.querySelectorAll('.rating-star').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const value = parseInt(btn.dataset.value, 10);
+            try {
+                const res = await fetch(`/api/v1/recipes/${recipeId}/rating`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value }),
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    paint(value);
+                    window.location.reload();
+                }
+            } catch (e) { console.error(e); }
+        });
+    });
+
+    const clearBtn = document.getElementById('clear-rating');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', async () => {
+            try {
+                const res = await fetch(`/api/v1/recipes/${recipeId}/rating`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (res.ok) window.location.reload();
+            } catch (e) { console.error(e); }
+        });
+    }
+})();
+
+// ---- Comments ----
+(function () {
+    const form = document.getElementById('comment-form');
+    if (form) {
+        const recipeId = form.dataset.recipeId;
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = document.getElementById('comment-body').value.trim();
+            const errorEl = document.getElementById('comment-error');
+            errorEl.classList.add('hidden');
+            if (!body) return;
+            try {
+                const res = await fetch(`/api/v1/recipes/${recipeId}/comments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ body }),
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    window.location.reload();
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    errorEl.textContent = data.error || 'Failed to post comment';
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                errorEl.textContent = 'Network error. Please try again.';
+                errorEl.classList.remove('hidden');
+            }
+        });
+    }
+
+    document.querySelectorAll('.delete-comment').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            if (!confirm('Delete this comment?')) return;
+            const recipeId = btn.dataset.recipeId;
+            const commentId = btn.dataset.commentId;
+            try {
+                const res = await fetch(`/api/v1/recipes/${recipeId}/comments/${commentId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (res.ok) window.location.reload();
+            } catch (e) { console.error(e); }
+        });
+    });
+})();
 </script>
 {% endblock %}

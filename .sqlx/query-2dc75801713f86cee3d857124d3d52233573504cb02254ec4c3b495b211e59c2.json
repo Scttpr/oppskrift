@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT c.author_id, r.author_id as recipe_owner\n            FROM recipe_comments c\n            JOIN recipes r ON r.id = c.recipe_id\n            WHERE c.id = $1 AND c.recipe_id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "author_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "recipe_owner",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2dc75801713f86cee3d857124d3d52233573504cb02254ec4c3b495b211e59c2"
+}

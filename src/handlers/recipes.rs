@@ -12,9 +12,13 @@ use crate::core::error::AppResult;
 use crate::core::pagination::{PaginationMeta, PaginationParams};
 use crate::core::schema_org::SchemaOrgRecipe;
 use crate::models::{
-    Ingredient, InstructionStep, Recipe, RecipeBookSummary, RecipeImage, RecipeSummary, User,
+    CommentWithAuthor, Ingredient, InstructionStep, RatingSummary, Recipe, RecipeBookSummary,
+    RecipeImage, RecipeSummary, User,
 };
-use crate::services::{BookService, ImageService, RecipeService, SavedRecipeService, UserService};
+use crate::services::{
+    BookService, CommentService, ImageService, RatingService, RecipeService, SavedRecipeService,
+    UserService,
+};
 use crate::AppState;
 
 /// Recipe page routes
@@ -88,6 +92,8 @@ struct RecipeViewTemplate {
     user_books: Vec<RecipeBookSummary>,
     recipe_in_book_ids: Vec<Uuid>,
     is_saved: bool,
+    rating: RatingSummary,
+    comments: Vec<CommentWithAuthor>,
 }
 
 /// View recipe page handler
@@ -105,6 +111,8 @@ async fn view_recipe_page(
     let instructions = RecipeService::get_instructions(&state.db, id).await?;
     let images = ImageService::get_images(&state.db, id).await?;
     let primary_image = images.iter().find(|i| i.is_primary).cloned();
+    let rating = RatingService::get_summary(&state.db, id, viewer_id).await?;
+    let comments = CommentService::list_comments(&state.db, id).await?;
 
     // Generate Schema.org JSON-LD
     let schema = SchemaOrgRecipe::from_recipe(
@@ -147,6 +155,8 @@ async fn view_recipe_page(
         user_books,
         recipe_in_book_ids,
         is_saved,
+        rating,
+        comments,
     };
 
     crate::core::render(&template)
@@ -282,6 +292,12 @@ mod tests {
             user_books: vec![],
             recipe_in_book_ids: vec![],
             is_saved: false,
+            rating: crate::models::RatingSummary {
+                average: None,
+                count: 0,
+                user_rating: None,
+            },
+            comments: vec![],
         };
         let result = template.render();
         assert!(result.is_ok());
@@ -381,6 +397,12 @@ mod tests {
             user_books: vec![],
             recipe_in_book_ids: vec![],
             is_saved: false,
+            rating: crate::models::RatingSummary {
+                average: None,
+                count: 0,
+                user_rating: None,
+            },
+            comments: vec![],
         };
         assert!(owner_template.render().is_ok());
 
@@ -398,6 +420,12 @@ mod tests {
             user_books: vec![],
             recipe_in_book_ids: vec![],
             is_saved: false,
+            rating: crate::models::RatingSummary {
+                average: None,
+                count: 0,
+                user_rating: None,
+            },
+            comments: vec![],
         };
         assert!(guest_template.render().is_ok());
     }

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                AVG(value)::float8 as \"average?\",\n                COUNT(*) as \"count!\"\n            FROM recipe_ratings\n            WHERE recipe_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "average?",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "8be579eddd433f136bb89680034eb8512266673805c334368fe29666cf7cdcb2"
+}
