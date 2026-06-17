@@ -55,9 +55,7 @@ async fn list_recipes_page(
         user,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// New recipe form template
@@ -71,9 +69,7 @@ struct NewRecipeTemplate {
 async fn new_recipe_page() -> AppResult<Html<String>> {
     let template = NewRecipeTemplate { recipe: None };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Recipe view page template
@@ -153,9 +149,7 @@ async fn view_recipe_page(
         is_saved,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Edit recipe form template
@@ -178,9 +172,7 @@ async fn edit_recipe_page(
         recipe: Some(recipe),
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 #[cfg(test)]

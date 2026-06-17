@@ -1,7 +1,7 @@
 use askama::Template;
 use axum::{response::Html, routing::get, Router};
 
-use crate::core::error::{AppError, AppResult};
+use crate::core::error::AppResult;
 use crate::AppState;
 
 /// Legal page routes
@@ -30,25 +30,19 @@ struct TermsTemplate;
 /// About page handler
 async fn about_page() -> AppResult<Html<String>> {
     let template = AboutTemplate;
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Privacy policy page handler
 async fn privacy_page() -> AppResult<Html<String>> {
     let template = PrivacyTemplate;
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Terms of service page handler
 async fn terms_page() -> AppResult<Html<String>> {
     let template = TermsTemplate;
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 #[cfg(test)]

@@ -39,9 +39,7 @@ async fn feed_page(
         pagination: feed.pagination,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 #[cfg(test)]

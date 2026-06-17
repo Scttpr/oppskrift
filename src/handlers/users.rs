@@ -75,9 +75,7 @@ async fn user_profile_page(
         is_following,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Saved recipes page template
@@ -109,9 +107,7 @@ async fn saved_recipes_page(
         pagination: saved_page.pagination,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Followers page template (T036)
@@ -209,9 +205,7 @@ async fn followers_page(
         current_user_id,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Following page handler (T038)
@@ -287,9 +281,7 @@ async fn following_page(
         current_user_id,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        crate::core::error::AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 #[cfg(test)]

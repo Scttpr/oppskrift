@@ -13,6 +13,8 @@ pub mod request_id;
 pub mod schema_org;
 pub mod seeds;
 pub mod storage;
+pub mod template;
 
 pub use config::Config;
 pub use request_id::{RequestContext, RequestId};
+pub use template::render;

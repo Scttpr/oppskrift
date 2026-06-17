@@ -7,7 +7,7 @@ use sqlx::PgPool;
 
 use crate::core::config::SmtpConfig;
 use crate::core::error::AppError;
-use crate::services::{AuthService, EmailService, PasswordService, TotpService};
+use crate::services::{AuthService, EmailService, PasswordService, SessionService, TotpService};
 
 /// Default session expiry in days
 pub const SESSION_EXPIRY_DAYS: u32 = 30;
@@ -59,6 +59,11 @@ impl ServiceFactory {
 
         let smtp_config = SmtpConfig::from_env(is_production);
         EmailService::new(smtp_config, base_url)
+    }
+
+    /// Create a SessionService instance using the default session expiry
+    pub fn create_session_service(db: PgPool) -> SessionService {
+        SessionService::new(db, SESSION_EXPIRY_DAYS)
     }
 
     /// Create a TotpService instance

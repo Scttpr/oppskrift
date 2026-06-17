@@ -605,9 +605,7 @@ async fn reset_password(
 
 /// Create a RequestContext from request extensions
 fn create_request_context(addr: SocketAddr, request_id: Option<&RequestId>) -> RequestContext {
-    RequestContext::new()
-        .with_ip(addr.ip())
-        .maybe_request_id(request_id.map(|r| r.0))
+    RequestContext::from_request(addr, request_id, None)
 }
 
 /// Create an AuthService instance from AppState

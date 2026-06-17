@@ -24,7 +24,6 @@ use crate::models::{
 use crate::models::{DisableTwoFactorRequest, EnableTwoFactorRequest};
 use crate::services::{
     AuthError, SecurityEvent, SecurityEventService, ServiceFactory, TotpError, UserService,
-    SESSION_EXPIRY_DAYS,
 };
 use crate::AppState;
 
@@ -102,8 +101,7 @@ async fn get_security_info(
         })?;
 
     // Get session count
-    let session_service =
-        crate::services::SessionService::new(state.db.clone(), SESSION_EXPIRY_DAYS);
+    let session_service = crate::services::ServiceFactory::create_session_service(state.db.clone());
     let active_sessions_count = session_service
         .count_for_user(auth_user.id)
         .await
@@ -417,8 +415,7 @@ async fn list_sessions(
     State(state): State<AppState>,
     auth_user: AuthUser,
 ) -> Result<Json<SessionListResponse>, AppError> {
-    let session_service =
-        crate::services::SessionService::new(state.db.clone(), SESSION_EXPIRY_DAYS);
+    let session_service = crate::services::ServiceFactory::create_session_service(state.db.clone());
 
     let service_sessions = session_service
         .list_for_user(auth_user.id, Some(auth_user.session_id))
@@ -468,8 +465,7 @@ async fn revoke_session(
         ));
     }
 
-    let session_service =
-        crate::services::SessionService::new(state.db.clone(), SESSION_EXPIRY_DAYS);
+    let session_service = crate::services::ServiceFactory::create_session_service(state.db.clone());
 
     // Verify session belongs to user before revoking
     let sessions = session_service
@@ -882,10 +878,7 @@ fn create_request_context(
     request_id: Option<&RequestId>,
     session_id: Option<uuid::Uuid>,
 ) -> RequestContext {
-    RequestContext::new()
-        .with_ip(addr.ip())
-        .maybe_request_id(request_id.map(|r| r.0))
-        .maybe_session_id(session_id)
+    RequestContext::from_request(addr, request_id, session_id)
 }
 
 /// Create an AuthService instance from AppState

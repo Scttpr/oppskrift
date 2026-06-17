@@ -73,9 +73,7 @@ async fn recipe_share_page(
         user,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Book share page template
@@ -127,7 +125,5 @@ async fn book_share_page(
         user,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }

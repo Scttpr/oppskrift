@@ -4,7 +4,7 @@
 //! This allows correlating all logs and audit events from a single request.
 
 use axum::{extract::Request, middleware::Next, response::Response};
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use uuid::Uuid;
 
 /// Request ID stored in request extensions
@@ -26,6 +26,18 @@ impl RequestContext {
     /// Create a new empty request context
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Build a request context from common request components
+    pub fn from_request(
+        addr: SocketAddr,
+        request_id: Option<&RequestId>,
+        session_id: Option<Uuid>,
+    ) -> Self {
+        Self::new()
+            .with_ip(addr.ip())
+            .maybe_request_id(request_id.map(|r| r.0))
+            .maybe_session_id(session_id)
     }
 
     /// Set the request ID

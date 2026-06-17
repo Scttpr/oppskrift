@@ -76,9 +76,7 @@ async fn list_groups_page(
         user,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// New group form template
@@ -96,9 +94,7 @@ async fn new_group_page(State(state): State<AppState>, auth: AuthUser) -> AppRes
 
     let template = NewGroupTemplate { group: None, user };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Group view page template
@@ -127,9 +123,7 @@ async fn view_group_page(
 
     let template = GroupViewTemplate { group, user };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
 
 /// Edit group form template
@@ -160,7 +154,5 @@ async fn edit_group_page(
         user,
     };
 
-    Ok(Html(template.render().map_err(|e| {
-        AppError::Internal(format!("Template error: {}", e))
-    })?))
+    crate::core::render(&template)
 }
