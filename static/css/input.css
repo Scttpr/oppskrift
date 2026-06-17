@@ -40,7 +40,9 @@
 
   h1, h2, h3, h4, h5, h6, .font-display {
     font-family: var(--font-display);
+    font-optical-sizing: auto;
     font-variation-settings: 'SOFT' 0, 'WONK' 1;
+    letter-spacing: -0.015em;
   }
 
   /* Warm, coral-tinted scrollbars to match the source theme */
@@ -61,6 +63,43 @@
   }
   *::-webkit-scrollbar-thumb:hover {
     background: rgba(196, 113, 74, 0.5);
+  }
+}
+
+/* =========================================================================
+   Reusable themed components
+   ========================================================================= */
+@layer components {
+  /* Buttons — pill shaped with a subtle hover lift */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-medium rounded-full transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
+  }
+  .btn-primary {
+    @apply btn px-6 py-3 bg-primary-600 text-white shadow-sm hover:bg-primary-700 hover:shadow-lg hover:-translate-y-0.5;
+  }
+  .btn-secondary {
+    @apply btn px-6 py-3 bg-white text-navy border border-navy/15 shadow-sm hover:border-navy/30 hover:-translate-y-0.5;
+  }
+
+  /* Card hover: lift + deepen shadow */
+  .card-lift {
+    @apply transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl;
+  }
+
+  /* Section heading with a short coral underline accent */
+  .section-title {
+    @apply relative inline-block pb-3;
+  }
+  .section-title::after {
+    content: "";
+    @apply absolute left-0 bottom-0 h-[3px] w-12 rounded-full bg-primary-500;
+  }
+
+  /* Warm decorative gradient for hero / feature backdrops */
+  .hero-warm {
+    background:
+      radial-gradient(55rem 28rem at 78% -12%, rgba(196, 113, 74, 0.18), transparent 60%),
+      radial-gradient(40rem 24rem at -5% 8%, rgba(26, 58, 82, 0.10), transparent 55%);
   }
 }
 

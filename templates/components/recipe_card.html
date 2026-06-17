@@ -2,15 +2,15 @@
    Usage: {% include "components/recipe_card.html" %}
    Variables: recipe (RecipeSummary), show_author (bool, optional)
 #}
-<article class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow h-full flex flex-col">
+<article class="card-lift group bg-white dark:bg-gray-800 rounded-2xl border border-navy/5 shadow-sm overflow-hidden h-full flex flex-col">
     <a href="/recipes/{{ recipe.id }}" class="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 flex flex-col h-full">
         {# Recipe Image - only shown when image exists #}
         {% if let Some(img_url) = recipe.primary_image_url %}
-        <div class="aspect-video bg-gray-200 dark:bg-gray-700 relative">
+        <div class="aspect-video bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
             <img
                 src="{{ img_url }}"
                 alt="{{ recipe.title }}"
-                class="w-full h-full object-cover"
+                class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 loading="lazy"
             />
             {# Difficulty Badge on image #}
