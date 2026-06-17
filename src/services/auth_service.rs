@@ -227,6 +227,7 @@ impl AuthService {
         let password_hash = self
             .password_service
             .hash(&request.password)
+            .await
             .map_err(|e| AuthError::Password(e.to_string()))?;
 
         // Generate ActivityPub ID
@@ -507,7 +508,7 @@ impl AuthService {
             Ok(user) => user,
             Err(_) => {
                 // Perform fake password verification for timing attack prevention
-                self.password_service.fake_verify(password);
+                self.password_service.fake_verify(password).await;
 
                 AuditEvent::new("auth.login.failure")
                     .with_context(ctx)
@@ -547,6 +548,7 @@ impl AuthService {
         let is_valid = self
             .password_service
             .verify(password, password_hash)
+            .await
             .map_err(|e| AuthError::Password(e.to_string()))?;
 
         if !is_valid {
@@ -1003,6 +1005,7 @@ impl AuthService {
         let password_hash = self
             .password_service
             .hash(new_password)
+            .await
             .map_err(|e| AuthError::Password(e.to_string()))?;
 
         // Update password
@@ -1077,6 +1080,7 @@ impl AuthService {
         let is_valid = self
             .password_service
             .verify(current_password, password_hash)
+            .await
             .map_err(|e| AuthError::Password(e.to_string()))?;
 
         if !is_valid {
@@ -1100,6 +1104,7 @@ impl AuthService {
         let password_hash = self
             .password_service
             .hash(new_password)
+            .await
             .map_err(|e| AuthError::Password(e.to_string()))?;
 
         // Update password
@@ -1180,6 +1185,7 @@ impl AuthService {
         let is_valid = self
             .password_service
             .verify(password, password_hash)
+            .await
             .map_err(|e| AuthError::Password(e.to_string()))?;
 
         if !is_valid {
@@ -1276,6 +1282,7 @@ impl AuthService {
         let is_valid = self
             .password_service
             .verify(password, password_hash)
+            .await
             .map_err(|e| AuthError::Password(e.to_string()))?;
 
         if !is_valid {

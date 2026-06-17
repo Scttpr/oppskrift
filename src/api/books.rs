@@ -110,7 +110,7 @@ async fn create_book(
                     let key = format!("books/{}/cover.webp", book_id);
 
                     let (processed, content_type) =
-                        crate::services::ImageService::process_image(&data)?;
+                        crate::services::ImageService::process_image(&data).await?;
                     cover_image_url = Some(storage.upload(&key, processed, &content_type).await?);
                 }
             }

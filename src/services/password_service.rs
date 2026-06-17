@@ -171,44 +171,58 @@ impl PasswordService {
     /// Hash a password using Argon2id
     ///
     /// Returns the PHC-formatted hash string suitable for storage.
-    pub fn hash(&self, password: &str) -> Result<String, PasswordError> {
-        let salt = SaltString::generate(&mut OsRng);
+    pub async fn hash(&self, password: &str) -> Result<String, PasswordError> {
+        let argon2 = self.argon2.clone();
+        let password = password.to_owned();
 
-        let hash = self
-            .argon2
-            .hash_password(password.as_bytes(), &salt)
-            .map_err(|_| PasswordError::HashingFailed)?;
+        // Argon2 hashing is CPU-bound; run off the async runtime.
+        tokio::task::spawn_blocking(move || {
+            let salt = SaltString::generate(&mut OsRng);
 
-        Ok(hash.to_string())
+            let hash = argon2
+                .hash_password(password.as_bytes(), &salt)
+                .map_err(|_| PasswordError::HashingFailed)?;
+
+            Ok(hash.to_string())
+        })
+        .await
+        .map_err(|_| PasswordError::HashingFailed)?
     }
 
     /// Verify a password against a stored hash
     ///
     /// Performs constant-time comparison to prevent timing attacks.
-    pub fn verify(&self, password: &str, hash: &str) -> Result<bool, PasswordError> {
-        let parsed_hash = PasswordHash::new(hash).map_err(|_| PasswordError::VerificationFailed)?;
+    pub async fn verify(&self, password: &str, hash: &str) -> Result<bool, PasswordError> {
+        let argon2 = self.argon2.clone();
+        let password = password.to_owned();
+        let hash = hash.to_owned();
 
-        match self
-            .argon2
-            .verify_password(password.as_bytes(), &parsed_hash)
-        {
-            Ok(()) => Ok(true),
-            Err(argon2::password_hash::Error::Password) => Ok(false),
-            Err(_) => Err(PasswordError::VerificationFailed),
-        }
+        // Argon2 verification is CPU-bound; run off the async runtime.
+        tokio::task::spawn_blocking(move || {
+            let parsed_hash =
+                PasswordHash::new(&hash).map_err(|_| PasswordError::VerificationFailed)?;
+
+            match argon2.verify_password(password.as_bytes(), &parsed_hash) {
+                Ok(()) => Ok(true),
+                Err(argon2::password_hash::Error::Password) => Ok(false),
+                Err(_) => Err(PasswordError::VerificationFailed),
+            }
+        })
+        .await
+        .map_err(|_| PasswordError::VerificationFailed)?
     }
 
     /// Generate a fake hash for timing attack prevention
     ///
     /// When a user doesn't exist, we still want to perform a hash verification
     /// to prevent timing attacks that could reveal which emails are registered.
-    pub fn fake_verify(&self, password: &str) {
+    pub async fn fake_verify(&self, password: &str) {
         // Use a pre-generated hash that will always fail verification
         // This ensures consistent timing regardless of user existence
         let fake_hash = "$argon2id$v=19$m=19456,t=2,p=1$fakesalt00000000$fakehash0000000000000000000000000000000000";
 
         // Ignore result - we just want the timing
-        let _ = self.verify(password, fake_hash);
+        let _ = self.verify(password, fake_hash).await;
     }
 
     /// Validate password and check HIBP in one call
@@ -275,19 +289,21 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn test_hash_and_verify() {
+    #[tokio::test]
+    async fn test_hash_and_verify() {
         let service = PasswordService::new(false);
         let password = "SecurePassword123";
 
-        let hash = service.hash(password).expect("Hashing should succeed");
+        let hash = service.hash(password).await.expect("Hashing should succeed");
         assert!(hash.starts_with("$argon2id$"));
 
         assert!(service
             .verify(password, &hash)
+            .await
             .expect("Verification should succeed"));
         assert!(!service
             .verify("WrongPassword123", &hash)
+            .await
             .expect("Verification should succeed"));
     }
 }
