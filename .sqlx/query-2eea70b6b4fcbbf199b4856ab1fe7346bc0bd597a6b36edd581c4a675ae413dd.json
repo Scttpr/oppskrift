@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                t.id, t.name, t.slug,\n                COUNT(r.id) as \"recipe_count!\"\n            FROM tags t\n            JOIN recipe_tags rt ON rt.tag_id = t.id\n            JOIN recipes r ON r.id = rt.recipe_id AND r.visibility = 'public'\n            GROUP BY t.id, t.name, t.slug\n            ORDER BY COUNT(r.id) DESC, t.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "recipe_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "2eea70b6b4fcbbf199b4856ab1fe7346bc0bd597a6b36edd581c4a675ae413dd"
+}

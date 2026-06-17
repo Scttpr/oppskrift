@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*)\n            FROM recipes r\n            JOIN recipe_tags rt ON rt.recipe_id = r.id\n            JOIN tags t ON t.id = rt.tag_id\n            WHERE r.visibility = 'public' AND t.slug = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "df79523a6e9b7c0ab5aeb1eea933e5c0c0900b58dc19a4797d65b73c5ec73a09"
+}

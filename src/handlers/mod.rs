@@ -8,6 +8,7 @@ pub mod legal;
 pub mod permissions;
 pub mod recipes;
 pub mod settings;
+pub mod tags;
 pub mod users;
 
 use askama::Template;
@@ -30,6 +31,7 @@ pub fn routes() -> Router<AppState> {
         .nest("/users", users::routes())
         .nest("/groups", groups::routes())
         .nest("/feed", feed::routes())
+        .nest("/tags", tags::routes())
         .nest("/settings", settings::routes())
         .merge(auth::routes())
         .merge(legal::routes())

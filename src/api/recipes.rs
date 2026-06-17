@@ -15,10 +15,10 @@ use crate::core::schema_org::SchemaOrgRecipe;
 use crate::core::storage::shared_storage;
 use crate::models::{
     CreateIngredient, CreateInstructionStep, CreateRecipe, Ingredient, InstructionStep, Recipe,
-    RecipeImage, RecipeSummary, UpdateRecipe,
+    RecipeImage, RecipeSummary, Tag, UpdateRecipe,
 };
 use crate::models::{GrantPermissionRequest, Permission, PermissionListResponse, ResourceType};
-use crate::services::{ImageService, PermissionService, RecipeService, UserService};
+use crate::services::{ImageService, PermissionService, RecipeService, TagService, UserService};
 use crate::AppState;
 
 /// Maximum upload size for recipe images (8 MB)
@@ -89,6 +89,8 @@ pub struct CreateRecipeRequest {
     pub ingredients: Vec<CreateIngredient>,
     #[serde(default)]
     pub instructions: Vec<CreateInstructionStep>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// Request body for updating a recipe
@@ -98,6 +100,7 @@ pub struct UpdateRecipeRequest {
     pub recipe: UpdateRecipe,
     pub ingredients: Option<Vec<CreateIngredient>>,
     pub instructions: Option<Vec<CreateInstructionStep>>,
+    pub tags: Option<Vec<String>>,
 }
 
 /// Full recipe response with related data
@@ -107,6 +110,7 @@ pub struct RecipeResponse {
     pub recipe: Recipe,
     pub ingredients: Vec<Ingredient>,
     pub instructions: Vec<InstructionStep>,
+    pub tags: Vec<Tag>,
 }
 
 /// POST /api/v1/recipes
@@ -147,7 +151,13 @@ async fn create_recipe(
         vec![]
     };
 
+    if !input.tags.is_empty() {
+        TagService::set_recipe_tags(&mut tx, recipe.id, &input.tags).await?;
+    }
+
     tx.commit().await?;
+
+    let tags = TagService::get_recipe_tags(&state.db, recipe.id).await?;
 
     // Create ActivityPub activity for federation (after commit)
     let _ = crate::services::ActivityService::create_recipe_activity(
@@ -161,6 +171,7 @@ async fn create_recipe(
             recipe,
             ingredients,
             instructions,
+            tags,
         }),
     ))
 }
@@ -180,6 +191,7 @@ async fn get_recipe(
     let ingredients = RecipeService::get_ingredients(&state.db, id).await?;
     let instructions = RecipeService::get_instructions(&state.db, id).await?;
     let images = ImageService::get_images(&state.db, id).await?;
+    let tags = TagService::get_recipe_tags(&state.db, id).await?;
 
     // Check Accept header for JSON-LD
     let accept = headers
@@ -208,6 +220,7 @@ async fn get_recipe(
             recipe,
             ingredients,
             instructions,
+            tags,
         })
         .into_response())
     }
@@ -255,6 +268,10 @@ async fn update_recipe(
         None
     };
 
+    if let Some(ref new_tags) = input.tags {
+        TagService::set_recipe_tags(&mut tx, id, new_tags).await?;
+    }
+
     tx.commit().await?;
 
     // For collections that weren't replaced, read the current state after commit
@@ -267,10 +284,13 @@ async fn update_recipe(
         None => RecipeService::get_instructions(&state.db, id).await?,
     };
 
+    let tags = TagService::get_recipe_tags(&state.db, id).await?;
+
     Ok(Json(RecipeResponse {
         recipe,
         ingredients,
         instructions,
+        tags,
     }))
 }
 
