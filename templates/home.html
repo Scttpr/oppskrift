@@ -4,58 +4,62 @@
 {% block meta_description %}Share and discover recipes with Oppskrift, a federated social platform powered by ActivityPub{% endblock %}
 
 {% block content %}
-<div class="text-center py-12">
-    <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-        Welcome to Oppskrift
-    </h1>
-    <p class="text-xl text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-        A federated platform for sharing recipes. Create, discover, and connect with food lovers across the fediverse.
-    </p>
-    <div class="flex justify-center gap-4">
-        <a href="/recipes" class="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors">
-            Browse Recipes
-        </a>
-        <a href="/register" class="px-6 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-lg transition-colors">
-            Create Account
-        </a>
+{# Hero #}
+<section class="hero-warm full-bleed -mt-8 border-b border-navy/5">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-24 text-center">
+        <p class="text-sm font-medium uppercase tracking-[0.2em] text-primary-700 mb-5">
+            Federated recipe sharing
+        </p>
+        <h1 class="font-display text-5xl sm:text-6xl lg:text-7xl font-semibold text-navy leading-[1.05] max-w-4xl mx-auto">
+            Cook, share &amp; discover <span class="italic text-primary-600">good food</span>.
+        </h1>
+        <p class="mt-6 text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
+            A warm home for your recipes — craft beautiful recipe cards, collect them into books, and connect with food lovers across the fediverse.
+        </p>
+        <div class="mt-9 flex flex-wrap justify-center gap-4">
+            <a href="/recipes" class="btn-primary">Browse Recipes</a>
+            <a href="/register" class="btn-secondary">Create Account</a>
+        </div>
     </div>
-</div>
+</section>
 
 {% if !recent_recipes.is_empty() %}
-<section class="mt-16">
-    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Recent Recipes</h2>
+<section class="mt-20">
+    <h2 class="section-title font-display text-2xl sm:text-3xl font-semibold text-navy mb-8">
+        Recent Recipes
+    </h2>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for recipe in recent_recipes %}
         {% include "components/recipe_card.html" %}
         {% endfor %}
     </div>
-    <div class="text-center mt-8">
-        <a href="/recipes" class="text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium">
-            View all recipes &rarr;
+    <div class="text-center mt-10">
+        <a href="/recipes" class="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium">
+            View all recipes <span aria-hidden="true">&rarr;</span>
         </a>
     </div>
 </section>
 {% endif %}
 
-<section class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-    <div class="text-center p-6">
+<section class="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="card-lift bg-white rounded-2xl border border-navy/10 p-7 text-center">
         <div class="text-4xl mb-4">&#127860;</div>
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Share Recipes</h3>
-        <p class="text-gray-600 dark:text-gray-400">
+        <h3 class="font-display text-xl font-semibold text-navy mb-2">Share Recipes</h3>
+        <p class="text-gray-600">
             Create and share your favorite recipes with detailed ingredients and instructions.
         </p>
     </div>
-    <div class="text-center p-6">
+    <div class="card-lift bg-white rounded-2xl border border-navy/10 p-7 text-center">
         <div class="text-4xl mb-4">&#128218;</div>
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Organize in Books</h3>
-        <p class="text-gray-600 dark:text-gray-400">
+        <h3 class="font-display text-xl font-semibold text-navy mb-2">Organize in Books</h3>
+        <p class="text-gray-600">
             Collect recipes into themed books and share your curated collections.
         </p>
     </div>
-    <div class="text-center p-6">
+    <div class="card-lift bg-white rounded-2xl border border-navy/10 p-7 text-center">
         <div class="text-4xl mb-4">&#127760;</div>
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Federated</h3>
-        <p class="text-gray-600 dark:text-gray-400">
+        <h3 class="font-display text-xl font-semibold text-navy mb-2">Federated</h3>
+        <p class="text-gray-600">
             Connect with users on other instances via ActivityPub federation.
         </p>
     </div>

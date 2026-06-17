@@ -11,40 +11,45 @@
 
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="/static">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Display typeface: Fraunces (serif) -->
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&display=swap" rel="stylesheet">
 
     {% block head %}{% endblock %}
 </head>
-<body class="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+<body class="min-h-screen flex flex-col bg-cream dark:bg-gray-900 text-gray-900 dark:text-gray-100">
     <!-- Skip Links for Keyboard Navigation (Constitution IV) -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <a href="#main-nav" class="skip-link">Skip to navigation</a>
 
     <!-- Header / Banner Landmark -->
-    <header role="banner" class="bg-white dark:bg-gray-800 shadow-sm">
+    <header role="banner" class="sticky top-0 z-40 bg-navy text-white shadow-sm border-b border-primary-500/40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
                 <div class="flex-shrink-0">
-                    <a href="/" class="text-xl font-bold text-primary-600 dark:text-primary-400">
+                    <a href="/" class="font-display text-2xl font-semibold text-white hover:text-primary-300">
                         Oppskrift
                     </a>
                 </div>
 
                 <!-- Navigation Landmark -->
                 <nav id="main-nav" role="navigation" aria-label="Main navigation" class="hidden md:flex space-x-8">
-                    <a href="/recipes" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                    <a href="/recipes" class="text-gray-200 hover:text-white">
                         Recipes
                     </a>
-                    <a href="/recipes/search" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                    <a href="/recipes/search" class="text-gray-200 hover:text-white">
                         Search
                     </a>
-                    <a href="/books" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                    <a href="/books" class="text-gray-200 hover:text-white">
                         Books
                     </a>
-                    <a href="/tags" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                    <a href="/tags" class="text-gray-200 hover:text-white">
                         Tags
                     </a>
-                    <a href="/feed" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                    <a href="/feed" class="text-gray-200 hover:text-white">
                         Feed
                     </a>
                     {% block nav_items %}{% endblock %}
@@ -56,7 +61,7 @@
                     <button
                         type="button"
                         id="contrast-toggle"
-                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        class="p-2 text-gray-300 hover:text-white"
                         aria-label="Toggle high contrast mode"
                         title="Toggle high contrast mode"
                     >
@@ -66,7 +71,7 @@
                     </button>
                     <!-- User Menu loaded via HTMX -->
                     <div hx-get="/partials/user-menu" hx-trigger="load" hx-swap="innerHTML">
-                        <a href="/login" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                        <a href="/login" class="text-gray-200 hover:text-white">
                             Sign In
                         </a>
                     </div>

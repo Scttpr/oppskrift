@@ -22,9 +22,26 @@ module.exports = {
           900: 'var(--color-primary-900, #7f1d1d)',
           950: 'var(--color-primary-950, #450a0a)',
         },
+        // Brand accents for the warm "Traiteurs Engagés" theme
+        navy: {
+          DEFAULT: '#1a3a52',
+          800: '#142d40',
+          900: '#0f2230',
+          soft: '#f0f4f7',
+        },
+        cream: {
+          DEFAULT: '#faf7f2',
+          panel: '#f5f1e8',
+        },
+        coral: {
+          DEFAULT: '#c4714a',
+          strong: '#e84b3a',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
+        display: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
       },
     },
   },
