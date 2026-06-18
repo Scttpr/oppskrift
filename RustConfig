@@ -1,3 +1,0 @@
-# Rust buildpack configuration for Scalingo
-VERSION=stable
-RUST_CARGO_BUILD_FLAGS="--release"

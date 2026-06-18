@@ -24,7 +24,6 @@ logs/
 # Documentation
 *.md
 !README.md
-specs/
 docs/
 
 # Test files
@@ -40,6 +39,3 @@ tailwindcss
 Dockerfile*
 docker-compose*.yml
 .dockerignore
-
-# Specify workflow files
-.specify/

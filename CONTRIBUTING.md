@@ -79,7 +79,7 @@ make clean       # Clean build artifacts and stop containers
 ## SQLx and Database
 
 SQLx verifies queries at compile time. A query cache is committed under `.sqlx/`,
-so builds work offline (`SQLX_OFFLINE=true`, as used by the Docker/buildpack builds)
+so builds work offline (`SQLX_OFFLINE=true`, as used by the Docker and CI builds)
 without a database. When you add or change a `sqlx::query!` macro, regenerate the
 cache against a running database and commit the result:
 
