@@ -11,9 +11,6 @@ release/
 .vscode/
 *.iml
 .claude
-.osk/domaines
-.osk/prompts
-.osk/templates
 
 # Environment
 .env
@@ -43,7 +40,7 @@ coverage/
 *.profraw
 *.profdata
 
-# SQLx offline cache - intentionally COMMITTED so Docker/buildpack/CI builds work
+# SQLx offline cache - intentionally COMMITTED so Docker/CI builds work
 # without a database (SQLX_OFFLINE=true). Regenerate after changing queries with:
 #   cargo sqlx prepare
 

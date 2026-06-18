@@ -43,8 +43,6 @@ paths = [
     '''\.env\.example''',
     # Crypto module tests (assertions checking key format)
     '''src/lib/crypto\.rs''',
-    # OSK templates with example tokens
-    '''\.osk/domaines/.*\.md''',
     # CI workflows with test-only keys
     '''\.github/workflows/.*\.yml''',
 ]
