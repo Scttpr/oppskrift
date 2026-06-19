@@ -62,7 +62,7 @@ impl IntoResponse for AppError {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "internal_error",
-                    "An internal error occurred".to_string(),
+                    "Une erreur interne s'est produite".to_string(),
                 )
             }
             AppError::Internal(msg) => {
@@ -70,7 +70,7 @@ impl IntoResponse for AppError {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "internal_error",
-                    "An internal error occurred".to_string(),
+                    "Une erreur interne s'est produite".to_string(),
                 )
             }
         };
@@ -102,5 +102,15 @@ mod tests {
     fn test_validation_error() {
         let error = AppError::Validation("Invalid email".to_string());
         assert_eq!(error.to_string(), "Validation error: Invalid email");
+    }
+
+    #[tokio::test]
+    async fn test_internal_error_message_is_french() {
+        let response = AppError::Internal("boom".to_string()).into_response();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["message"], "Une erreur interne s'est produite");
     }
 }

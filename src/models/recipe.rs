@@ -47,6 +47,17 @@ impl std::fmt::Display for Difficulty {
     }
 }
 
+impl Difficulty {
+    /// French display label.
+    pub fn label_fr(&self) -> &'static str {
+        match self {
+            Difficulty::Easy => "Facile",
+            Difficulty::Medium => "Moyen",
+            Difficulty::Hard => "Difficile",
+        }
+    }
+}
+
 /// Recipe entity - core content type
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Recipe {
@@ -116,6 +127,13 @@ pub struct RecipeSummary {
 mod tests {
     use super::*;
     use validator::Validate;
+
+    #[test]
+    fn test_difficulty_label_fr() {
+        assert_eq!(Difficulty::Easy.label_fr(), "Facile");
+        assert_eq!(Difficulty::Medium.label_fr(), "Moyen");
+        assert_eq!(Difficulty::Hard.label_fr(), "Difficile");
+    }
 
     // ==========================================================================
     // Visibility Tests (T046)
