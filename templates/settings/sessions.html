@@ -4,19 +4,19 @@
 <section aria-labelledby="sessions-heading">
     <div class="flex items-center justify-between mb-6">
         <h2 id="sessions-heading" class="text-lg font-medium text-gray-900 dark:text-white">
-            Active Sessions
+            Sessions actives
         </h2>
         <a
             href="/settings/security"
             class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
-            Back to Security
+            Retour à la sécurité
         </a>
     </div>
 
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        These are the devices currently signed in to your account. If you see any unfamiliar sessions,
-        you should sign out all other devices and change your password immediately.
+        Voici les appareils actuellement connectés à ton compte. Si tu repères une session inconnue,
+        déconnecte tous les autres appareils et change ton mot de passe immédiatement.
     </p>
 
     {# Session count summary #}
@@ -24,7 +24,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-900 dark:text-white">
-                    Total Active Sessions
+                    Total des sessions actives
                 </p>
                 <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1" id="session-count">
                     {{ session_count }}
@@ -59,7 +59,7 @@
                             </p>
                             {% if session.is_current %}
                             <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                Current
+                                Actuelle
                             </span>
                             {% endif %}
                         </div>
@@ -67,7 +67,7 @@
                             IP: {{ session.ip_address }}
                         </p>
                         <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                            Last active: {{ session.last_activity }} &middot; Started: {{ session.created_at }}
+                            Dernière activité : {{ session.last_activity }} &middot; Début : {{ session.created_at }}
                         </p>
                     </div>
                 </div>
@@ -80,7 +80,7 @@
                     hx-post="/settings/security/sessions/{{ session.id }}/revoke"
                     hx-target="#session-{{ session.id }}"
                     hx-swap="outerHTML"
-                    hx-confirm="Revoke this session? The device will be signed out immediately."
+                    hx-confirm="Révoquer cette session ? L'appareil sera déconnecté immédiatement."
                 >
                     <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
                     <button
@@ -90,7 +90,7 @@
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
-                        Revoke
+                        Révoquer
                     </button>
                 </form>
                 {% endif %}
@@ -109,8 +109,8 @@
                 </svg>
                 <div>
                     <p class="text-sm text-yellow-800 dark:text-yellow-200">
-                        You have {{ session_count - 1 }} other active session{% if session_count > 2 %}s{% endif %}.
-                        If you don't recognize any of these, sign out all other devices immediately.
+                        Tu as {{ session_count - 1 }} autre{% if session_count > 2 %}s{% endif %} session{% if session_count > 2 %}s{% endif %} active{% if session_count > 2 %}s{% endif %}.
+                        Si tu n'en reconnais aucune, déconnecte tous les autres appareils immédiatement.
                     </p>
                 </div>
             </div>
@@ -120,13 +120,13 @@
             <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
             <button
                 type="submit"
-                onclick="return confirm('Sign out all other sessions? All other devices will be signed out immediately.')"
+                onclick="return confirm('Déconnecter toutes les autres sessions ? Tous les autres appareils seront déconnectés immédiatement.')"
                 class="inline-flex items-center px-4 py-2 border border-red-300 dark:border-red-700 text-sm font-medium rounded-md text-red-700 dark:text-red-400 bg-white dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800"
             >
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                 </svg>
-                Sign Out All Other Sessions
+                Déconnecter toutes les autres sessions
             </button>
         </form>
     </div>
@@ -138,7 +138,7 @@
             </svg>
             <div>
                 <p class="text-sm text-green-800 dark:text-green-200">
-                    You only have one active session. No other devices are signed in.
+                    Tu n'as qu'une seule session active. Aucun autre appareil n'est connecté.
                 </p>
             </div>
         </div>
