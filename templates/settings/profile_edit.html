@@ -4,13 +4,13 @@
 <section aria-labelledby="profile-edit-heading">
     <div class="flex items-center justify-between mb-6">
         <h2 id="profile-edit-heading" class="text-lg font-medium text-gray-900 dark:text-white">
-            Edit Profile
+            Modifier le profil
         </h2>
         <a
             href="/settings/profile"
             class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
-            Cancel
+            Annuler
         </a>
     </div>
 
@@ -23,7 +23,7 @@
             </svg>
             <div>
                 <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
-                    There were errors with your submission
+                    Des erreurs sont survenues dans ta soumission
                 </h3>
                 <ul class="mt-2 text-sm text-red-700 dark:text-red-300 list-disc list-inside">
                     {% for error in errors %}
@@ -42,7 +42,7 @@
         {# Display Name #}
         <div>
             <label for="display_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Display name <span class="text-red-500" aria-label="required">*</span>
+                Nom affiché <span class="text-red-500" aria-label="obligatoire">*</span>
             </label>
             <input
                 type="text"
@@ -57,7 +57,7 @@
                 class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
             />
             <p id="display_name_help" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                1-100 characters. This is how your name appears to others.
+                1 à 100 caractères. C'est ainsi que ton nom apparaît aux autres.
             </p>
         </div>
 
@@ -75,21 +75,21 @@
                 class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
             >{{ form.bio }}</textarea>
             <p id="bio_help" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Up to 500 characters. Tell others about yourself.
+                Jusqu'à 500 caractères. Parle un peu de toi.
             </p>
         </div>
 
         {# Avatar URL #}
         <div>
             <label for="avatar_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Avatar URL
+                URL de l'avatar
             </label>
             <div class="mt-1 flex items-center space-x-4">
                 {# Preview #}
                 {% if !form.avatar_url.is_empty() %}
                 <img
                     src="{{ form.avatar_url }}"
-                    alt="Avatar preview"
+                    alt="Aperçu de l'avatar"
                     class="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                 />
                 {% else %}
@@ -110,17 +110,17 @@
                 />
             </div>
             <p id="avatar_url_help" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Link to an image. Leave empty to use your initials.
+                Lien vers une image. Laisse vide pour utiliser tes initiales.
             </p>
         </div>
 
         {# Measurement Preference #}
         <fieldset>
             <legend class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Measurement system
+                Système de mesure
             </legend>
             <p id="measurement_pref_help" class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                Choose how recipe quantities are displayed.
+                Choisis comment les quantités des recettes sont affichées.
             </p>
             <div class="mt-2 space-y-2" role="radiogroup" aria-describedby="measurement_pref_help">
                 <div class="flex items-center">
@@ -137,7 +137,7 @@
                         class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
                     />
                     <label for="measurement_metric" class="ml-3 text-sm text-gray-700 dark:text-gray-300">
-                        Metric (grams, liters, Celsius)
+                        Métrique (grammes, litres, Celsius)
                     </label>
                 </div>
                 <div class="flex items-center">
@@ -154,7 +154,7 @@
                         class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
                     />
                     <label for="measurement_imperial" class="ml-3 text-sm text-gray-700 dark:text-gray-300">
-                        Imperial (ounces, cups, Fahrenheit)
+                        Impérial (onces, tasses, Fahrenheit)
                     </label>
                 </div>
             </div>
@@ -166,13 +166,13 @@
                 href="/settings/profile"
                 class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
             >
-                Cancel
+                Annuler
             </a>
             <button
                 type="submit"
                 class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-gray-800"
             >
-                Save Changes
+                Enregistrer les modifications
             </button>
         </div>
     </form>
