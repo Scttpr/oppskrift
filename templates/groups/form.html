@@ -1,19 +1,19 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}{% if let Some(g) = group %}Edit {{ g.name }}{% else %}New Group{% endif %} - Oppskrift{% endblock %}
+{% block title %}{% if let Some(g) = group %}Modifier {{ g.name }}{% else %}Nouveau groupe{% endif %} - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
     {# Header #}
     <div class="mb-8">
         <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
-            <a href="/groups" class="hover:text-primary-600 dark:hover:text-primary-400">Groups</a>
+            <a href="/groups" class="hover:text-primary-600 dark:hover:text-primary-400">Groupes</a>
             <span>/</span>
-            <span>{% if let Some(g) = group %}Edit{% else %}New{% endif %}</span>
+            <span>{% if let Some(g) = group %}Modifier{% else %}Nouveau{% endif %}</span>
         </div>
 
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-            {% if let Some(g) = group %}Edit {{ g.name }}{% else %}New Group{% endif %}
+            {% if let Some(g) = group %}Modifier {{ g.name }}{% else %}Nouveau groupe{% endif %}
         </h1>
     </div>
 
@@ -26,7 +26,7 @@
         {# Name #}
         <div>
             <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Group Name *
+                Nom du groupe *
             </label>
             <input
                 type="text"
@@ -35,7 +35,7 @@
                 required
                 maxlength="100"
                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                placeholder="e.g., Family Recipes"
+                placeholder="ex. : Recettes de famille"
                 {% if let Some(g) = group %}value="{{ g.name }}"{% endif %}
             />
         </div>
@@ -51,7 +51,7 @@
                 rows="3"
                 maxlength="500"
                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                placeholder="What is this group for?"
+                placeholder="À quoi sert ce groupe ?"
             >{% if let Some(g) = group %}{% if let Some(desc) = g.description %}{{ desc }}{% endif %}{% endif %}</textarea>
         </div>
 
@@ -63,7 +63,7 @@
                 class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                 onclick="deleteGroup('{{ g.id }}')"
             >
-                Delete Group
+                Supprimer le groupe
             </button>
             {% else %}
             <div></div>
@@ -74,13 +74,13 @@
                     href="{% if let Some(g) = group %}/groups/{{ g.id }}{% else %}/groups{% endif %}"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
                 >
-                    Cancel
+                    Annuler
                 </a>
                 <button
                     type="submit"
                     class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                 >
-                    {% if let Some(_) = group %}Save Changes{% else %}Create Group{% endif %}
+                    {% if let Some(_) = group %}Enregistrer les modifications{% else %}Créer le groupe{% endif %}
                 </button>
             </div>
         </div>
@@ -97,7 +97,7 @@ async function submitForm(event) {
     const description = document.getElementById('description').value.trim() || null;
 
     if (!name) {
-        alert('Name is required');
+        alert('Le nom est obligatoire');
         return;
     }
 
@@ -117,15 +117,15 @@ async function submitForm(event) {
             window.location.href = `/groups/${result.id}`;
         } else {
             const error = await response.json();
-            alert(error.message || 'Failed to save group');
+            alert(error.message || "Échec de l'enregistrement du groupe");
         }
     } catch (e) {
-        alert('Failed to save group');
+        alert("Échec de l'enregistrement du groupe");
     }
 }
 
 async function deleteGroup(id) {
-    if (!confirm('Are you sure you want to delete this group? This action cannot be undone.')) return;
+    if (!confirm('Es-tu sûr de vouloir supprimer ce groupe ? Cette action est irréversible.')) return;
 
     try {
         const response = await fetch(`/api/v1/groups/${id}`, {
@@ -136,10 +136,10 @@ async function deleteGroup(id) {
             window.location.href = '/groups';
         } else {
             const error = await response.json();
-            alert(error.message || 'Failed to delete group');
+            alert(error.message || 'Échec de la suppression du groupe');
         }
     } catch (e) {
-        alert('Failed to delete group');
+        alert('Échec de la suppression du groupe');
     }
 }
 </script>
