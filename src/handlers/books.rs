@@ -172,7 +172,7 @@ async fn view_book_page(
             let title = recipe_titles
                 .get(&contrib.recipe_id)
                 .cloned()
-                .unwrap_or_else(|| "Unknown Recipe".to_string());
+                .unwrap_or_else(|| "Recette inconnue".to_string());
             let view = ContributionItemView::from_display(contrib, title);
             match view.status {
                 ContributionStatus::Pending => pending.push(view),
@@ -272,7 +272,7 @@ async fn accept_contribution(
     let book = BookService::get_by_id(&state.db, book_id).await?;
     if book.owner_id != auth.id {
         return Err(AppError::Forbidden(
-            "Only the book owner can manage contributions".to_string(),
+            "Seul le propriétaire du livre peut gérer les contributions".to_string(),
         ));
     }
 
@@ -330,7 +330,7 @@ async fn reject_contribution(
     if let Some(ref reason) = form.reason {
         if reason.len() > 500 {
             return Err(AppError::BadRequest(
-                "Rejection reason must be at most 500 characters".to_string(),
+                "Le motif de rejet doit comporter au plus 500 caractères".to_string(),
             ));
         }
     }
@@ -339,7 +339,7 @@ async fn reject_contribution(
     let book = BookService::get_by_id(&state.db, book_id).await?;
     if book.owner_id != auth.id {
         return Err(AppError::Forbidden(
-            "Only the book owner can manage contributions".to_string(),
+            "Seul le propriétaire du livre peut gérer les contributions".to_string(),
         ));
     }
 

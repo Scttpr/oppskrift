@@ -31,7 +31,7 @@
                     {# Owner #}
                     {% if let Some(owner) = owner %}
                     <p class="mt-1 text-gray-600 dark:text-gray-400">
-                        by <a href="/users/{{ owner.id }}" class="text-primary-600 dark:text-primary-400 hover:underline">{{ owner.display_name }}</a>
+                        par <a href="/users/{{ owner.id }}" class="text-primary-600 dark:text-primary-400 hover:underline">{{ owner.display_name }}</a>
                     </p>
                     {% endif %}
 
@@ -42,7 +42,7 @@
                     {% endif %}
 
                     <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                        {{ recipe_count }} recipe{% if recipe_count != 1 %}s{% endif %}
+                        {{ recipe_count }} recette{% if recipe_count != 1 %}s{% endif %}
                     </p>
                 </div>
             </div>
@@ -53,26 +53,26 @@
                 <a
                     href="/books/{{ book.id }}/share"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
-                    title="Manage sharing settings"
+                    title="Gérer le partage"
                 >
                     <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                     </svg>
-                    Share
+                    Partager
                 </a>
                 <a
                     href="/books/{{ book.id }}/edit"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
-                    Edit
+                    Modifier
                 </a>
                 <button
                     hx-delete="/api/v1/books/{{ book.id }}"
-                    hx-confirm="Are you sure you want to delete this book?"
+                    hx-confirm="Es-tu sûr de vouloir supprimer ce livre ?"
                     hx-on::after-request="if(event.detail.successful) window.location.href = '/books'"
                     class="px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-600 rounded-md hover:bg-red-50 dark:hover:bg-red-900"
                 >
-                    Delete
+                    Supprimer
                 </button>
             </div>
             {% endif %}
@@ -82,7 +82,7 @@
     {# Recipes in Book #}
     <section aria-labelledby="recipes-heading">
         <h2 id="recipes-heading" class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Recipes in this Book
+            Recettes de ce livre
         </h2>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -96,12 +96,12 @@
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No recipes yet</h3>
+            <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">Aucune recette pour le moment</h3>
             <p class="mt-2 text-gray-500 dark:text-gray-400">
                 {% if is_owner %}
-                Add recipes to this book from any recipe page.
+                Ajoute des recettes à ce livre depuis n'importe quelle page de recette.
                 {% else %}
-                This book doesn't have any recipes yet.
+                Ce livre ne contient aucune recette pour le moment.
                 {% endif %}
             </p>
         </div>
@@ -115,7 +115,7 @@
             Contributions
             {% if contributions.pending_count > 0 %}
             <span class="ml-2 px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded-full">
-                {{ contributions.pending_count }} pending
+                {{ contributions.pending_count }} en attente
             </span>
             {% endif %}
         </h2>
@@ -123,7 +123,7 @@
         {# Pending Contributions #}
         {% if !contributions.pending.is_empty() %}
         <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
-            <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Pending Review</h3>
+            <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3">En attente de validation</h3>
             <div class="space-y-3">
                 {% for contrib in contributions.pending %}
                 <div id="contribution-{{ contrib.id }}" class="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
@@ -132,7 +132,7 @@
                             {{ contrib.recipe_title }}
                         </a>
                         <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                            by {{ contrib.contributor_name }} &middot; {{ contrib.added_at }}
+                            par {{ contrib.contributor_name }} &middot; {{ contrib.added_at }}
                         </span>
                     </div>
                     <div class="flex items-center gap-2">
@@ -145,7 +145,7 @@
                         >
                             <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
                             <button type="submit" class="px-3 py-1 text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-400 dark:hover:bg-green-900 rounded">
-                                Accept
+                                Accepter
                             </button>
                         </form>
                         <form
@@ -154,11 +154,11 @@
                             hx-post="/books/{{ book.id }}/contributions/{{ contrib.id }}/reject"
                             hx-target="#contribution-{{ contrib.id }}"
                             hx-swap="outerHTML"
-                            hx-confirm="Reject this contribution?"
+                            hx-confirm="Rejeter cette contribution ?"
                         >
                             <input type="hidden" name="_csrf" value="{{ csrf_token }}" />
                             <button type="submit" class="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-400 dark:hover:bg-red-900 rounded">
-                                Reject
+                                Rejeter
                             </button>
                         </form>
                     </div>
@@ -171,7 +171,7 @@
         {# Accepted Contributions #}
         {% if !contributions.accepted.is_empty() %}
         <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
-            <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Accepted</h3>
+            <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Acceptées</h3>
             <div class="space-y-2">
                 {% for contrib in contributions.accepted %}
                 <div class="flex items-center justify-between p-2 text-sm">
@@ -179,7 +179,7 @@
                         {{ contrib.recipe_title }}
                     </a>
                     <span class="text-xs text-gray-500 dark:text-gray-400">
-                        by {{ contrib.contributor_name }}
+                        par {{ contrib.contributor_name }}
                     </span>
                 </div>
                 {% endfor %}
@@ -191,7 +191,7 @@
         {% if !contributions.rejected.is_empty() %}
         <details class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
             <summary class="p-4 cursor-pointer text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
-                Rejected ({{ contributions.rejected.len() }})
+                Rejetées ({{ contributions.rejected.len() }})
             </summary>
             <div class="px-4 pb-4 space-y-2">
                 {% for contrib in contributions.rejected %}
@@ -210,7 +210,7 @@
         {% if contributions.pending.is_empty() && contributions.accepted.is_empty() && contributions.rejected.is_empty() %}
         <div class="text-center py-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
             <p class="text-gray-500 dark:text-gray-400">
-                No contributions yet. Share your book to receive recipe contributions.
+                Aucune contribution pour le moment. Partage ton livre pour recevoir des contributions de recettes.
             </p>
         </div>
         {% endif %}

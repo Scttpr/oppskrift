@@ -15,7 +15,7 @@
             />
             {# Recipe Count Badge on image #}
             <span class="absolute bottom-2 right-2 px-2 py-1 text-xs font-medium rounded-full bg-gray-900/75 text-white">
-                {{ book.recipe_count }} recipe{% if book.recipe_count != 1 %}s{% endif %}
+                {{ book.recipe_count }} recette{% if book.recipe_count != 1 %}s{% endif %}
             </span>
         </div>
         {% endif %}
@@ -36,7 +36,7 @@
             {% if book.cover_image_url.is_none() %}
             <div class="mt-auto pt-3">
                 <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                    {{ book.recipe_count }} recipe{% if book.recipe_count != 1 %}s{% endif %}
+                    {{ book.recipe_count }} recette{% if book.recipe_count != 1 %}s{% endif %}
                 </span>
             </div>
             {% endif %}

@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}{% if let Some(_) = book %}Edit Book{% else %}Create Book{% endif %} - Oppskrift{% endblock %}
+{% block title %}{% if let Some(_) = book %}Modifier le livre{% else %}Créer un livre{% endif %} - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
     <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">
-        {% if let Some(_) = book %}Edit Recipe Book{% else %}Create a New Recipe Book{% endif %}
+        {% if let Some(_) = book %}Modifier le livre de recettes{% else %}Créer un nouveau livre de recettes{% endif %}
     </h1>
 
     <div id="form-errors" class="hidden mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -21,7 +21,7 @@
         {# Title #}
         <div>
             <label for="title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Title <span class="text-red-500" aria-hidden="true">*</span>
+                Titre <span class="text-red-500" aria-hidden="true">*</span>
             </label>
             <input
                 type="text"
@@ -34,7 +34,7 @@
                 aria-describedby="title-help"
             />
             <p id="title-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Give your recipe book a descriptive name
+                Donne un nom descriptif à ton livre de recettes
             </p>
         </div>
 
@@ -54,7 +54,7 @@
         {# Cover Image #}
         <div>
             <label for="cover_image" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Cover Image
+                Image de couverture
             </label>
             <input
                 type="file"
@@ -71,14 +71,14 @@
             />
             {% if let Some(b) = book %}
             {% if let Some(cover_url) = b.cover_image_url %}
-            <img src="{{ cover_url }}" alt="Current cover" class="mt-2 w-32 h-24 object-cover rounded" />
+            <img src="{{ cover_url }}" alt="Couverture actuelle" class="mt-2 w-32 h-24 object-cover rounded" />
             {% endif %}
             {% endif %}
         </div>
 
         {# Visibility #}
         <div>
-            <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Visibility</span>
+            <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Visibilité</span>
             <div class="flex items-center gap-4">
                 <label class="flex items-center gap-2">
                     <input
@@ -104,7 +104,7 @@
                         {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
-                    <span class="text-gray-700 dark:text-gray-300">Private</span>
+                    <span class="text-gray-700 dark:text-gray-300">Privé</span>
                 </label>
             </div>
         </div>
@@ -115,13 +115,13 @@
                 type="submit"
                 class="px-6 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
             >
-                {% if let Some(_) = book %}Update Book{% else %}Create Book{% endif %}
+                {% if let Some(_) = book %}Mettre à jour le livre{% else %}Créer le livre{% endif %}
             </button>
             <a
                 href="{% if let Some(b) = book %}/books/{{ b.id }}{% else %}/books{% endif %}"
                 class="px-6 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
             >
-                Cancel
+                Annuler
             </a>
         </div>
     </form>
@@ -137,7 +137,7 @@ document.getElementById('book-form').addEventListener('submit', async (e) => {
 
     // Disable button during submission
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving...';
+    submitBtn.textContent = 'Enregistrement…';
     errorDiv.classList.add('hidden');
 
     const formData = new FormData(form);
@@ -159,16 +159,16 @@ document.getElementById('book-form').addEventListener('submit', async (e) => {
             // Redirect to the book page
             window.location.href = `/books/${result.id}`;
         } else {
-            errorText.textContent = result.error || 'Failed to save book';
+            errorText.textContent = result.error || "Échec de l'enregistrement du livre";
             errorDiv.classList.remove('hidden');
             submitBtn.disabled = false;
-            submitBtn.textContent = isEdit ? 'Update Book' : 'Create Book';
+            submitBtn.textContent = isEdit ? 'Mettre à jour le livre' : 'Créer le livre';
         }
     } catch (err) {
-        errorText.textContent = 'Network error. Please try again.';
+        errorText.textContent = 'Erreur réseau. Réessaie.';
         errorDiv.classList.remove('hidden');
         submitBtn.disabled = false;
-        submitBtn.textContent = isEdit ? 'Update Book' : 'Create Book';
+        submitBtn.textContent = isEdit ? 'Mettre à jour le livre' : 'Créer le livre';
     }
 });
 </script>

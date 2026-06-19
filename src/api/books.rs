@@ -130,7 +130,7 @@ async fn create_book(
         }
     }
 
-    let title = title.ok_or_else(|| AppError::BadRequest("Title is required".to_string()))?;
+    let title = title.ok_or_else(|| AppError::BadRequest("Le titre est obligatoire".to_string()))?;
 
     let visibility_enum = match visibility.as_deref() {
         Some("public") | None => Some(crate::models::Visibility::Public),
