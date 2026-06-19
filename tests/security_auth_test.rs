@@ -418,6 +418,7 @@ async fn test_account_lockout_after_failed_attempts() {
             .unwrap_or("");
 
         let indicates_lockout = message.to_lowercase().contains("lock")
+            || message.to_lowercase().contains("verrouillé")
             || message.to_lowercase().contains("too many")
             || message.to_lowercase().contains("temporarily")
             || response.body.get("locked_until").is_some();

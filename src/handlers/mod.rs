@@ -87,6 +87,21 @@ struct HomeTemplate {
     recent_recipes: Vec<RecipeSummary>,
 }
 
+/// Home page handler
+async fn home_page(State(state): State<AppState>) -> AppResult<Html<String>> {
+    let params = PaginationParams {
+        page: 1,
+        page_size: 6,
+    };
+    let recipes_page = RecipeService::list_public(&state.db, &params).await?;
+
+    let template = HomeTemplate {
+        recent_recipes: recipes_page.data,
+    };
+
+    crate::core::render(&template)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,19 +163,4 @@ mod tests {
             .expect("user menu renders");
         assert!(!logged_out.contains("Sign In"), "login link must be French");
     }
-}
-
-/// Home page handler
-async fn home_page(State(state): State<AppState>) -> AppResult<Html<String>> {
-    let params = PaginationParams {
-        page: 1,
-        page_size: 6,
-    };
-    let recipes_page = RecipeService::list_public(&state.db, &params).await?;
-
-    let template = HomeTemplate {
-        recent_recipes: recipes_page.data,
-    };
-
-    crate::core::render(&template)
 }
