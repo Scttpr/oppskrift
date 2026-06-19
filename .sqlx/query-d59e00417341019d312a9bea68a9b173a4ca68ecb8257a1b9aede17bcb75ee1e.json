@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                b.id, b.owner_id, b.title, b.description, b.cover_image_url,\n                b.visibility as \"visibility: Visibility\",\n                b.created_at,\n                COUNT(e.id) as \"recipe_count!\"\n            FROM recipe_books b\n            LEFT JOIN book_recipe_entries e ON e.book_id = b.id\n            WHERE b.visibility = 'public'\n            GROUP BY b.id\n            ORDER BY b.created_at DESC\n            LIMIT $1 OFFSET $2\n            ",
+  "query": "\n                    SELECT\n                        b.id, b.owner_id, b.title, b.description, b.cover_image_url,\n                        b.visibility as \"visibility: Visibility\",\n                        b.created_at,\n                        COUNT(e.id) as \"recipe_count!\"\n                    FROM recipe_books b\n                    LEFT JOIN book_recipe_entries e ON e.book_id = b.id\n                    WHERE b.visibility = 'public'\n                    GROUP BY b.id\n                    ORDER BY b.created_at DESC\n                    LIMIT $1 OFFSET $2\n                    ",
   "describe": {
     "columns": [
       {
@@ -72,5 +72,5 @@
       null
     ]
   },
-  "hash": "8aaf4bb751d914adef289773c8056940e8dc30b715a5cc942cbc6109a2bc65a8"
+  "hash": "d59e00417341019d312a9bea68a9b173a4ca68ecb8257a1b9aede17bcb75ee1e"
 }

@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::core::audit::AuditEvent;
 use crate::core::error::{AppError, AppResult};
-use crate::core::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::pagination::{paginate, PaginatedResponse, PaginationParams};
 use crate::models::{
     CreateIngredient, CreateInstructionStep, CreateRecipe, Difficulty, Ingredient, InstructionStep,
     PermissionLevel, Recipe, RecipeSummary, ResourceType, UpdateRecipe, Visibility,
@@ -258,45 +258,39 @@ impl RecipeService {
         author_id: Uuid,
         params: &PaginationParams,
     ) -> AppResult<PaginatedResponse<RecipeSummary>> {
-        let limit = params.limit();
-        let offset = params.offset();
-
-        let recipes = sqlx::query_as!(
-            RecipeSummary,
-            r#"
-            SELECT
-                r.id, r.author_id, r.title, r.description,
-                r.prep_time_min, r.cook_time_min,
-                r.difficulty as "difficulty: Difficulty",
-                r.created_at,
-                ri.url as "primary_image_url?"
-            FROM recipes r
-            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
-            WHERE r.author_id = $1
-            ORDER BY r.created_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-            author_id,
-            limit as i64,
-            offset as i64
+        paginate(
+            params,
+            |limit, offset| {
+                sqlx::query_as!(
+                    RecipeSummary,
+                    r#"
+                    SELECT
+                        r.id, r.author_id, r.title, r.description,
+                        r.prep_time_min, r.cook_time_min,
+                        r.difficulty as "difficulty: Difficulty",
+                        r.created_at,
+                        ri.url as "primary_image_url?"
+                    FROM recipes r
+                    LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
+                    WHERE r.author_id = $1
+                    ORDER BY r.created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                    author_id,
+                    limit,
+                    offset
+                )
+                .fetch_all(pool)
+            },
+            || {
+                sqlx::query_scalar!(
+                    r#"SELECT COUNT(*) as "count!" FROM recipes WHERE author_id = $1"#,
+                    author_id
+                )
+                .fetch_one(pool)
+            },
         )
-        .fetch_all(pool)
-        .await?;
-
-        let total: i64 = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM recipes WHERE author_id = $1",
-            author_id
-        )
-        .fetch_one(pool)
-        .await?
-        .unwrap_or(0);
-
-        Ok(PaginatedResponse::new(
-            recipes,
-            params.page,
-            limit,
-            total as u64,
-        ))
+        .await
     }
 
     /// List public recipes
@@ -304,42 +298,37 @@ impl RecipeService {
         pool: &PgPool,
         params: &PaginationParams,
     ) -> AppResult<PaginatedResponse<RecipeSummary>> {
-        let limit = params.limit();
-        let offset = params.offset();
-
-        let recipes = sqlx::query_as!(
-            RecipeSummary,
-            r#"
-            SELECT
-                r.id, r.author_id, r.title, r.description,
-                r.prep_time_min, r.cook_time_min,
-                r.difficulty as "difficulty: Difficulty",
-                r.created_at,
-                ri.url as "primary_image_url?"
-            FROM recipes r
-            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
-            WHERE r.visibility = 'public'
-            ORDER BY r.created_at DESC
-            LIMIT $1 OFFSET $2
-            "#,
-            limit as i64,
-            offset as i64
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let total: i64 =
-            sqlx::query_scalar!("SELECT COUNT(*) FROM recipes WHERE visibility = 'public'")
+        paginate(
+            params,
+            |limit, offset| {
+                sqlx::query_as!(
+                    RecipeSummary,
+                    r#"
+                    SELECT
+                        r.id, r.author_id, r.title, r.description,
+                        r.prep_time_min, r.cook_time_min,
+                        r.difficulty as "difficulty: Difficulty",
+                        r.created_at,
+                        ri.url as "primary_image_url?"
+                    FROM recipes r
+                    LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
+                    WHERE r.visibility = 'public'
+                    ORDER BY r.created_at DESC
+                    LIMIT $1 OFFSET $2
+                    "#,
+                    limit,
+                    offset
+                )
+                .fetch_all(pool)
+            },
+            || {
+                sqlx::query_scalar!(
+                    r#"SELECT COUNT(*) as "count!" FROM recipes WHERE visibility = 'public'"#
+                )
                 .fetch_one(pool)
-                .await?
-                .unwrap_or(0);
-
-        Ok(PaginatedResponse::new(
-            recipes,
-            params.page,
-            limit,
-            total as u64,
-        ))
+            },
+        )
+        .await
     }
 
     /// Search public recipes by title and description (full-text)
@@ -353,52 +342,46 @@ impl RecipeService {
         query: &str,
         params: &PaginationParams,
     ) -> AppResult<PaginatedResponse<RecipeSummary>> {
-        let limit = params.limit();
-        let offset = params.offset();
-
-        let recipes = sqlx::query_as!(
-            RecipeSummary,
-            r#"
-            SELECT
-                r.id, r.author_id, r.title, r.description,
-                r.prep_time_min, r.cook_time_min,
-                r.difficulty as "difficulty: Difficulty",
-                r.created_at,
-                ri.url as "primary_image_url?"
-            FROM recipes r
-            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
-            WHERE r.visibility = 'public'
-              AND r.search_vector @@ websearch_to_tsquery('english', $1)
-            ORDER BY ts_rank(r.search_vector, websearch_to_tsquery('english', $1)) DESC,
-                     r.created_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-            query,
-            limit as i64,
-            offset as i64
+        paginate(
+            params,
+            |limit, offset| {
+                sqlx::query_as!(
+                    RecipeSummary,
+                    r#"
+                    SELECT
+                        r.id, r.author_id, r.title, r.description,
+                        r.prep_time_min, r.cook_time_min,
+                        r.difficulty as "difficulty: Difficulty",
+                        r.created_at,
+                        ri.url as "primary_image_url?"
+                    FROM recipes r
+                    LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
+                    WHERE r.visibility = 'public'
+                      AND r.search_vector @@ websearch_to_tsquery('english', $1)
+                    ORDER BY ts_rank(r.search_vector, websearch_to_tsquery('english', $1)) DESC,
+                             r.created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                    query,
+                    limit,
+                    offset
+                )
+                .fetch_all(pool)
+            },
+            || {
+                sqlx::query_scalar!(
+                    r#"
+                    SELECT COUNT(*) as "count!"
+                    FROM recipes
+                    WHERE visibility = 'public'
+                      AND search_vector @@ websearch_to_tsquery('english', $1)
+                    "#,
+                    query
+                )
+                .fetch_one(pool)
+            },
         )
-        .fetch_all(pool)
-        .await?;
-
-        let total: i64 = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*)
-            FROM recipes
-            WHERE visibility = 'public'
-              AND search_vector @@ websearch_to_tsquery('english', $1)
-            "#,
-            query
-        )
-        .fetch_one(pool)
-        .await?
-        .unwrap_or(0);
-
-        Ok(PaginatedResponse::new(
-            recipes,
-            params.page,
-            limit,
-            total as u64,
-        ))
+        .await
     }
 
     /// Get ingredients for a recipe

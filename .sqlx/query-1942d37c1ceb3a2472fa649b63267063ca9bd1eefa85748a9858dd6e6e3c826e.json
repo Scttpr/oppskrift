@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                r.id, r.author_id, r.title, r.description,\n                r.prep_time_min, r.cook_time_min,\n                r.difficulty as \"difficulty: Difficulty\",\n                r.created_at,\n                ri.url as \"primary_image_url?\"\n            FROM recipes r\n            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true\n            WHERE r.visibility = 'public'\n              AND r.search_vector @@ websearch_to_tsquery('english', $1)\n            ORDER BY ts_rank(r.search_vector, websearch_to_tsquery('english', $1)) DESC,\n                     r.created_at DESC\n            LIMIT $2 OFFSET $3\n            ",
+  "query": "\n                    SELECT\n                        r.id, r.author_id, r.title, r.description,\n                        r.prep_time_min, r.cook_time_min,\n                        r.difficulty as \"difficulty: crate::models::Difficulty\",\n                        r.created_at,\n                        ri.url as \"primary_image_url?\"\n                    FROM recipes r\n                    INNER JOIN book_recipe_entries e ON e.recipe_id = r.id\n                    LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true\n                    WHERE e.book_id = $1 AND r.visibility = 'public'\n                    ORDER BY e.position\n                    LIMIT $2 OFFSET $3\n                    ",
   "describe": {
     "columns": [
       {
@@ -35,7 +35,7 @@
       },
       {
         "ordinal": 6,
-        "name": "difficulty: Difficulty",
+        "name": "difficulty: crate::models::Difficulty",
         "type_info": {
           "Custom": {
             "name": "difficulty_type",
@@ -62,7 +62,7 @@
     ],
     "parameters": {
       "Left": [
-        "Text",
+        "Uuid",
         "Int8",
         "Int8"
       ]
@@ -79,5 +79,5 @@
       false
     ]
   },
-  "hash": "493716fd0633c14d88c7c58e4cffda6609e40a9ab3120f1bf5f0143f271d958a"
+  "hash": "1942d37c1ceb3a2472fa649b63267063ca9bd1eefa85748a9858dd6e6e3c826e"
 }

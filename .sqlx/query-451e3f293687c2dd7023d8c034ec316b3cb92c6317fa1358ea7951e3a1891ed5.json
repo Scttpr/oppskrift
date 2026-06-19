@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT COUNT(*) as \"count!\"\n                    FROM recipes\n                    WHERE visibility = 'public'\n                      AND search_vector @@ websearch_to_tsquery('english', $1)\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "451e3f293687c2dd7023d8c034ec316b3cb92c6317fa1358ea7951e3a1891ed5"
+}

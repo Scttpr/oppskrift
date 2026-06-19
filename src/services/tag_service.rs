@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::core::error::{AppError, AppResult};
-use crate::core::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::pagination::{paginate, PaginatedResponse, PaginationParams};
 use crate::models::{slugify, Difficulty, RecipeSummary, Tag, TagWithCount, MAX_TAGS_PER_RECIPE};
 
 /// Service for tag / category operations
@@ -135,52 +135,46 @@ impl TagService {
         slug: &str,
         params: &PaginationParams,
     ) -> AppResult<PaginatedResponse<RecipeSummary>> {
-        let limit = params.limit();
-        let offset = params.offset();
-
-        let recipes = sqlx::query_as!(
-            RecipeSummary,
-            r#"
-            SELECT
-                r.id, r.author_id, r.title, r.description,
-                r.prep_time_min, r.cook_time_min,
-                r.difficulty as "difficulty: Difficulty",
-                r.created_at,
-                ri.url as "primary_image_url?"
-            FROM recipes r
-            JOIN recipe_tags rt ON rt.recipe_id = r.id
-            JOIN tags t ON t.id = rt.tag_id
-            LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
-            WHERE r.visibility = 'public' AND t.slug = $1
-            ORDER BY r.created_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-            slug,
-            limit as i64,
-            offset as i64
+        paginate(
+            params,
+            |limit, offset| {
+                sqlx::query_as!(
+                    RecipeSummary,
+                    r#"
+                    SELECT
+                        r.id, r.author_id, r.title, r.description,
+                        r.prep_time_min, r.cook_time_min,
+                        r.difficulty as "difficulty: Difficulty",
+                        r.created_at,
+                        ri.url as "primary_image_url?"
+                    FROM recipes r
+                    JOIN recipe_tags rt ON rt.recipe_id = r.id
+                    JOIN tags t ON t.id = rt.tag_id
+                    LEFT JOIN recipe_images ri ON ri.recipe_id = r.id AND ri.is_primary = true
+                    WHERE r.visibility = 'public' AND t.slug = $1
+                    ORDER BY r.created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                    slug,
+                    limit,
+                    offset
+                )
+                .fetch_all(pool)
+            },
+            || {
+                sqlx::query_scalar!(
+                    r#"
+                    SELECT COUNT(*) as "count!"
+                    FROM recipes r
+                    JOIN recipe_tags rt ON rt.recipe_id = r.id
+                    JOIN tags t ON t.id = rt.tag_id
+                    WHERE r.visibility = 'public' AND t.slug = $1
+                    "#,
+                    slug
+                )
+                .fetch_one(pool)
+            },
         )
-        .fetch_all(pool)
-        .await?;
-
-        let total: i64 = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*)
-            FROM recipes r
-            JOIN recipe_tags rt ON rt.recipe_id = r.id
-            JOIN tags t ON t.id = rt.tag_id
-            WHERE r.visibility = 'public' AND t.slug = $1
-            "#,
-            slug
-        )
-        .fetch_one(pool)
-        .await?
-        .unwrap_or(0);
-
-        Ok(PaginatedResponse::new(
-            recipes,
-            params.page,
-            limit,
-            total as u64,
-        ))
+        .await
     }
 }

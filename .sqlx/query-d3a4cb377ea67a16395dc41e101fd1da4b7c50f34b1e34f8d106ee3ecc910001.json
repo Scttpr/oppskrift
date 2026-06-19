@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id, actor_id,\n                activity_type as \"activity_type: ActivityType\",\n                target_type as \"target_type: TargetType\",\n                target_id, created_at, ap_id\n            FROM activities\n            WHERE actor_id = $1\n            ORDER BY created_at DESC\n            LIMIT $2 OFFSET $3\n            ",
+  "query": "\n                    SELECT\n                        id, actor_id,\n                        activity_type as \"activity_type: ActivityType\",\n                        target_type as \"target_type: TargetType\",\n                        target_id, created_at, ap_id\n                    FROM activities\n                    WHERE actor_id = $1\n                    ORDER BY created_at DESC\n                    LIMIT $2 OFFSET $3\n                    ",
   "describe": {
     "columns": [
       {
@@ -78,5 +78,5 @@
       false
     ]
   },
-  "hash": "4544c0faa3ef2bd19b41caf1a203881585fa1fb92db42d3a8baaeba2c0afe9ba"
+  "hash": "d3a4cb377ea67a16395dc41e101fd1da4b7c50f34b1e34f8d106ee3ecc910001"
 }
