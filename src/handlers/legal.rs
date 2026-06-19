@@ -64,6 +64,46 @@ mod tests {
     // Template Rendering Tests (T056)
     // ==========================================================================
 
+    fn assert_no_english(html: &str, sentinels: &[&str]) {
+        for s in sentinels {
+            assert!(
+                !html.contains(s),
+                "should not contain English sentinel: {s:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_legal_pages_are_french() {
+        assert_no_english(
+            &AboutTemplate.render().unwrap(),
+            &[
+                "About Oppskrift",
+                "What is Oppskrift",
+                "Features",
+                "Open Source",
+            ],
+        );
+        assert_no_english(
+            &TermsTemplate.render().unwrap(),
+            &[
+                "Terms of Service",
+                "Acceptance of Terms",
+                "User Content",
+                "Governing Law",
+            ],
+        );
+        assert_no_english(
+            &PrivacyTemplate.render().unwrap(),
+            &[
+                "Privacy Policy",
+                "Data Controller",
+                "Your Rights",
+                "Data Retention",
+            ],
+        );
+    }
+
     #[test]
     fn test_about_template_renders() {
         let template = AboutTemplate;
