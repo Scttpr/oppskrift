@@ -10,7 +10,7 @@ use axum::{
 };
 
 use super::{create_request_context, generate_csrf, validate_csrf, CsrfOnlyForm};
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::Viewer;
 use crate::core::audit::AuditEvent;
 use crate::core::error::{AppError, AppResult};
 use crate::core::request_id::RequestId;
@@ -33,10 +33,10 @@ struct PrivacyPageTemplate {
 /// Privacy settings page handler (GET) (T020)
 pub(crate) async fn privacy_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -63,20 +63,20 @@ pub(crate) async fn toggle_federation(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
-    auth: AuthUser,
+    viewer: Viewer,
     Form(form): Form<CsrfOnlyForm>,
 ) -> AppResult<Html<String>> {
     // Validate CSRF token
-    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+    validate_csrf(&state, &form.csrf_token, viewer.session_id)?;
 
-    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), viewer.session_id);
 
     // Get current state and toggle
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
     let new_state = !user.federation_enabled;
 
     // Update federation status
-    UserService::update_federation_enabled(&state.db, auth.id, new_state).await?;
+    UserService::update_federation_enabled(&state.db, viewer.id, new_state).await?;
 
     // Log the change
     let event_type = if new_state {
@@ -85,13 +85,13 @@ pub(crate) async fn toggle_federation(
         "settings.federation.disable"
     };
     AuditEvent::new(event_type)
-        .with_user(auth.id)
+        .with_user(viewer.id)
         .with_context(&ctx)
         .persist(&state.db)
         .await;
 
     // Return updated toggle button for HTMX swap
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let csrf_token = generate_csrf(&state, viewer.session_id);
     let html = format!(
         r#"<form
             method="POST"
@@ -137,18 +137,18 @@ pub(crate) async fn export_data(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
-    auth: AuthUser,
+    viewer: Viewer,
     Form(form): Form<CsrfOnlyForm>,
 ) -> Result<Response, AppError> {
     use crate::services::{ExportRateLimitResult, ExportService};
 
     // Validate CSRF token
-    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+    validate_csrf(&state, &form.csrf_token, viewer.session_id)?;
 
-    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), viewer.session_id);
 
     // Use advisory lock to prevent TOCTOU race condition on rate limit
-    let lock_acquired = ExportService::try_acquire_lock(&state.db, auth.id).await?;
+    let lock_acquired = ExportService::try_acquire_lock(&state.db, viewer.id).await?;
     if !lock_acquired {
         return Err(AppError::BadRequest(
             "Export already in progress. Please wait and try again.".to_string(),
@@ -156,7 +156,7 @@ pub(crate) async fn export_data(
     }
 
     // Check rate limit (T028): 1 export per hour
-    match ExportService::check_rate_limit(&state.db, auth.id).await? {
+    match ExportService::check_rate_limit(&state.db, viewer.id).await? {
         ExportRateLimitResult::RateLimited(wait_mins) => {
             return Err(AppError::BadRequest(format!(
                 "Export rate limit exceeded. Please wait {} more minute(s).",
@@ -167,10 +167,10 @@ pub(crate) async fn export_data(
     }
 
     // Get user data
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
 
     // Check recipe count for async threshold (FR-015: >50 recipes = async)
-    let recipe_count = ExportService::count_user_recipes(&state.db, auth.id).await?;
+    let recipe_count = ExportService::count_user_recipes(&state.db, viewer.id).await?;
 
     // For now, we only implement sync export (T026)
     // TODO: Implement async export for >50 recipes in future iteration
@@ -186,7 +186,7 @@ pub(crate) async fn export_data(
 
     // Log export event
     AuditEvent::new("account_export")
-        .with_user(auth.id)
+        .with_user(viewer.id)
         .with_context(&ctx)
         .persist(&state.db)
         .await;

@@ -14,11 +14,11 @@ pub mod users;
 use askama::Template;
 use axum::{extract::State, response::Html, routing::get, Router};
 
-use crate::api::middleware::OptionalAuthUser;
+use crate::api::middleware::OptionalViewer;
 use crate::core::error::AppResult;
 use crate::core::pagination::PaginationParams;
 use crate::models::RecipeSummary;
-use crate::services::{RecipeService, UserService};
+use crate::services::RecipeService;
 use crate::AppState;
 
 /// Create HTML page routes
@@ -52,28 +52,19 @@ struct UserMenuTemplate {
 }
 
 /// User menu partial handler - returns HTML fragment for HTMX
-async fn user_menu_partial(
-    State(state): State<AppState>,
-    auth: OptionalAuthUser,
-) -> AppResult<Html<String>> {
-    let current_user = if let Some(auth_user) = auth.0 {
-        UserService::get_by_id(&state.db, auth_user.id)
-            .await
-            .ok()
-            .map(|u| {
-                let display_name = if u.display_name.is_empty() {
-                    u.username
-                } else {
-                    u.display_name
-                };
-                CurrentUser {
-                    id: u.id,
-                    display_name,
-                }
-            })
-    } else {
-        None
-    };
+async fn user_menu_partial(viewer: OptionalViewer) -> AppResult<Html<String>> {
+    let current_user = viewer.0.map(|v| {
+        let u = v.user;
+        let display_name = if u.display_name.is_empty() {
+            u.username
+        } else {
+            u.display_name
+        };
+        CurrentUser {
+            id: u.id,
+            display_name,
+        }
+    });
 
     let template = UserMenuTemplate { current_user };
 

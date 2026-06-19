@@ -15,12 +15,12 @@ use super::{
     create_auth_service, create_request_context, generate_csrf, validate_csrf, CsrfOnlyForm,
 };
 use crate::api::account::SecurityEventView;
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::{AuthUser, Viewer};
 use crate::core::audit::AuditEvent;
 use crate::core::error::{AppError, AppResult};
 use crate::core::request_id::{RequestContext, RequestId};
 use crate::models::session::SessionItemView;
-use crate::services::{SecurityEventService, ServiceFactory, UserService};
+use crate::services::{SecurityEventService, ServiceFactory};
 use crate::AppState;
 
 // =============================================================================
@@ -40,11 +40,8 @@ pub(crate) struct SecurityTemplate {
 }
 
 /// Security settings page
-pub(crate) async fn security_page(
-    State(state): State<AppState>,
-    auth: AuthUser,
-) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+pub(crate) async fn security_page(viewer: Viewer) -> AppResult<Html<String>> {
+    let user = viewer.user;
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -100,10 +97,10 @@ struct PasswordChangeTemplate {
 /// Password change page (GET)
 pub(crate) async fn password_change_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -126,13 +123,13 @@ pub(crate) async fn password_change_page(
 /// Password change handler (POST) (T043)
 pub(crate) async fn password_change(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
     Form(form): Form<ChangePasswordForm>,
 ) -> AppResult<Html<String>> {
     // Validate CSRF token
-    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+    validate_csrf(&state, &form.csrf_token, viewer.session_id)?;
 
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
     let mut errors = vec![];
 
     // Validate form
@@ -152,7 +149,7 @@ pub(crate) async fn password_change(
     }
 
     if !errors.is_empty() {
-        let csrf_token = generate_csrf(&state, auth.session_id);
+        let csrf_token = generate_csrf(&state, viewer.session_id);
         let deletion_pending = user.deletion_requested_at.is_some();
         let deletion_date = user
             .deletion_requested_at
@@ -173,11 +170,11 @@ pub(crate) async fn password_change(
 
     // Call auth service to change password
     let auth_service = create_auth_service(&state);
-    let ctx = RequestContext::new().with_session_id(auth.session_id);
+    let ctx = RequestContext::new().with_session_id(viewer.session_id);
     match auth_service
         .change_password(
-            auth.id,
-            auth.session_id,
+            viewer.id,
+            viewer.session_id,
             &form.current_password,
             &form.new_password,
             &ctx,
@@ -189,7 +186,7 @@ pub(crate) async fn password_change(
             // and logs the audit event
 
             tracing::info!(
-                user_id = %auth.id,
+                user_id = %viewer.id,
                 sessions_revoked = sessions_revoked,
                 "Password changed via settings"
             );
@@ -212,7 +209,7 @@ pub(crate) async fn password_change(
             crate::core::render(&template)
         }
         Err(e) => {
-            let csrf_token = generate_csrf(&state, auth.session_id);
+            let csrf_token = generate_csrf(&state, viewer.session_id);
             let deletion_pending = user.deletion_requested_at.is_some();
             let deletion_date = user
                 .deletion_requested_at
@@ -254,15 +251,15 @@ struct SessionsPageTemplate {
 /// Sessions page handler (GET) (T010)
 pub(crate) async fn sessions_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     // Get all active sessions with details
     let session_service = ServiceFactory::create_session_service(state.db.clone());
     let session_infos = session_service
-        .list_for_user(auth.id, Some(auth.session_id))
+        .list_for_user(viewer.id, Some(viewer.session_id))
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to list sessions");
@@ -429,10 +426,10 @@ struct SecurityEventsPageTemplate {
 /// Default pagination: 20 events per page, most recent first.
 pub(crate) async fn security_events_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
 
     // Parse pagination parameters
     let page: u32 = params
@@ -443,11 +440,11 @@ pub(crate) async fn security_events_page(
     let per_page: u32 = 20; // FR-007: 20 events per page
 
     // Get total count for pagination
-    let total_count = SecurityEventService::count_for_user(&state.db, auth.id).await?;
+    let total_count = SecurityEventService::count_for_user(&state.db, viewer.id).await?;
     let total_pages = ((total_count as u32).saturating_sub(1) / per_page) + 1;
 
     // Get events for current page (FR-005: reverse chronological order)
-    let events = SecurityEventService::list_for_user(&state.db, auth.id, page, per_page).await?;
+    let events = SecurityEventService::list_for_user(&state.db, viewer.id, page, per_page).await?;
 
     // Convert to view models
     let events: Vec<SecurityEventView> = events.iter().map(SecurityEventView::from_event).collect();

@@ -7,7 +7,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::api::middleware::{AuthUser, OptionalAuthUser};
+use crate::api::middleware::{AuthUser, OptionalViewer};
 use crate::core::error::AppResult;
 use crate::core::pagination::{PaginatedResponse, PaginationMeta, PaginationParams};
 use crate::core::schema_org::SchemaOrgRecipe;
@@ -44,15 +44,11 @@ struct RecipeListTemplate {
 async fn list_recipes_page(
     State(state): State<AppState>,
     Query(params): Query<PaginationParams>,
-    auth: OptionalAuthUser,
+    viewer: OptionalViewer,
 ) -> AppResult<Html<String>> {
     let recipes_page = RecipeService::list_public(&state.db, &params).await?;
 
-    let user = if let Some(auth_user) = auth.0 {
-        UserService::get_by_id(&state.db, auth_user.id).await.ok()
-    } else {
-        None
-    };
+    let user = viewer.0.map(|v| v.user);
 
     let template = RecipeListTemplate {
         recipes: recipes_page.data,
@@ -146,9 +142,9 @@ struct RecipeViewTemplate {
 async fn view_recipe_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    auth: OptionalAuthUser,
+    viewer: OptionalViewer,
 ) -> AppResult<Html<String>> {
-    let viewer_id = auth.0.as_ref().map(|u| u.id);
+    let viewer_id = viewer.0.as_ref().map(|v| v.id);
     let recipe = RecipeService::get_by_id_authorized(&state.db, id, viewer_id).await?;
     let author = UserService::get_by_id(&state.db, recipe.author_id)
         .await
@@ -174,17 +170,15 @@ async fn view_recipe_page(
     let is_owner = viewer_id == Some(recipe.author_id);
 
     // Fetch current user, their books, and saved status
-    let (user, user_books, recipe_in_book_ids, is_saved) = if let Some(auth_user) = auth.0.as_ref()
-    {
-        let user = UserService::get_by_id(&state.db, auth_user.id).await.ok();
-        let books = BookService::list_by_owner(&state.db, auth_user.id)
+    let (user, user_books, recipe_in_book_ids, is_saved) = if let Some(v) = viewer.0 {
+        let books = BookService::list_by_owner(&state.db, v.id)
             .await
             .unwrap_or_default();
-        let in_books = BookService::get_book_ids_containing_recipe(&state.db, auth_user.id, id)
+        let in_books = BookService::get_book_ids_containing_recipe(&state.db, v.id, id)
             .await
             .unwrap_or_default();
-        let is_saved = SavedRecipeService::is_saved(&state.db, auth_user.id, id).await?;
-        (user, books, in_books, is_saved)
+        let is_saved = SavedRecipeService::is_saved(&state.db, v.id, id).await?;
+        (Some(v.user), books, in_books, is_saved)
     } else {
         (None, vec![], vec![], false)
     };
