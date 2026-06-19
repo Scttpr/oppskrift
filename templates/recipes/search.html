@@ -1,24 +1,24 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Search Recipes - Oppskrift{% endblock %}
+{% block title %}Recherche de recettes - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
     {# Header #}
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-            Search Recipes
+            Recherche de recettes
         </h1>
 
         {# Search form #}
         <form method="get" action="/recipes/search" role="search" class="flex gap-2 max-w-2xl">
-            <label for="recipe-search" class="sr-only">Search recipes</label>
+            <label for="recipe-search" class="sr-only">Rechercher des recettes</label>
             <input
                 type="search"
                 id="recipe-search"
                 name="q"
                 value="{{ query }}"
-                placeholder="Search by title or description…"
+                placeholder="Rechercher par titre ou description…"
                 autocomplete="off"
                 class="flex-grow px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
@@ -29,7 +29,7 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                Search
+                Rechercher
             </button>
         </form>
     </div>
@@ -37,7 +37,7 @@
     {% if !query.is_empty() %}
     {# Results summary #}
     <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        {{ pagination.total_items }} result{% if pagination.total_items != 1 %}s{% endif %} for
+        {{ pagination.total_items }} résultat{% if pagination.total_items != 1 %}s{% endif %} pour
         <span class="font-medium text-gray-700 dark:text-gray-300">{{ query }}</span>
     </p>
 
@@ -54,8 +54,8 @@
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
-        <h2 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No recipes found</h2>
-        <p class="mt-2 text-gray-500 dark:text-gray-400">Try a different search term.</p>
+        <h2 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">Aucune recette trouvée</h2>
+        <p class="mt-2 text-gray-500 dark:text-gray-400">Essaie un autre terme de recherche.</p>
     </div>
     {% endif %}
 
@@ -66,23 +66,23 @@
         <a
             href="?q={{ query }}&page={{ pagination.page - 1 }}"
             class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
-            aria-label="Previous page"
+            aria-label="Page précédente"
         >
-            Previous
+            Précédent
         </a>
         {% endif %}
 
         <span class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
-            Page {{ pagination.page }} of {{ pagination.total_pages }}
+            Page {{ pagination.page }} sur {{ pagination.total_pages }}
         </span>
 
         {% if pagination.has_next %}
         <a
             href="?q={{ query }}&page={{ pagination.page + 1 }}"
             class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
-            aria-label="Next page"
+            aria-label="Page suivante"
         >
-            Next
+            Suivant
         </a>
         {% endif %}
     </nav>

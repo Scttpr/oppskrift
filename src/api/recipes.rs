@@ -386,18 +386,19 @@ async fn upload_image(
                     field
                         .bytes()
                         .await
-                        .map_err(|e| AppError::BadRequest(format!("Failed to read image: {}", e)))?
+                        .map_err(|e| {
+                            AppError::BadRequest(format!("Échec de la lecture de l'image : {}", e))
+                        })?
                         .to_vec(),
                 );
             }
             "alt_text" => {
-                let value = field
-                    .text()
-                    .await
-                    .map_err(|e| AppError::BadRequest(format!("Failed to read alt_text: {}", e)))?;
+                let value = field.text().await.map_err(|e| {
+                    AppError::BadRequest(format!("Échec de la lecture du texte alternatif : {}", e))
+                })?;
                 if value.len() > 1000 {
                     return Err(AppError::BadRequest(
-                        "alt_text must be at most 1000 characters".to_string(),
+                        "Le texte alternatif doit comporter au plus 1000 caractères".to_string(),
                     ));
                 }
                 alt_text = Some(value);
@@ -410,7 +411,8 @@ async fn upload_image(
         }
     }
 
-    let data = image_data.ok_or_else(|| AppError::BadRequest("No image provided".to_string()))?;
+    let data =
+        image_data.ok_or_else(|| AppError::BadRequest("Aucune image fournie".to_string()))?;
 
     // Validate MIME type if provided
     if let Some(mime) = &content_type {

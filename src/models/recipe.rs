@@ -78,16 +78,34 @@ pub struct Recipe {
 /// Create a new recipe
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct CreateRecipe {
-    #[validate(length(min = 1, max = 200, message = "Title must be 1-200 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 200,
+        message = "Le titre doit comporter de 1 à 200 caractères"
+    ))]
     pub title: String,
-    #[validate(length(max = 2000, message = "Description must be at most 2000 characters"))]
+    #[validate(length(
+        max = 2000,
+        message = "La description doit comporter au plus 2000 caractères"
+    ))]
     pub description: Option<String>,
     pub visibility: Option<Visibility>,
-    #[validate(range(min = 0, max = 1440, message = "Prep time must be 0-1440 minutes"))]
+    #[validate(range(
+        min = 0,
+        max = 1440,
+        message = "Le temps de préparation doit être compris entre 0 et 1440 minutes"
+    ))]
     pub prep_time_min: Option<i32>,
-    #[validate(range(min = 0, max = 1440, message = "Cook time must be 0-1440 minutes"))]
+    #[validate(range(
+        min = 0,
+        max = 1440,
+        message = "Le temps de cuisson doit être compris entre 0 et 1440 minutes"
+    ))]
     pub cook_time_min: Option<i32>,
-    #[validate(length(max = 100, message = "Servings must be at most 100 characters"))]
+    #[validate(length(
+        max = 100,
+        message = "Les portions doivent comporter au plus 100 caractères"
+    ))]
     pub servings: Option<String>,
     pub difficulty: Option<Difficulty>,
 }
@@ -95,16 +113,34 @@ pub struct CreateRecipe {
 /// Update an existing recipe
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct UpdateRecipe {
-    #[validate(length(min = 1, max = 200, message = "Title must be 1-200 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 200,
+        message = "Le titre doit comporter de 1 à 200 caractères"
+    ))]
     pub title: Option<String>,
-    #[validate(length(max = 2000, message = "Description must be at most 2000 characters"))]
+    #[validate(length(
+        max = 2000,
+        message = "La description doit comporter au plus 2000 caractères"
+    ))]
     pub description: Option<String>,
     pub visibility: Option<Visibility>,
-    #[validate(range(min = 0, max = 1440, message = "Prep time must be 0-1440 minutes"))]
+    #[validate(range(
+        min = 0,
+        max = 1440,
+        message = "Le temps de préparation doit être compris entre 0 et 1440 minutes"
+    ))]
     pub prep_time_min: Option<i32>,
-    #[validate(range(min = 0, max = 1440, message = "Cook time must be 0-1440 minutes"))]
+    #[validate(range(
+        min = 0,
+        max = 1440,
+        message = "Le temps de cuisson doit être compris entre 0 et 1440 minutes"
+    ))]
     pub cook_time_min: Option<i32>,
-    #[validate(length(max = 100, message = "Servings must be at most 100 characters"))]
+    #[validate(length(
+        max = 100,
+        message = "Les portions doivent comporter au plus 100 caractères"
+    ))]
     pub servings: Option<String>,
     pub difficulty: Option<Difficulty>,
 }
