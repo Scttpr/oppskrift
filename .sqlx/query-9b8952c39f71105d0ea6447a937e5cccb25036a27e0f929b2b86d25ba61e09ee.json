@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT COUNT(*) FROM recipe_books WHERE owner_id = $1",
+  "query": "SELECT COUNT(*) as \"count!\" FROM security_events WHERE user_id = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "count",
+        "name": "count!",
         "type_info": "Int8"
       }
     ],
@@ -18,5 +18,5 @@
       null
     ]
   },
-  "hash": "637ca28fc7ccb169a50c00bd5f25e0cd2947f8dba2f85c27b08f0ac52b466661"
+  "hash": "9b8952c39f71105d0ea6447a937e5cccb25036a27e0f929b2b86d25ba61e09ee"
 }

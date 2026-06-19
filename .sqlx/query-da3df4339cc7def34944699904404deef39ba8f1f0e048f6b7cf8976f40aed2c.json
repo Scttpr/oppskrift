@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT COUNT(*) FROM recipe_books WHERE visibility = 'public'",
+  "query": "SELECT COUNT(*) as \"count!\" FROM recipes WHERE visibility = 'public'",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "count",
+        "name": "count!",
         "type_info": "Int8"
       }
     ],
@@ -16,5 +16,5 @@
       null
     ]
   },
-  "hash": "b5a98547511996e054d63e3a5a413b5558f013e5185d802f1f33c70ec9ee5b04"
+  "hash": "da3df4339cc7def34944699904404deef39ba8f1f0e048f6b7cf8976f40aed2c"
 }

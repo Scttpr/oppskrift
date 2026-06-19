@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT COUNT(*) as \"count!\" FROM book_recipe_entries e\n                    INNER JOIN recipes r ON r.id = e.recipe_id\n                    WHERE e.book_id = $1 AND r.visibility = 'public'\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a0aea8814f23dd0343febcb6f9bade3c2416d7e949c1762ab057e7a0e6c6ea21"
+}

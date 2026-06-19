@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT COUNT(*) as \"count!\"\n                    FROM saved_recipes sr\n                    INNER JOIN recipes r ON r.id = sr.recipe_id\n                    WHERE sr.user_id = $1\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "cfe1dbb0ecfda0dc5d51a59b24b9f2b2caf8aad83abef426aa2ac4c2132938e5"
+}

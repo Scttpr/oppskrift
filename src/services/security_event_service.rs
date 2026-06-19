@@ -9,7 +9,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::core::error::AppError;
-use crate::core::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::pagination::{paginate, PaginatedResponse, PaginationParams};
 
 /// Security event record from the database
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -79,15 +79,39 @@ impl SecurityEventService {
         user_id: Uuid,
         params: &PaginationParams,
     ) -> Result<PaginatedResponse<SecurityEvent>, AppError> {
-        let total = Self::count_for_user(db, user_id).await?;
-        let events = Self::list_for_user(db, user_id, params.page, params.page_size).await?;
-
-        Ok(PaginatedResponse::new(
-            events,
-            params.page,
-            params.page_size,
-            total as u64,
-        ))
+        paginate(
+            params,
+            |limit, offset| {
+                sqlx::query_as!(
+                    SecurityEvent,
+                    r#"
+                    SELECT
+                        id,
+                        event_type::text as "event_type!",
+                        ip_address::text as ip_address,
+                        user_agent,
+                        metadata,
+                        created_at
+                    FROM security_events
+                    WHERE user_id = $1
+                    ORDER BY created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                    user_id,
+                    limit,
+                    offset,
+                )
+                .fetch_all(db)
+            },
+            || {
+                sqlx::query_scalar!(
+                    r#"SELECT COUNT(*) as "count!" FROM security_events WHERE user_id = $1"#,
+                    user_id
+                )
+                .fetch_one(db)
+            },
+        )
+        .await
     }
 
     /// Get the most recent events for a user (simple limit query)

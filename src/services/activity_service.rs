@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::core::error::AppResult;
-use crate::core::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::pagination::{paginate, PaginatedResponse, PaginationParams};
 use crate::models::{Activity, ActivityType, ActivityWithActor, CreateActivity, TargetType};
 
 pub struct ActivityService;
@@ -127,58 +127,51 @@ impl ActivityService {
         user_id: Uuid,
         params: &PaginationParams,
     ) -> AppResult<PaginatedResponse<ActivityWithActor>> {
-        let limit = params.limit();
-        let offset = params.offset();
-
-        // Get total count of activities from followed users
-        let total: i64 = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*) as "count!"
-            FROM activities a
-            WHERE a.actor_id IN (
-                SELECT following_id FROM follows WHERE follower_id = $1
-            )
-            "#,
-            user_id
+        paginate(
+            params,
+            |limit, offset| {
+                sqlx::query_as!(
+                    ActivityWithActor,
+                    r#"
+                    SELECT
+                        a.id,
+                        a.actor_id,
+                        u.username as actor_username,
+                        u.display_name as actor_display_name,
+                        u.avatar_url as actor_avatar_url,
+                        a.activity_type as "activity_type: ActivityType",
+                        a.target_type as "target_type: TargetType",
+                        a.target_id,
+                        a.created_at
+                    FROM activities a
+                    INNER JOIN users u ON u.id = a.actor_id
+                    WHERE a.actor_id IN (
+                        SELECT following_id FROM follows WHERE follower_id = $1
+                    )
+                    ORDER BY a.created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                    user_id,
+                    limit,
+                    offset
+                )
+                .fetch_all(pool)
+            },
+            || {
+                sqlx::query_scalar!(
+                    r#"
+                    SELECT COUNT(*) as "count!"
+                    FROM activities a
+                    WHERE a.actor_id IN (
+                        SELECT following_id FROM follows WHERE follower_id = $1
+                    )
+                    "#,
+                    user_id
+                )
+                .fetch_one(pool)
+            },
         )
-        .fetch_one(pool)
-        .await?;
-
-        // Get paginated activities with actor info
-        let activities = sqlx::query_as!(
-            ActivityWithActor,
-            r#"
-            SELECT
-                a.id,
-                a.actor_id,
-                u.username as actor_username,
-                u.display_name as actor_display_name,
-                u.avatar_url as actor_avatar_url,
-                a.activity_type as "activity_type: ActivityType",
-                a.target_type as "target_type: TargetType",
-                a.target_id,
-                a.created_at
-            FROM activities a
-            INNER JOIN users u ON u.id = a.actor_id
-            WHERE a.actor_id IN (
-                SELECT following_id FROM follows WHERE follower_id = $1
-            )
-            ORDER BY a.created_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-            user_id,
-            limit as i64,
-            offset as i64
-        )
-        .fetch_all(pool)
-        .await?;
-
-        Ok(PaginatedResponse::new(
-            activities,
-            params.page,
-            limit,
-            total as u64,
-        ))
+        .await
     }
 
     /// Get activities by a specific user
@@ -187,46 +180,41 @@ impl ActivityService {
         user_id: Uuid,
         params: &PaginationParams,
     ) -> AppResult<PaginatedResponse<Activity>> {
-        let limit = params.limit();
-        let offset = params.offset();
-
-        let total: i64 = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*) as "count!"
-            FROM activities
-            WHERE actor_id = $1
-            "#,
-            user_id
+        paginate(
+            params,
+            |limit, offset| {
+                sqlx::query_as!(
+                    Activity,
+                    r#"
+                    SELECT
+                        id, actor_id,
+                        activity_type as "activity_type: ActivityType",
+                        target_type as "target_type: TargetType",
+                        target_id, created_at, ap_id
+                    FROM activities
+                    WHERE actor_id = $1
+                    ORDER BY created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                    user_id,
+                    limit,
+                    offset
+                )
+                .fetch_all(pool)
+            },
+            || {
+                sqlx::query_scalar!(
+                    r#"
+                    SELECT COUNT(*) as "count!"
+                    FROM activities
+                    WHERE actor_id = $1
+                    "#,
+                    user_id
+                )
+                .fetch_one(pool)
+            },
         )
-        .fetch_one(pool)
-        .await?;
-
-        let activities = sqlx::query_as!(
-            Activity,
-            r#"
-            SELECT
-                id, actor_id,
-                activity_type as "activity_type: ActivityType",
-                target_type as "target_type: TargetType",
-                target_id, created_at, ap_id
-            FROM activities
-            WHERE actor_id = $1
-            ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-            user_id,
-            limit as i64,
-            offset as i64
-        )
-        .fetch_all(pool)
-        .await?;
-
-        Ok(PaginatedResponse::new(
-            activities,
-            params.page,
-            limit,
-            total as u64,
-        ))
+        .await
     }
 }
 

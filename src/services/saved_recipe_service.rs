@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::core::error::{AppError, AppResult};
-use crate::core::pagination::{PaginatedResponse, PaginationParams};
+use crate::core::pagination::{paginate, PaginatedResponse, PaginationParams};
 use crate::models::{RecipeSummary, SavedRecipe};
 
 pub struct SavedRecipeService;
@@ -84,50 +84,43 @@ impl SavedRecipeService {
         user_id: Uuid,
         params: &PaginationParams,
     ) -> AppResult<PaginatedResponse<RecipeSummary>> {
-        let limit = params.limit();
-        let offset = params.offset();
-
-        // Get total count
-        let total: i64 = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*) as "count!"
-            FROM saved_recipes sr
-            INNER JOIN recipes r ON r.id = sr.recipe_id
-            WHERE sr.user_id = $1
-            "#,
-            user_id
+        paginate(
+            params,
+            |limit, offset| {
+                sqlx::query_as!(
+                    RecipeSummary,
+                    r#"
+                    SELECT r.id, r.author_id, r.title, r.description,
+                           r.difficulty as "difficulty: _",
+                           r.prep_time_min, r.cook_time_min,
+                           r.created_at,
+                           (SELECT url FROM recipe_images WHERE recipe_id = r.id AND is_primary = true LIMIT 1) as primary_image_url
+                    FROM recipes r
+                    INNER JOIN saved_recipes sr ON sr.recipe_id = r.id
+                    WHERE sr.user_id = $1
+                    ORDER BY sr.saved_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                    user_id,
+                    limit,
+                    offset
+                )
+                .fetch_all(pool)
+            },
+            || {
+                sqlx::query_scalar!(
+                    r#"
+                    SELECT COUNT(*) as "count!"
+                    FROM saved_recipes sr
+                    INNER JOIN recipes r ON r.id = sr.recipe_id
+                    WHERE sr.user_id = $1
+                    "#,
+                    user_id
+                )
+                .fetch_one(pool)
+            },
         )
-        .fetch_one(pool)
-        .await?;
-
-        // Get paginated recipes
-        let recipes = sqlx::query_as!(
-            RecipeSummary,
-            r#"
-            SELECT r.id, r.author_id, r.title, r.description,
-                   r.difficulty as "difficulty: _",
-                   r.prep_time_min, r.cook_time_min,
-                   r.created_at,
-                   (SELECT url FROM recipe_images WHERE recipe_id = r.id AND is_primary = true LIMIT 1) as primary_image_url
-            FROM recipes r
-            INNER JOIN saved_recipes sr ON sr.recipe_id = r.id
-            WHERE sr.user_id = $1
-            ORDER BY sr.saved_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-            user_id,
-            limit as i64,
-            offset as i64
-        )
-        .fetch_all(pool)
-        .await?;
-
-        Ok(PaginatedResponse::new(
-            recipes,
-            params.page,
-            limit,
-            total as u64,
-        ))
+        .await
     }
 }
 
