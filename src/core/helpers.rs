@@ -40,6 +40,11 @@ pub fn format_fr_month_year(dt: &DateTime<Utc>) -> String {
     format!("{} {}", french_month(dt), dt.year())
 }
 
+/// Format a date in French (no time), e.g. "25 décembre 2025".
+pub fn format_fr_date(dt: &DateTime<Utc>) -> String {
+    format!("{} {} {}", dt.day(), french_month(dt), dt.year())
+}
+
 /// Mask an email address for display
 ///
 /// Shows the first character, asterisks, and the domain.
@@ -90,6 +95,12 @@ mod tests {
     fn test_format_fr_month_year() {
         let dt = Utc.with_ymd_and_hms(2025, 12, 1, 0, 0, 0).unwrap();
         assert_eq!(format_fr_month_year(&dt), "décembre 2025");
+    }
+
+    #[test]
+    fn test_format_fr_date() {
+        let dt = Utc.with_ymd_and_hms(2025, 12, 25, 14, 30, 0).unwrap();
+        assert_eq!(format_fr_date(&dt), "25 décembre 2025");
     }
 
     #[test]

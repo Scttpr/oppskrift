@@ -45,11 +45,9 @@ pub(crate) async fn account_page(
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let masked_email = user
         .email
@@ -81,7 +79,7 @@ pub struct ChangeEmailForm {
     #[serde(rename = "_csrf")]
     pub csrf_token: String,
 
-    #[validate(email(message = "Please enter a valid email address"))]
+    #[validate(email(message = "Saisis une adresse e-mail valide"))]
     pub new_email: String,
 
     pub password: String,
@@ -110,11 +108,9 @@ pub(crate) async fn email_change_page(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let template = EmailChangeTemplate {
         active_tab: "account",
@@ -146,11 +142,9 @@ pub(crate) async fn email_change(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     // Validate form
     let mut errors = vec![];
@@ -170,7 +164,7 @@ pub(crate) async fn email_change(
             deletion_pending,
             deletion_date,
             flash_success: None,
-            flash_error: Some("Please fix the errors below".to_string()),
+            flash_error: Some("Corrige les erreurs ci-dessous".to_string()),
             errors,
             current_email: mask_email(user.email.as_deref().unwrap_or("")),
             csrf_token,
@@ -198,7 +192,7 @@ pub(crate) async fn email_change(
         deletion_pending,
         deletion_date,
         flash_success: Some(
-            "If the email is valid and not already in use, you will receive a confirmation email."
+            "Si l'adresse e-mail est valide et pas déjà utilisée, tu recevras un e-mail de confirmation."
                 .to_string(),
         ),
         flash_error: None,
@@ -246,11 +240,9 @@ pub(crate) async fn delete_account_page(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let template = DeleteAccountTemplate {
         active_tab: "account",
@@ -304,9 +296,10 @@ pub(crate) async fn delete_account(
             let template = AccountTemplate {
                 active_tab: "account",
                 deletion_pending: true,
-                deletion_date: Some(deletion_date.format("%B %d, %Y").to_string()),
+                deletion_date: Some(crate::core::helpers::format_fr_date(&deletion_date)),
                 flash_success: Some(
-                    "Account deletion scheduled. You can cancel within 30 days.".to_string(),
+                    "Suppression du compte programmée. Tu peux l'annuler dans les 30 jours."
+                        .to_string(),
                 ),
                 flash_error: None,
                 masked_email: mask_email(user.email.as_deref().unwrap_or("")),

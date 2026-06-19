@@ -52,11 +52,9 @@ pub(crate) async fn twofa_setup_page(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     // If 2FA is already enabled, show message instead of setup
     if user.totp_enabled {
@@ -77,18 +75,17 @@ pub(crate) async fn twofa_setup_page(
 
     // Generate 2FA setup (QR code and secret)
     let totp_service = create_totp_service(&state)?;
-    let email = user
-        .email
-        .as_ref()
-        .ok_or_else(|| AppError::BadRequest("Email required for 2FA setup".to_string()))?;
+    let email = user.email.as_ref().ok_or_else(|| {
+        AppError::BadRequest("Une adresse e-mail est requise pour configurer la 2FA".to_string())
+    })?;
 
     let setup = totp_service
         .setup_2fa(auth.id, email)
         .await
         .map_err(|e| match e {
-            TotpError::AlreadyEnabled => {
-                AppError::Conflict("Two-factor authentication is already enabled".to_string())
-            }
+            TotpError::AlreadyEnabled => AppError::Conflict(
+                "L'authentification à deux facteurs est déjà activée".to_string(),
+            ),
             e => {
                 tracing::error!(error = %e, "2FA setup failed");
                 AppError::Internal("2FA setup failed".to_string())
@@ -125,11 +122,9 @@ pub(crate) async fn twofa_enable(
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     // Validate TOTP code format
     if form.totp_code.len() != 6 || !form.totp_code.chars().all(|c| c.is_ascii_digit()) {
@@ -144,7 +139,7 @@ pub(crate) async fn twofa_enable(
             deletion_pending,
             deletion_date,
             flash_success: None,
-            flash_error: Some("Please enter a valid 6-digit code".to_string()),
+            flash_error: Some("Saisis un code valide à 6 chiffres".to_string()),
             qr_code: setup.as_ref().map(|s| s.qr_code.clone()),
             secret: setup.as_ref().map(|s| s.secret.clone()),
             csrf_token,
@@ -175,9 +170,9 @@ pub(crate) async fn twofa_enable(
         }
         Err(e) => {
             let error_msg = match e {
-                TotpError::InvalidCode => "Invalid code. Please try again.".to_string(),
-                TotpError::NoPendingSetup => "Setup expired. Please start again.".to_string(),
-                _ => "Failed to enable 2FA. Please try again.".to_string(),
+                TotpError::InvalidCode => "Code invalide. Réessaie.".to_string(),
+                TotpError::NoPendingSetup => "La configuration a expiré. Recommence.".to_string(),
+                _ => "Échec de l'activation de la 2FA. Réessaie.".to_string(),
             };
 
             // Re-generate QR code for retry
@@ -241,16 +236,14 @@ pub(crate) async fn twofa_recovery_page(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     // Check if 2FA is enabled
     if !user.totp_enabled {
         return Err(AppError::BadRequest(
-            "Two-factor authentication is not enabled".to_string(),
+            "L'authentification à deux facteurs n'est pas activée".to_string(),
         ));
     }
 
@@ -271,7 +264,7 @@ pub(crate) async fn twofa_recovery_page(
         flash_error: None,
         codes_total: total,
         codes_remaining: remaining,
-        generated_at: generated_at.map(|dt| dt.format("%B %d, %Y at %H:%M UTC").to_string()),
+        generated_at: generated_at.map(|dt| crate::core::helpers::format_fr_datetime(&dt)),
         csrf_token,
         new_codes: None,
     };
@@ -303,18 +296,15 @@ pub(crate) async fn twofa_regenerate_codes(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     // Verify password first
     let auth_service = create_auth_service(&state);
-    let password_hash = user
-        .password_hash
-        .as_ref()
-        .ok_or_else(|| AppError::BadRequest("Password not set for this account".to_string()))?;
+    let password_hash = user.password_hash.as_ref().ok_or_else(|| {
+        AppError::BadRequest("Aucun mot de passe défini pour ce compte".to_string())
+    })?;
 
     let password_valid = auth_service
         .password_service()
@@ -337,10 +327,10 @@ pub(crate) async fn twofa_regenerate_codes(
             deletion_pending,
             deletion_date,
             flash_success: None,
-            flash_error: Some("Incorrect password".to_string()),
+            flash_error: Some("Mot de passe incorrect".to_string()),
             codes_total: total,
             codes_remaining: remaining,
-            generated_at: generated_at.map(|dt| dt.format("%B %d, %Y at %H:%M UTC").to_string()),
+            generated_at: generated_at.map(|dt| crate::core::helpers::format_fr_datetime(&dt)),
             csrf_token,
             new_codes: None,
         };
@@ -362,15 +352,11 @@ pub(crate) async fn twofa_regenerate_codes(
         active_tab: "security",
         deletion_pending,
         deletion_date,
-        flash_success: Some("Recovery codes regenerated successfully".to_string()),
+        flash_success: Some("Codes de récupération régénérés avec succès".to_string()),
         flash_error: None,
         codes_total: 8,
         codes_remaining: 8,
-        generated_at: Some(
-            chrono::Utc::now()
-                .format("%B %d, %Y at %H:%M UTC")
-                .to_string(),
-        ),
+        generated_at: Some(crate::core::helpers::format_fr_datetime(&chrono::Utc::now())),
         csrf_token,
         new_codes: Some(response.codes),
     };
@@ -408,16 +394,14 @@ pub(crate) async fn twofa_disable_page(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     // Check if 2FA is enabled
     if !user.totp_enabled {
         return Err(AppError::BadRequest(
-            "Two-factor authentication is not enabled".to_string(),
+            "L'authentification à deux facteurs n'est pas activée".to_string(),
         ));
     }
 
@@ -449,18 +433,15 @@ pub(crate) async fn twofa_disable(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     // Verify password first
     let auth_service = create_auth_service(&state);
-    let password_hash = user
-        .password_hash
-        .as_ref()
-        .ok_or_else(|| AppError::BadRequest("Password not set for this account".to_string()))?;
+    let password_hash = user.password_hash.as_ref().ok_or_else(|| {
+        AppError::BadRequest("Aucun mot de passe défini pour ce compte".to_string())
+    })?;
 
     let password_valid = auth_service
         .password_service()
@@ -477,7 +458,7 @@ pub(crate) async fn twofa_disable(
             deletion_pending,
             deletion_date,
             flash_success: None,
-            flash_error: Some("Incorrect password".to_string()),
+            flash_error: Some("Mot de passe incorrect".to_string()),
             csrf_token,
         };
 
@@ -495,10 +476,12 @@ pub(crate) async fn twofa_disable(
         Err(e) => {
             let error_msg = match e {
                 TotpError::InvalidCode | TotpError::InvalidRecoveryCode => {
-                    "Invalid code. Please try again.".to_string()
+                    "Code invalide. Réessaie.".to_string()
                 }
-                TotpError::NotEnabled => "Two-factor authentication is not enabled".to_string(),
-                _ => "Failed to disable 2FA. Please try again.".to_string(),
+                TotpError::NotEnabled => {
+                    "L'authentification à deux facteurs n'est pas activée".to_string()
+                }
+                _ => "Échec de la désactivation de la 2FA. Réessaie.".to_string(),
             };
 
             let template = TwoFaDisableTemplate {
