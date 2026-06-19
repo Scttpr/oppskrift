@@ -2,7 +2,7 @@
 
 {% block title %}{{ profile.display_name }} - Oppskrift{% endblock %}
 
-{% block meta_description %}{% if let Some(bio) = profile.bio %}{{ bio }}{% else %}View recipes by {{ profile.display_name }} on Oppskrift{% endif %}{% endblock %}
+{% block meta_description %}{% if let Some(bio) = profile.bio %}{{ bio }}{% else %}Découvre les recettes de {{ profile.display_name }} sur Oppskrift{% endif %}{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
@@ -14,7 +14,7 @@
                 {% if let Some(avatar) = profile.avatar_url %}
                 <img
                     src="{{ avatar }}"
-                    alt="{{ profile.display_name }}'s avatar"
+                    alt="Avatar de {{ profile.display_name }}"
                     class="w-24 h-24 rounded-full object-cover"
                 />
                 {% else %}
@@ -45,16 +45,16 @@
                 <div class="mt-3 flex items-center gap-4 text-sm">
                     <a href="/users/{{ profile.id }}/followers" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                         <strong>{{ follow_counts.followers_count }}</strong>
-                        <span class="text-gray-500 dark:text-gray-400">followers</span>
+                        <span class="text-gray-500 dark:text-gray-400">abonnés</span>
                     </a>
                     <a href="/users/{{ profile.id }}/following" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                         <strong>{{ follow_counts.following_count }}</strong>
-                        <span class="text-gray-500 dark:text-gray-400">following</span>
+                        <span class="text-gray-500 dark:text-gray-400">abonnements</span>
                     </a>
                 </div>
 
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Member since {{ profile.created_at.format("%B %Y") }}
+                    Membre depuis {{ crate::core::helpers::format_fr_month_year(profile.created_at) }}
                 </p>
             </div>
 
@@ -65,13 +65,13 @@
                     href="/users/{{ profile.id }}/saved"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
                 >
-                    Saved Recipes
+                    Recettes enregistrées
                 </a>
                 <a
                     href="/settings"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
                 >
-                    Edit Profile
+                    Modifier le profil
                 </a>
                 {% else %}
                 {# Follow/Unfollow Button #}
@@ -82,7 +82,7 @@
                     hx-target="this"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
                 >
-                    Following
+                    Abonné
                 </button>
                 {% else %}
                 <button
@@ -91,7 +91,7 @@
                     hx-target="this"
                     class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
                 >
-                    Follow
+                    Suivre
                 </button>
                 {% endif %}
                 {% endif %}
@@ -103,7 +103,7 @@
     <section aria-labelledby="recipes-heading">
         <div class="flex items-center justify-between mb-4">
             <h2 id="recipes-heading" class="text-xl font-semibold text-gray-900 dark:text-white">
-                Recipes by {{ profile.display_name }}
+                Recettes de {{ profile.display_name }}
             </h2>
 
             {% if is_own_profile %}
@@ -114,7 +114,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                New Recipe
+                Nouvelle recette
             </a>
             {% endif %}
         </div>
@@ -133,17 +133,17 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             {% if is_own_profile %}
-            <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No recipes yet</h3>
-            <p class="mt-2 text-gray-500 dark:text-gray-400">Get started by creating your first recipe.</p>
+            <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">Aucune recette pour le moment</h3>
+            <p class="mt-2 text-gray-500 dark:text-gray-400">Commence par créer ta première recette.</p>
             <a
                 href="/recipes/new"
                 class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700"
             >
-                Create Recipe
+                Créer une recette
             </a>
             {% else %}
-            <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No recipes</h3>
-            <p class="mt-2 text-gray-500 dark:text-gray-400">{{ profile.display_name }} hasn't shared any recipes yet.</p>
+            <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">Aucune recette</h3>
+            <p class="mt-2 text-gray-500 dark:text-gray-400">{{ profile.display_name }} n'a pas encore partagé de recette.</p>
             {% endif %}
         </div>
         {% endif %}
@@ -156,12 +156,12 @@
                 href="?page={{ pagination.page - 1 }}"
                 class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
             >
-                Previous
+                Précédent
             </a>
             {% endif %}
 
             <span class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
-                Page {{ pagination.page }} of {{ pagination.total_pages }}
+                Page {{ pagination.page }} sur {{ pagination.total_pages }}
             </span>
 
             {% if pagination.has_next %}
@@ -169,7 +169,7 @@
                 href="?page={{ pagination.page + 1 }}"
                 class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
             >
-                Next
+                Suivant
             </a>
             {% endif %}
         </nav>

@@ -19,12 +19,12 @@ const FRENCH_MONTHS: [&str; 12] = [
     "décembre",
 ];
 
-fn french_month(dt: DateTime<Utc>) -> &'static str {
+fn french_month(dt: &DateTime<Utc>) -> &'static str {
     FRENCH_MONTHS[(dt.month0()) as usize]
 }
 
 /// Format a datetime in French, e.g. "25 décembre 2025 à 14h30".
-pub fn format_fr_datetime(dt: DateTime<Utc>) -> String {
+pub fn format_fr_datetime(dt: &DateTime<Utc>) -> String {
     format!(
         "{} {} {} à {:02}h{:02}",
         dt.day(),
@@ -36,7 +36,7 @@ pub fn format_fr_datetime(dt: DateTime<Utc>) -> String {
 }
 
 /// Format a month and year in French, e.g. "décembre 2025".
-pub fn format_fr_month_year(dt: DateTime<Utc>) -> String {
+pub fn format_fr_month_year(dt: &DateTime<Utc>) -> String {
     format!("{} {}", french_month(dt), dt.year())
 }
 
@@ -77,19 +77,19 @@ mod tests {
     #[test]
     fn test_format_fr_datetime() {
         let dt = Utc.with_ymd_and_hms(2025, 12, 25, 14, 30, 0).unwrap();
-        assert_eq!(format_fr_datetime(dt), "25 décembre 2025 à 14h30");
+        assert_eq!(format_fr_datetime(&dt), "25 décembre 2025 à 14h30");
     }
 
     #[test]
     fn test_format_fr_datetime_pads_time_not_day() {
         let dt = Utc.with_ymd_and_hms(2025, 1, 5, 9, 5, 0).unwrap();
-        assert_eq!(format_fr_datetime(dt), "5 janvier 2025 à 09h05");
+        assert_eq!(format_fr_datetime(&dt), "5 janvier 2025 à 09h05");
     }
 
     #[test]
     fn test_format_fr_month_year() {
         let dt = Utc.with_ymd_and_hms(2025, 12, 1, 0, 0, 0).unwrap();
-        assert_eq!(format_fr_month_year(dt), "décembre 2025");
+        assert_eq!(format_fr_month_year(&dt), "décembre 2025");
     }
 
     #[test]

@@ -261,7 +261,7 @@ impl EmailService {
         to: &str,
         deletion_date: chrono::DateTime<chrono::Utc>,
     ) -> Result<(), EmailError> {
-        let date_str = crate::core::helpers::format_fr_datetime(deletion_date);
+        let date_str = crate::core::helpers::format_fr_datetime(&deletion_date);
         let subject = "La suppression de ton compte Oppskrift est programmée";
         let body = format!(
             r#"<!DOCTYPE html>
