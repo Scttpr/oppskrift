@@ -366,6 +366,86 @@ mod tests {
         assert!(html.contains("View Recipe") || !html.is_empty());
     }
 
+    fn assert_no_english(html: &str, sentinels: &[&str]) {
+        for s in sentinels {
+            assert!(
+                !html.contains(s),
+                "should not contain English sentinel: {s:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_recipe_list_is_french() {
+        let html = RecipeListTemplate {
+            recipes: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+            user: None,
+        }
+        .render()
+        .unwrap();
+        assert_no_english(
+            &html,
+            &[
+                "No recipes yet",
+                "Get started",
+                "New Recipe",
+                "Create Recipe",
+            ],
+        );
+    }
+
+    #[test]
+    fn test_recipe_search_is_french() {
+        let html = RecipeSearchTemplate {
+            query: String::new(),
+            recipes: vec![],
+            pagination: PaginationMeta {
+                page: 1,
+                page_size: 10,
+                total_items: 0,
+                total_pages: 0,
+                has_next: false,
+                has_prev: false,
+            },
+        }
+        .render()
+        .unwrap();
+        assert_no_english(&html, &["Search Recipes", "Search by title"]);
+    }
+
+    #[test]
+    fn test_new_recipe_form_is_french() {
+        let html = NewRecipeTemplate {
+            recipe: None,
+            tags: String::new(),
+        }
+        .render()
+        .unwrap();
+        assert_no_english(
+            &html,
+            &[
+                "Basic Information",
+                "Time &amp; Difficulty",
+                "Prep Time",
+                "Cook Time",
+                "Servings",
+                "Visibility",
+                "Create Recipe",
+                "Cancel",
+                ">Easy<",
+                ">Hard<",
+            ],
+        );
+    }
+
     // ==========================================================================
     // Pagination Tests (T052)
     // ==========================================================================

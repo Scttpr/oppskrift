@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Saved Recipes - Oppskrift{% endblock %}
+{% block title %}Recettes enregistrées - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
     <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">
-        Saved Recipes
+        Recettes enregistrées
     </h1>
 
     {# Recipe Grid #}
@@ -21,15 +21,15 @@
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
         </svg>
-        <h2 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No saved recipes yet</h2>
+        <h2 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">Aucune recette enregistrée pour le moment</h2>
         <p class="mt-2 text-gray-500 dark:text-gray-400">
-            Save recipes you want to try later by clicking the bookmark button.
+            Enregistre les recettes que tu veux essayer plus tard en cliquant sur le bouton signet.
         </p>
         <a
             href="/recipes"
             class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700"
         >
-            Browse Recipes
+            Parcourir les recettes
         </a>
     </div>
     {% endif %}
@@ -42,12 +42,12 @@
             href="?page={{ pagination.page - 1 }}"
             class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
         >
-            Previous
+            Précédent
         </a>
         {% endif %}
 
         <span class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
-            Page {{ pagination.page }} of {{ pagination.total_pages }}
+            Page {{ pagination.page }} sur {{ pagination.total_pages }}
         </span>
 
         {% if pagination.has_next %}
@@ -55,7 +55,7 @@
             href="?page={{ pagination.page + 1 }}"
             class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
         >
-            Next
+            Suivant
         </a>
         {% endif %}
     </nav>

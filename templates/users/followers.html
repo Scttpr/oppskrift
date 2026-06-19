@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}{{ profile.display_name }}'s Followers - Oppskrift{% endblock %}
+{% block title %}Abonnés de {{ profile.display_name }} - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
@@ -13,13 +13,13 @@
             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
-            Back to profile
+            Retour au profil
         </a>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-            {% if is_own_profile %}Your Followers{% else %}{{ profile.display_name }}'s Followers{% endif %}
+            {% if is_own_profile %}Tes abonnés{% else %}Abonnés de {{ profile.display_name }}{% endif %}
         </h1>
         <p class="mt-1 text-gray-500 dark:text-gray-400">
-            {{ pagination.total_items }} follower{% if pagination.total_items != 1 %}s{% endif %}
+            {{ pagination.total_items }} abonné{% if pagination.total_items != 1 %}s{% endif %}
         </p>
     </header>
 
@@ -34,7 +34,7 @@
                     {% if let Some(avatar) = user.avatar_url %}
                     <img
                         src="{{ avatar }}"
-                        alt="{{ user.display_name }}'s avatar"
+                        alt="Avatar de {{ user.display_name }}"
                         class="w-12 h-12 rounded-full object-cover"
                     />
                     {% else %}
@@ -54,7 +54,7 @@
                         </a>
                         {% if user.follows_you %}
                         <span class="px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded">
-                            Follows you
+                            Te suit
                         </span>
                         {% endif %}
                     </div>
@@ -78,7 +78,7 @@
                         hx-target="this"
                         class="flex-shrink-0 px-4 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
                     >
-                        Following
+                        Abonné
                     </button>
                     {% else %}
                     <button
@@ -87,7 +87,7 @@
                         hx-target="this"
                         class="flex-shrink-0 px-4 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
                     >
-                        Follow
+                        Suivre
                     </button>
                     {% endif %}
                     {% endif %}
@@ -102,12 +102,12 @@
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
-        <h2 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No followers yet</h2>
+        <h2 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">Aucun abonné pour le moment</h2>
         <p class="mt-2 text-gray-500 dark:text-gray-400">
             {% if is_own_profile %}
-            Share your recipes to gain followers.
+            Partage tes recettes pour gagner des abonnés.
             {% else %}
-            {{ profile.display_name }} doesn't have any followers yet.
+            {{ profile.display_name }} n'a pas encore d'abonnés.
             {% endif %}
         </p>
     </div>
@@ -121,12 +121,12 @@
             href="?page={{ pagination.page - 1 }}"
             class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
         >
-            Previous
+            Précédent
         </a>
         {% endif %}
 
         <span class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
-            Page {{ pagination.page }} of {{ pagination.total_pages }}
+            Page {{ pagination.page }} sur {{ pagination.total_pages }}
         </span>
 
         {% if pagination.has_next %}
@@ -134,7 +134,7 @@
             href="?page={{ pagination.page + 1 }}"
             class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
         >
-            Next
+            Suivant
         </a>
         {% endif %}
     </nav>

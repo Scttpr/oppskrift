@@ -8,7 +8,7 @@
         {% if let Some(avatar) = activity.actor_avatar_url %}
         <img
             src="{{ avatar }}"
-            alt="{{ activity.actor_display_name }}'s avatar"
+            alt="Avatar de {{ activity.actor_display_name }}"
             class="w-10 h-10 rounded-full object-cover"
         />
         {% else %}
@@ -30,19 +30,19 @@
                 {% match activity.activity_type %}
                 {% when crate::models::ActivityType::Create %}
                     {% match activity.target_type %}
-                    {% when crate::models::TargetType::Recipe %}created a new recipe
-                    {% when crate::models::TargetType::Book %}created a new recipe book
-                    {% when crate::models::TargetType::User %}joined
+                    {% when crate::models::TargetType::Recipe %}a créé une nouvelle recette
+                    {% when crate::models::TargetType::Book %}a créé un nouveau livre de recettes
+                    {% when crate::models::TargetType::User %}a rejoint Oppskrift
                     {% endmatch %}
-                {% when crate::models::ActivityType::Share %}shared a recipe
-                {% when crate::models::ActivityType::Follow %}started following someone
+                {% when crate::models::ActivityType::Share %}a partagé une recette
+                {% when crate::models::ActivityType::Follow %}s'est abonné à quelqu'un
                 {% endmatch %}
             </span>
         </p>
 
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             <time datetime="{{ activity.created_at }}">
-                {{ activity.created_at.format("%B %d, %Y at %H:%M") }}
+                {{ crate::core::helpers::format_fr_datetime(activity.created_at) }}
             </time>
         </p>
 
@@ -54,21 +54,21 @@
                 href="/recipes/{{ activity.target_id }}"
                 class="text-primary-600 dark:text-primary-400 hover:underline text-sm"
             >
-                View recipe
+                Voir la recette
             </a>
             {% when crate::models::TargetType::Book %}
             <a
                 href="/books/{{ activity.target_id }}"
                 class="text-primary-600 dark:text-primary-400 hover:underline text-sm"
             >
-                View book
+                Voir le livre
             </a>
             {% when crate::models::TargetType::User %}
             <a
                 href="/users/{{ activity.target_id }}"
                 class="text-primary-600 dark:text-primary-400 hover:underline text-sm"
             >
-                View profile
+                Voir le profil
             </a>
             {% endmatch %}
         </div>

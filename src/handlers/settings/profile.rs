@@ -64,7 +64,7 @@ impl ProfileView {
             avatar_url: user.avatar_url.clone(),
             measurement_pref: user.measurement_pref,
             totp_enabled: user.totp_enabled,
-            created_at: user.created_at.format("%B %d, %Y").to_string(),
+            created_at: crate::core::helpers::format_fr_date(&user.created_at),
         }
     }
 }
@@ -89,11 +89,9 @@ pub(crate) async fn profile_page(
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let template = ProfileTemplate {
         active_tab: "profile",
@@ -118,13 +116,17 @@ pub struct UpdateProfileForm {
     #[serde(rename = "_csrf")]
     pub csrf_token: String,
 
-    #[validate(length(min = 1, max = 100, message = "Display name must be 1-100 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Le nom affiché doit comporter de 1 à 100 caractères"
+    ))]
     pub display_name: String,
 
-    #[validate(length(max = 500, message = "Bio must be at most 500 characters"))]
+    #[validate(length(max = 500, message = "La bio doit comporter au plus 500 caractères"))]
     pub bio: Option<String>,
 
-    #[validate(url(message = "Avatar URL must be a valid URL"))]
+    #[validate(url(message = "L'URL de l'avatar doit être une URL valide"))]
     pub avatar_url: Option<String>,
 
     pub measurement_pref: String,
@@ -203,11 +205,9 @@ pub(crate) async fn profile_edit_page(
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     // Generate CSRF token (T028)
     let csrf_token = generate_csrf(&state, auth.session_id);
@@ -272,11 +272,9 @@ pub(crate) async fn profile_update(
     // If validation errors, re-render form with errors (T029)
     if !errors.is_empty() {
         let deletion_pending = user.deletion_requested_at.is_some();
-        let deletion_date = user.deletion_requested_at.map(|dt| {
-            (dt + chrono::Duration::days(30))
-                .format("%B %d, %Y")
-                .to_string()
-        });
+        let deletion_date = user
+            .deletion_requested_at
+            .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
         let csrf_token = generate_csrf(&state, auth.session_id);
 
@@ -285,7 +283,7 @@ pub(crate) async fn profile_update(
             deletion_pending,
             deletion_date,
             flash_success: None,
-            flash_error: Some("Please fix the errors below".to_string()),
+            flash_error: Some("Corrige les erreurs ci-dessous".to_string()),
             form: ProfileEditData {
                 display_name: form.display_name.clone(),
                 bio: form.bio.clone().unwrap_or_default(),
@@ -323,17 +321,15 @@ pub(crate) async fn profile_update(
     let updated_user = UserService::get_by_id(&state.db, auth.id).await?;
 
     let deletion_pending = updated_user.deletion_requested_at.is_some();
-    let deletion_date = updated_user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = updated_user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let template = ProfileTemplate {
         active_tab: "profile",
         deletion_pending,
         deletion_date,
-        flash_success: Some("Profile updated successfully".to_string()),
+        flash_success: Some("Profil mis à jour avec succès".to_string()),
         flash_error: None,
         profile: ProfileView::from_user(&updated_user),
     };

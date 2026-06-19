@@ -39,11 +39,9 @@ pub(crate) async fn privacy_page(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let template = PrivacyPageTemplate {
         active_tab: "privacy",

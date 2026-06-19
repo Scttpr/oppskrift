@@ -37,6 +37,16 @@ pub enum MeasurementPref {
     Imperial,
 }
 
+impl MeasurementPref {
+    /// French display label.
+    pub fn label_fr(&self) -> &'static str {
+        match self {
+            MeasurementPref::Metric => "Métrique",
+            MeasurementPref::Imperial => "Impérial",
+        }
+    }
+}
+
 /// What happens to user's content on account deletion
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "deletion_content_choice", rename_all = "snake_case")]
@@ -194,6 +204,12 @@ mod tests {
     #[test]
     fn test_measurement_pref_default() {
         assert_eq!(MeasurementPref::default(), MeasurementPref::Metric);
+    }
+
+    #[test]
+    fn test_measurement_pref_label_fr() {
+        assert_eq!(MeasurementPref::Metric.label_fr(), "Métrique");
+        assert_eq!(MeasurementPref::Imperial.label_fr(), "Impérial");
     }
 
     #[test]

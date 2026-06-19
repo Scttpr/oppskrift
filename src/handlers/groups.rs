@@ -116,7 +116,7 @@ async fn view_group_page(
 
     // Check membership
     if !GroupService::is_member(&state.db, id, auth.id).await? {
-        return Err(AppError::NotFound("Group not found".to_string()));
+        return Err(AppError::NotFound("Groupe introuvable".to_string()));
     }
 
     let group = GroupService::get_detail(&state.db, id, auth.id).await?;
@@ -146,7 +146,7 @@ async fn edit_group_page(
 
     // Only owner can edit
     if !group.is_owner {
-        return Err(AppError::NotFound("Group not found".to_string()));
+        return Err(AppError::NotFound("Groupe introuvable".to_string()));
     }
 
     let template = EditGroupTemplate {

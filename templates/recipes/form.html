@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}{% if let Some(_) = recipe %}Edit Recipe{% else %}Create Recipe{% endif %} - Oppskrift{% endblock %}
+{% block title %}{% if let Some(_) = recipe %}Modifier la recette{% else %}Créer une recette{% endif %} - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
     <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">
-        {% if let Some(_) = recipe %}Edit Recipe{% else %}Create a New Recipe{% endif %}
+        {% if let Some(_) = recipe %}Modifier la recette{% else %}Créer une nouvelle recette{% endif %}
     </h1>
 
     <form
@@ -15,11 +15,11 @@
     >
         {# Basic Info #}
         <section class="space-y-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Basic Information</h2>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Informations de base</h2>
 
             <div>
                 <label for="title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Title <span class="text-red-500" aria-hidden="true">*</span>
+                    Titre <span class="text-red-500" aria-hidden="true">*</span>
                 </label>
                 <input
                     type="text"
@@ -32,7 +32,7 @@
                     aria-describedby="title-help"
                 />
                 <p id="title-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Give your recipe a descriptive name (max 200 characters)
+                    Donne un nom descriptif à ta recette (200 caractères max)
                 </p>
             </div>
 
@@ -48,19 +48,19 @@
                     aria-describedby="description-help"
                 >{% if let Some(r) = recipe %}{% if let Some(desc) = r.description %}{{ desc }}{% endif %}{% endif %}</textarea>
                 <p id="description-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    A brief summary of your recipe
+                    Un bref résumé de ta recette
                 </p>
             </div>
         </section>
 
         {# Time and Difficulty #}
         <section class="space-y-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Time &amp; Difficulty</h2>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Temps &amp; difficulté</h2>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                     <label for="prep_time_min" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Prep Time (minutes)
+                        Temps de préparation (minutes)
                     </label>
                     <input
                         type="number"
@@ -74,7 +74,7 @@
 
                 <div>
                     <label for="cook_time_min" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Cook Time (minutes)
+                        Temps de cuisson (minutes)
                     </label>
                     <input
                         type="number"
@@ -88,38 +88,38 @@
 
                 <div>
                     <label for="difficulty" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Difficulty
+                        Difficulté
                     </label>
                     <select
                         id="difficulty"
                         name="difficulty"
                         class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     >
-                        <option value="">Select...</option>
+                        <option value="">Sélectionner…</option>
                         {% match recipe %}
                         {% when Some with (r) %}
                             {% match r.difficulty %}
                             {% when Some with (crate::models::Difficulty::Easy) %}
-                        <option value="easy" selected>Easy</option>
-                        <option value="medium">Medium</option>
-                        <option value="hard">Hard</option>
+                        <option value="easy" selected>Facile</option>
+                        <option value="medium">Moyen</option>
+                        <option value="hard">Difficile</option>
                             {% when Some with (crate::models::Difficulty::Medium) %}
-                        <option value="easy">Easy</option>
-                        <option value="medium" selected>Medium</option>
-                        <option value="hard">Hard</option>
+                        <option value="easy">Facile</option>
+                        <option value="medium" selected>Moyen</option>
+                        <option value="hard">Difficile</option>
                             {% when Some with (crate::models::Difficulty::Hard) %}
-                        <option value="easy">Easy</option>
-                        <option value="medium">Medium</option>
-                        <option value="hard" selected>Hard</option>
+                        <option value="easy">Facile</option>
+                        <option value="medium">Moyen</option>
+                        <option value="hard" selected>Difficile</option>
                             {% when None %}
-                        <option value="easy">Easy</option>
-                        <option value="medium">Medium</option>
-                        <option value="hard">Hard</option>
+                        <option value="easy">Facile</option>
+                        <option value="medium">Moyen</option>
+                        <option value="hard">Difficile</option>
                             {% endmatch %}
                         {% when None %}
-                        <option value="easy">Easy</option>
-                        <option value="medium">Medium</option>
-                        <option value="hard">Hard</option>
+                        <option value="easy">Facile</option>
+                        <option value="medium">Moyen</option>
+                        <option value="hard">Difficile</option>
                         {% endmatch %}
                     </select>
                 </div>
@@ -127,14 +127,14 @@
 
             <div>
                 <label for="servings" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Servings
+                    Portions
                 </label>
                 <input
                     type="text"
                     id="servings"
                     name="servings"
                     maxlength="50"
-                    placeholder="e.g., 4 servings, 12 cookies"
+                    placeholder="ex. : 4 portions, 12 biscuits"
                     value="{% if let Some(r) = recipe %}{% if let Some(s) = r.servings %}{{ s }}{% endif %}{% endif %}"
                     class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 />
@@ -142,26 +142,26 @@
 
             <div>
                 <label for="tags" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Tags
+                    Étiquettes
                 </label>
                 <input
                     type="text"
                     id="tags"
                     name="tags"
-                    placeholder="e.g., dessert, vegetarian, quick"
+                    placeholder="ex. : dessert, végétarien, rapide"
                     value="{{ tags }}"
                     class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     aria-describedby="tags-help"
                 />
                 <p id="tags-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Comma-separated. Helps people find your recipe.
+                    Séparées par des virgules. Aide les autres à trouver ta recette.
                 </p>
             </div>
         </section>
 
         {# Visibility #}
         <section class="space-y-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Visibility</h2>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Visibilité</h2>
 
             <div class="flex items-center gap-4">
                 <label class="flex items-center gap-2">
@@ -198,7 +198,7 @@
                         {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
-                    <span class="text-gray-700 dark:text-gray-300">Private</span>
+                    <span class="text-gray-700 dark:text-gray-300">Privé</span>
                 </label>
                 <label class="flex items-center gap-2">
                     <input
@@ -216,7 +216,7 @@
                         {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
-                    <span class="text-gray-700 dark:text-gray-300">Followers Only</span>
+                    <span class="text-gray-700 dark:text-gray-300">Abonnés uniquement</span>
                 </label>
             </div>
         </section>
@@ -232,13 +232,13 @@
                 type="submit"
                 class="px-6 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
             >
-                {% if let Some(_) = recipe %}Update Recipe{% else %}Create Recipe{% endif %}
+                {% if let Some(_) = recipe %}Mettre à jour la recette{% else %}Créer la recette{% endif %}
             </button>
             <a
                 href="{% if let Some(r) = recipe %}/recipes/{{ r.id }}{% else %}/recipes{% endif %}"
                 class="px-6 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
             >
-                Cancel
+                Annuler
             </a>
         </div>
     </form>
@@ -253,7 +253,7 @@ document.getElementById('recipe-form').addEventListener('submit', async (e) => {
     const submitBtn = form.querySelector('button[type="submit"]');
 
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving...';
+    submitBtn.textContent = 'Enregistrement…';
     errorDiv.classList.add('hidden');
 
     const formData = new FormData(form);
@@ -293,16 +293,16 @@ document.getElementById('recipe-form').addEventListener('submit', async (e) => {
         if (response.ok) {
             window.location.href = `/recipes/${result.id}`;
         } else {
-            errorText.textContent = result.error || 'Failed to save recipe';
+            errorText.textContent = result.error || "Échec de l'enregistrement de la recette";
             errorDiv.classList.remove('hidden');
             submitBtn.disabled = false;
-            submitBtn.textContent = isEdit ? 'Update Recipe' : 'Create Recipe';
+            submitBtn.textContent = isEdit ? 'Mettre à jour la recette' : 'Créer la recette';
         }
     } catch (err) {
-        errorText.textContent = 'Network error. Please try again.';
+        errorText.textContent = 'Erreur réseau. Réessaie.';
         errorDiv.classList.remove('hidden');
         submitBtn.disabled = false;
-        submitBtn.textContent = isEdit ? 'Update Recipe' : 'Create Recipe';
+        submitBtn.textContent = isEdit ? 'Mettre à jour la recette' : 'Créer la recette';
     }
 });
 </script>

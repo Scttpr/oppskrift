@@ -29,15 +29,15 @@ const HIBP_TIMEOUT_SECS: u64 = 5;
 
 #[derive(Debug, Error)]
 pub enum PasswordError {
-    #[error("Password is too short (minimum {MIN_PASSWORD_LENGTH} characters)")]
+    #[error("Le mot de passe est trop court (au moins {MIN_PASSWORD_LENGTH} caractères)")]
     TooShort,
-    #[error("Password must contain at least one uppercase letter")]
+    #[error("Le mot de passe doit contenir au moins une majuscule")]
     NoUppercase,
-    #[error("Password must contain at least one lowercase letter")]
+    #[error("Le mot de passe doit contenir au moins une minuscule")]
     NoLowercase,
-    #[error("Password must contain at least one digit")]
+    #[error("Le mot de passe doit contenir au moins un chiffre")]
     NoDigit,
-    #[error("This password has been found in data breaches and cannot be used")]
+    #[error("Ce mot de passe a été trouvé dans des fuites de données et ne peut pas être utilisé")]
     Breached,
     #[error("Password hashing failed")]
     HashingFailed,

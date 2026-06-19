@@ -2,7 +2,7 @@
 
 {% block title %}{{ recipe.title }} - Oppskrift{% endblock %}
 
-{% block meta_description %}{% if let Some(desc) = recipe.description %}{{ desc }}{% else %}A delicious recipe on Oppskrift{% endif %}{% endblock %}
+{% block meta_description %}{% if let Some(desc) = recipe.description %}{{ desc }}{% else %}Une délicieuse recette sur Oppskrift{% endif %}{% endblock %}
 
 {% block head %}
 {# Schema.org JSON-LD #}
@@ -24,7 +24,7 @@
                 {# Author #}
                 {% if let Some(author) = author %}
                 <p class="mt-2 text-gray-600 dark:text-gray-400">
-                    by <a href="/users/{{ author.id }}" class="text-primary-600 dark:text-primary-400 hover:underline">{{ author.display_name }}</a>
+                    par <a href="/users/{{ author.id }}" class="text-primary-600 dark:text-primary-400 hover:underline">{{ author.display_name }}</a>
                 </p>
                 {% endif %}
             </div>
@@ -39,7 +39,7 @@
                     type="button"
                     onclick="unsaveRecipe(this, '{{ recipe.id }}')"
                     class="save-btn px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900 border border-primary-300 dark:border-primary-600 rounded-md hover:bg-primary-100 dark:hover:bg-primary-800 cursor-pointer"
-                    title="Unsave recipe"
+                    title="Retirer des favoris"
                     data-saved="true"
                 >
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -51,7 +51,7 @@
                     type="button"
                     onclick="saveRecipe(this, '{{ recipe.id }}')"
                     class="save-btn px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                    title="Save recipe"
+                    title="Enregistrer la recette"
                     data-saved="false"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -65,7 +65,7 @@
                     type="button"
                     onclick="shareRecipe(this)"
                     class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                    title="Share recipe"
+                    title="Partager la recette"
                 >
                     <svg class="share-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -81,7 +81,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                         </svg>
-                        Add to Book
+                        Ajouter à un livre
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
@@ -96,7 +96,7 @@
                                 onclick="event.stopPropagation(); removeFromBook(this, '{{ book.id }}', '{{ recipe.id }}')"
                                 class="block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
                                 role="menuitem"
-                                title="Click to remove from book"
+                                title="Clique pour retirer du livre"
                             >
                                 ✓ {{ book.title }}
                             </button>
@@ -113,14 +113,14 @@
                             {% endfor %}
                             <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                             {% else %}
-                            <p class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">No books yet</p>
+                            <p class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">Aucun livre pour le moment</p>
                             {% endif %}
                             <a
                                 href="/books/new"
                                 class="block px-4 py-2 text-sm text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 role="menuitem"
                             >
-                                + Create New Book
+                                + Créer un nouveau livre
                             </a>
                         </div>
                     </div>
@@ -132,26 +132,26 @@
                 <a
                     href="/recipes/{{ recipe.id }}/share"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
-                    title="Manage sharing settings"
+                    title="Gérer le partage"
                 >
                     <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    Share
+                    Partager
                 </a>
                 <a
                     href="/recipes/{{ recipe.id }}/edit"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
-                    Edit
+                    Modifier
                 </a>
                 <button
                     hx-delete="/api/v1/recipes/{{ recipe.id }}"
-                    hx-confirm="Are you sure you want to delete this recipe?"
+                    hx-confirm="Es-tu sûr de vouloir supprimer cette recette ?"
                     hx-on::after-request="if(event.detail.successful) window.location.href = '/recipes'"
                     class="px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-600 rounded-md hover:bg-red-50 dark:hover:bg-red-900"
                 >
-                    Delete
+                    Supprimer
                 </button>
                 {% endif %}
             </div>
@@ -167,7 +167,7 @@
                 {% when crate::models::Difficulty::Hard %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
                 {% endmatch %}
             ">
-                {{ difficulty }}
+                {{ difficulty.label_fr() }}
             </span>
             {% endif %}
 
@@ -176,7 +176,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {{ prep }} min prep
+                {{ prep }} min prép.
             </span>
             {% endif %}
 
@@ -185,7 +185,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
                 </svg>
-                {{ cook }} min cook
+                {{ cook }} min cuisson
             </span>
             {% endif %}
 
@@ -237,21 +237,21 @@
         {# Ingredients Sidebar #}
         <aside class="lg:col-span-1">
             {# Serving scaler #}
-            <div id="recipe-scaler" class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" role="group" aria-label="Scale ingredient quantities">
-                <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Adjust quantities</p>
+            <div id="recipe-scaler" class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" role="group" aria-label="Ajuster les quantités d'ingrédients">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ajuster les quantités</p>
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" class="scale-btn px-2.5 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-factor="0.5">½×</button>
                     <button type="button" class="scale-btn px-2.5 py-1 text-sm rounded-md border border-primary-500 bg-primary-50 dark:bg-primary-900 text-primary-700 dark:text-primary-200 font-medium" data-factor="1" aria-pressed="true">1×</button>
                     <button type="button" class="scale-btn px-2.5 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-factor="2">2×</button>
                     <button type="button" class="scale-btn px-2.5 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600" data-factor="3">3×</button>
-                    <label class="sr-only" for="scale-custom">Custom multiplier</label>
+                    <label class="sr-only" for="scale-custom">Multiplicateur personnalisé</label>
                     <input
                         type="number"
                         id="scale-custom"
                         min="0.1"
                         max="100"
                         step="0.5"
-                        placeholder="custom ×"
+                        placeholder="perso ×"
                         class="w-24 px-2 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                     />
                 </div>
@@ -270,14 +270,14 @@
     {% if images.len() > 1 %}
     <section class="mt-12" aria-labelledby="gallery-heading">
         <h2 id="gallery-heading" class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            More Photos
+            Plus de photos
         </h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             {% for image in images %}
             {% if !image.is_primary %}
             <img
                 src="{{ image.url }}"
-                alt="{% if let Some(alt) = image.alt_text %}{{ alt }}{% else %}Recipe photo{% endif %}"
+                alt="{% if let Some(alt) = image.alt_text %}{{ alt }}{% else %}Photo de la recette{% endif %}"
                 class="rounded-lg object-cover aspect-square"
                 loading="lazy"
             />
@@ -290,7 +290,7 @@
     {# Ratings & Reviews #}
     <section class="mt-12 border-t border-gray-200 dark:border-gray-700 pt-8" aria-labelledby="reviews-heading">
         <h2 id="reviews-heading" class="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
-            Ratings &amp; Reviews
+            Notes &amp; avis
         </h2>
 
         {# Average rating #}
@@ -299,24 +299,24 @@
             <span class="text-3xl font-bold text-gray-900 dark:text-white">{{ "{:.1}"|format(avg) }}</span>
             <span class="text-yellow-500 text-xl" aria-hidden="true">★</span>
             <span class="text-gray-500 dark:text-gray-400">
-                ({{ rating.count }} rating{% if rating.count != 1 %}s{% endif %})
+                ({{ rating.count }} note{% if rating.count != 1 %}s{% endif %})
             </span>
             {% else %}
-            <span class="text-gray-500 dark:text-gray-400">No ratings yet</span>
+            <span class="text-gray-500 dark:text-gray-400">Aucune note pour le moment</span>
             {% endif %}
         </div>
 
         {# Rating widget (logged-in users) #}
         {% if let Some(_) = user %}
         <div class="mb-8">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Your rating</p>
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ta note</p>
             <div id="rating-stars" class="inline-flex items-center gap-1" data-recipe-id="{{ recipe.id }}">
                 {% for star in [1, 2, 3, 4, 5] %}
                 <button
                     type="button"
                     class="rating-star text-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
                     data-value="{{ star }}"
-                    aria-label="Rate {{ star }} out of 5"
+                    aria-label="Noter {{ star }} sur 5"
                 >
                     <span class="star-glyph {% if let Some(ur) = rating.user_rating %}{% if star <= ur %}text-yellow-500{% else %}text-gray-300 dark:text-gray-600{% endif %}{% else %}text-gray-300 dark:text-gray-600{% endif %}">★</span>
                 </button>
@@ -327,7 +327,7 @@
                     id="clear-rating"
                     class="ml-3 text-sm text-gray-500 dark:text-gray-400 hover:underline"
                 >
-                    Clear
+                    Effacer
                 </button>
                 {% endif %}
             </div>
@@ -338,7 +338,7 @@
         {% if let Some(_) = user %}
         <form id="comment-form" class="mb-8" data-recipe-id="{{ recipe.id }}">
             <label for="comment-body" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Leave a comment
+                Laisse un commentaire
             </label>
             <textarea
                 id="comment-body"
@@ -353,21 +353,21 @@
                     type="submit"
                     class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                 >
-                    Post Comment
+                    Publier le commentaire
                 </button>
                 <span id="comment-error" class="text-sm text-red-600 dark:text-red-400 hidden"></span>
             </div>
         </form>
         {% else %}
         <p class="mb-8 text-sm text-gray-500 dark:text-gray-400">
-            <a href="/login" class="text-primary-600 dark:text-primary-400 hover:underline">Sign in</a> to rate or comment.
+            <a href="/login" class="text-primary-600 dark:text-primary-400 hover:underline">Connecte-toi</a> pour noter ou commenter.
         </p>
         {% endif %}
 
         {# Comment list #}
         <div id="comment-list" class="space-y-6">
             {% if comments.is_empty() %}
-            <p class="text-gray-500 dark:text-gray-400">No comments yet.</p>
+            <p class="text-gray-500 dark:text-gray-400">Aucun commentaire pour le moment.</p>
             {% else %}
             {% for comment in comments %}
             <article class="flex gap-3">
@@ -388,7 +388,7 @@
                     data-recipe-id="{{ recipe.id }}"
                     data-comment-id="{{ comment.id }}"
                 >
-                    Delete
+                    Supprimer
                 </button>
                 {% endif %}
                 {% endif %}
@@ -410,13 +410,13 @@ async function shareRecipe(btn) {
         shareIcon.classList.add('hidden');
         checkIcon.classList.remove('hidden');
         btn.classList.add('text-green-600', 'dark:text-green-400');
-        btn.title = 'Copied!';
+        btn.title = 'Copié !';
         // Reset after 2 seconds
         setTimeout(() => {
             shareIcon.classList.remove('hidden');
             checkIcon.classList.add('hidden');
             btn.classList.remove('text-green-600', 'dark:text-green-400');
-            btn.title = 'Share recipe';
+            btn.title = 'Partager la recette';
         }, 2000);
     } catch (e) {
         console.error('Failed to copy URL:', e);
@@ -433,7 +433,7 @@ async function saveRecipe(btn, recipeId) {
         if (response.ok) {
             // Switch to saved state
             btn.className = 'save-btn px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900 border border-primary-300 dark:border-primary-600 rounded-md hover:bg-primary-100 dark:hover:bg-primary-800 cursor-pointer';
-            btn.title = 'Unsave recipe';
+            btn.title = 'Retirer des favoris';
             btn.dataset.saved = 'true';
             btn.innerHTML = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>';
             btn.onclick = function() { unsaveRecipe(btn, recipeId); };
@@ -454,7 +454,7 @@ async function unsaveRecipe(btn, recipeId) {
         if (response.ok) {
             // Switch to unsaved state
             btn.className = 'save-btn px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer';
-            btn.title = 'Save recipe';
+            btn.title = 'Enregistrer la recette';
             btn.dataset.saved = 'false';
             btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>';
             btn.onclick = function() { saveRecipe(btn, recipeId); };
@@ -479,7 +479,7 @@ async function addToBook(btn, bookId, recipeId) {
             btn.style.color = '#16a34a';
             btn.innerHTML = '✓ ' + title;
             btn.className = 'block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer';
-            btn.title = 'Click to remove from book';
+            btn.title = 'Clique pour retirer du livre';
             btn.onclick = function(e) { e.stopPropagation(); removeFromBook(btn, bookId, recipeId, title); };
             btn.disabled = false;
         } else {
@@ -583,11 +583,11 @@ async function removeFromBook(btn, bookId, recipeId, title) {
                     window.location.reload();
                 } else {
                     const data = await res.json().catch(() => ({}));
-                    errorEl.textContent = data.error || 'Failed to post comment';
+                    errorEl.textContent = data.error || 'Échec de la publication du commentaire';
                     errorEl.classList.remove('hidden');
                 }
             } catch (e) {
-                errorEl.textContent = 'Network error. Please try again.';
+                errorEl.textContent = 'Erreur réseau. Réessaie.';
                 errorEl.classList.remove('hidden');
             }
         });
@@ -595,7 +595,7 @@ async function removeFromBook(btn, bookId, recipeId, title) {
 
     document.querySelectorAll('.delete-comment').forEach((btn) => {
         btn.addEventListener('click', async () => {
-            if (!confirm('Delete this comment?')) return;
+            if (!confirm('Supprimer ce commentaire ?')) return;
             const recipeId = btn.dataset.recipeId;
             const commentId = btn.dataset.commentId;
             try {

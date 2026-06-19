@@ -47,11 +47,9 @@ pub(crate) async fn security_page(
     let user = UserService::get_by_id(&state.db, auth.id).await?;
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let template = SecurityTemplate {
         active_tab: "security",
@@ -77,7 +75,10 @@ pub struct ChangePasswordForm {
 
     pub current_password: String,
 
-    #[validate(length(min = 12, message = "Password must be at least 12 characters"))]
+    #[validate(length(
+        min = 12,
+        message = "Le mot de passe doit comporter au moins 12 caractères"
+    ))]
     pub new_password: String,
 
     pub confirm_password: String,
@@ -105,11 +106,9 @@ pub(crate) async fn password_change_page(
     let csrf_token = generate_csrf(&state, auth.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let template = PasswordChangeTemplate {
         active_tab: "security",
@@ -155,18 +154,16 @@ pub(crate) async fn password_change(
     if !errors.is_empty() {
         let csrf_token = generate_csrf(&state, auth.session_id);
         let deletion_pending = user.deletion_requested_at.is_some();
-        let deletion_date = user.deletion_requested_at.map(|dt| {
-            (dt + chrono::Duration::days(30))
-                .format("%B %d, %Y")
-                .to_string()
-        });
+        let deletion_date = user
+            .deletion_requested_at
+            .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
         let template = PasswordChangeTemplate {
             active_tab: "security",
             deletion_pending,
             deletion_date,
             flash_success: None,
-            flash_error: Some("Please fix the errors below".to_string()),
+            flash_error: Some("Corrige les erreurs ci-dessous".to_string()),
             errors,
             csrf_token,
         };
@@ -202,12 +199,10 @@ pub(crate) async fn password_change(
                 active_tab: "security",
                 deletion_pending: user.deletion_requested_at.is_some(),
                 deletion_date: user.deletion_requested_at.map(|dt| {
-                    (dt + chrono::Duration::days(30))
-                        .format("%B %d, %Y")
-                        .to_string()
+                    crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30)))
                 }),
                 flash_success: Some(
-                    "Password changed successfully. Other sessions have been signed out."
+                    "Mot de passe modifié avec succès. Les autres sessions ont été déconnectées."
                         .to_string(),
                 ),
                 flash_error: None,
@@ -219,11 +214,9 @@ pub(crate) async fn password_change(
         Err(e) => {
             let csrf_token = generate_csrf(&state, auth.session_id);
             let deletion_pending = user.deletion_requested_at.is_some();
-            let deletion_date = user.deletion_requested_at.map(|dt| {
-                (dt + chrono::Duration::days(30))
-                    .format("%B %d, %Y")
-                    .to_string()
-            });
+            let deletion_date = user
+                .deletion_requested_at
+                .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
             let template = PasswordChangeTemplate {
                 active_tab: "security",
@@ -296,11 +289,9 @@ pub(crate) async fn sessions_page(
     let session_count = sessions.len() as i64;
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let template = SessionsPageTemplate {
         active_tab: "security",
@@ -471,11 +462,9 @@ pub(crate) async fn security_events_page(
     };
 
     let deletion_pending = user.deletion_requested_at.is_some();
-    let deletion_date = user.deletion_requested_at.map(|dt| {
-        (dt + chrono::Duration::days(30))
-            .format("%B %d, %Y")
-            .to_string()
-    });
+    let deletion_date = user
+        .deletion_requested_at
+        .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     let template = SecurityEventsPageTemplate {
         active_tab: "security",

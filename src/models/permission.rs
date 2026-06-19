@@ -51,6 +51,17 @@ impl std::fmt::Display for PermissionLevel {
     }
 }
 
+impl PermissionLevel {
+    /// French display label.
+    pub fn label_fr(&self) -> &'static str {
+        match self {
+            PermissionLevel::View => "Lecture",
+            PermissionLevel::Edit => "Modification",
+            PermissionLevel::Contributor => "Contributeur",
+        }
+    }
+}
+
 /// Subject type defines who can receive permissions
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "subject_type", rename_all = "lowercase")]
@@ -70,6 +81,17 @@ impl std::fmt::Display for SubjectType {
             SubjectType::User => write!(f, "User"),
             SubjectType::Group => write!(f, "Group"),
             SubjectType::Instance => write!(f, "Instance"),
+        }
+    }
+}
+
+impl SubjectType {
+    /// French display label.
+    pub fn label_fr(&self) -> &'static str {
+        match self {
+            SubjectType::User => "Utilisateur",
+            SubjectType::Group => "Groupe",
+            SubjectType::Instance => "Instance",
         }
     }
 }

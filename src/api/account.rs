@@ -161,7 +161,7 @@ impl SecurityEventView {
             ip_address: event
                 .ip_address
                 .clone()
-                .unwrap_or_else(|| "Unknown".to_string()),
+                .unwrap_or_else(|| "Inconnu".to_string()),
             device_info: Self::parse_user_agent(event.user_agent.as_deref()),
             timestamp: crate::models::session::format_relative_time(event.created_at),
             metadata_summary: Self::summarize_metadata(event.metadata.as_ref()),
@@ -171,18 +171,18 @@ impl SecurityEventView {
     /// Convert event type code to human-readable label
     fn format_event_type(event_type: &str) -> String {
         match event_type {
-            "auth.login" => "Login".to_string(),
-            "auth.login.failed" => "Failed login attempt".to_string(),
-            "auth.logout" => "Logout".to_string(),
-            "auth.password.change" => "Password changed".to_string(),
-            "auth.password.reset" => "Password reset".to_string(),
-            "auth.email.change" => "Email changed".to_string(),
-            "auth.2fa.enable" => "2FA enabled".to_string(),
-            "auth.2fa.disable" => "2FA disabled".to_string(),
-            "auth.session.revoke" => "Session revoked".to_string(),
-            "auth.recovery_code.used" => "Recovery code used".to_string(),
-            "auth.deletion.request" => "Account deletion requested".to_string(),
-            "auth.deletion.cancel" => "Account deletion cancelled".to_string(),
+            "auth.login" => "Connexion".to_string(),
+            "auth.login.failed" => "Tentative de connexion échouée".to_string(),
+            "auth.logout" => "Déconnexion".to_string(),
+            "auth.password.change" => "Mot de passe modifié".to_string(),
+            "auth.password.reset" => "Mot de passe réinitialisé".to_string(),
+            "auth.email.change" => "Adresse e-mail modifiée".to_string(),
+            "auth.2fa.enable" => "2FA activée".to_string(),
+            "auth.2fa.disable" => "2FA désactivée".to_string(),
+            "auth.session.revoke" => "Session révoquée".to_string(),
+            "auth.recovery_code.used" => "Code de récupération utilisé".to_string(),
+            "auth.deletion.request" => "Suppression de compte demandée".to_string(),
+            "auth.deletion.cancel" => "Suppression de compte annulée".to_string(),
             other => other.replace(['.', '_'], " "),
         }
     }
@@ -216,7 +216,7 @@ impl SecurityEventView {
                 } else if ua.contains("Edg") {
                     "Edge"
                 } else {
-                    "Browser"
+                    "Navigateur"
                 };
 
                 let os = if ua.contains("Windows") {
@@ -230,12 +230,12 @@ impl SecurityEventView {
                 } else if ua.contains("iPhone") || ua.contains("iPad") {
                     "iOS"
                 } else {
-                    "Unknown OS"
+                    "OS inconnu"
                 };
 
-                format!("{} on {}", browser, os)
+                format!("{} sur {}", browser, os)
             }
-            _ => "Unknown device".to_string(),
+            _ => "Appareil inconnu".to_string(),
         }
     }
 

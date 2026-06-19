@@ -1,24 +1,24 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Oppskrift - Federated Recipe Sharing{% endblock %}
-{% block meta_description %}Share and discover recipes with Oppskrift, a federated social platform powered by ActivityPub{% endblock %}
+{% block title %}Oppskrift - Partage de recettes fédéré{% endblock %}
+{% block meta_description %}Partage et découvre des recettes avec Oppskrift, une plateforme sociale fédérée propulsée par ActivityPub{% endblock %}
 
 {% block content %}
 {# Hero #}
 <section class="hero-warm full-bleed -mt-8 border-b border-navy/5">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-24 text-center">
         <p class="text-sm font-medium uppercase tracking-[0.2em] text-primary-700 mb-5">
-            Federated recipe sharing
+            Partage de recettes fédéré
         </p>
         <h1 class="font-display text-5xl sm:text-6xl lg:text-7xl font-semibold text-navy leading-[1.05] max-w-4xl mx-auto">
-            Cook, share &amp; discover <span class="italic text-primary-600">good food</span>.
+            Cuisine, partage &amp; découvre <span class="italic text-primary-600">de bons petits plats</span>.
         </h1>
         <p class="mt-6 text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
-            A warm home for your recipes — craft beautiful recipe cards, collect them into books, and connect with food lovers across the fediverse.
+            Un foyer chaleureux pour tes recettes — crée de belles fiches de recettes, regroupe-les dans des livres et connecte-toi avec des passionnés de cuisine à travers le fédivers.
         </p>
         <div class="mt-9 flex flex-wrap justify-center gap-4">
-            <a href="/recipes" class="btn-primary">Browse Recipes</a>
-            <a href="/register" class="btn-secondary">Create Account</a>
+            <a href="/recipes" class="btn-primary">Parcourir les recettes</a>
+            <a href="/register" class="btn-secondary">Créer un compte</a>
         </div>
     </div>
 </section>
@@ -26,7 +26,7 @@
 {% if !recent_recipes.is_empty() %}
 <section class="mt-20">
     <h2 class="section-title font-display text-2xl sm:text-3xl font-semibold text-navy mb-8">
-        Recent Recipes
+        Recettes récentes
     </h2>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for recipe in recent_recipes %}
@@ -35,7 +35,7 @@
     </div>
     <div class="text-center mt-10">
         <a href="/recipes" class="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium">
-            View all recipes <span aria-hidden="true">&rarr;</span>
+            Voir toutes les recettes <span aria-hidden="true">&rarr;</span>
         </a>
     </div>
 </section>
@@ -44,23 +44,23 @@
 <section class="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6">
     <div class="card-lift bg-white rounded-2xl border border-navy/10 p-7 text-center">
         <div class="text-4xl mb-4">&#127860;</div>
-        <h3 class="font-display text-xl font-semibold text-navy mb-2">Share Recipes</h3>
+        <h3 class="font-display text-xl font-semibold text-navy mb-2">Partage tes recettes</h3>
         <p class="text-gray-600">
-            Create and share your favorite recipes with detailed ingredients and instructions.
+            Crée et partage tes recettes préférées avec des ingrédients et des instructions détaillés.
         </p>
     </div>
     <div class="card-lift bg-white rounded-2xl border border-navy/10 p-7 text-center">
         <div class="text-4xl mb-4">&#128218;</div>
-        <h3 class="font-display text-xl font-semibold text-navy mb-2">Organize in Books</h3>
+        <h3 class="font-display text-xl font-semibold text-navy mb-2">Organise en livres</h3>
         <p class="text-gray-600">
-            Collect recipes into themed books and share your curated collections.
+            Regroupe tes recettes dans des livres thématiques et partage tes collections.
         </p>
     </div>
     <div class="card-lift bg-white rounded-2xl border border-navy/10 p-7 text-center">
         <div class="text-4xl mb-4">&#127760;</div>
-        <h3 class="font-display text-xl font-semibold text-navy mb-2">Federated</h3>
+        <h3 class="font-display text-xl font-semibold text-navy mb-2">Fédéré</h3>
         <p class="text-gray-600">
-            Connect with users on other instances via ActivityPub federation.
+            Connecte-toi avec des utilisateurs d'autres instances via la fédération ActivityPub.
         </p>
     </div>
 </section>

@@ -20,19 +20,26 @@ lazy_static! {
 /// Registration request
 #[derive(Debug, Clone, Deserialize, Validate, ToSchema)]
 pub struct RegisterRequest {
-    #[validate(email(message = "Invalid email format"))]
+    #[validate(email(message = "Format d'e-mail invalide"))]
     pub email: String,
 
     #[validate(
-        length(min = 3, max = 30, message = "Username must be 3-30 characters"),
-        regex(path = *USERNAME_REGEX, message = "Username can only contain a-z, 0-9, and _")
+        length(min = 3, max = 30, message = "Le nom d'utilisateur doit comporter de 3 à 30 caractères"),
+        regex(path = *USERNAME_REGEX, message = "Le nom d'utilisateur ne peut contenir que a-z, 0-9 et _")
     )]
     pub username: String,
 
-    #[validate(length(min = 10, message = "Password must be at least 10 characters"))]
+    #[validate(length(
+        min = 10,
+        message = "Le mot de passe doit comporter au moins 10 caractères"
+    ))]
     pub password: String,
 
-    #[validate(length(min = 1, max = 100, message = "Display name must be 1-100 characters"))]
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Le nom affiché doit comporter de 1 à 100 caractères"
+    ))]
     pub display_name: Option<String>,
 }
 
@@ -46,7 +53,7 @@ pub struct RegisterResponse {
 /// Login request
 #[derive(Debug, Clone, Deserialize, Validate, ToSchema)]
 pub struct LoginRequest {
-    #[validate(email(message = "Invalid email format"))]
+    #[validate(email(message = "Format d'e-mail invalide"))]
     pub email: String,
     pub password: String,
 }

@@ -101,32 +101,32 @@ impl EmailService {
     pub async fn send_confirmation(&self, to: &str, token: &str) -> Result<(), EmailError> {
         let link = format!("{}/confirm-email/{}", self.base_url, token);
 
-        let subject = "Confirm your Oppskrift account";
+        let subject = "Confirme ton compte Oppskrift";
         let body = format!(
             r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Confirm your email</title>
+    <title>Confirme ton e-mail</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <h1 style="color: #333;">Welcome to Oppskrift!</h1>
-    <p>Please confirm your email address by clicking the button below:</p>
+    <h1 style="color: #333;">Bienvenue sur Oppskrift !</h1>
+    <p>Confirme ton adresse e-mail en cliquant sur le bouton ci-dessous :</p>
     <p style="margin: 30px 0;">
         <a href="{link}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            Confirm Email
+            Confirmer l'e-mail
         </a>
     </p>
     <p style="color: #666; font-size: 14px;">
-        Or copy and paste this link into your browser:<br>
+        Ou copie-colle ce lien dans ton navigateur :<br>
         <a href="{link}" style="color: #2563eb;">{link}</a>
     </p>
     <p style="color: #666; font-size: 14px;">
-        This link will expire in 24 hours.
+        Ce lien expirera dans 24 heures.
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 12px;">
-        If you didn't create an account on Oppskrift, you can safely ignore this email.
+        Si tu n'as pas créé de compte sur Oppskrift, tu peux ignorer cet e-mail.
     </p>
 </body>
 </html>"#,
@@ -140,33 +140,33 @@ impl EmailService {
     pub async fn send_password_reset(&self, to: &str, token: &str) -> Result<(), EmailError> {
         let link = format!("{}/reset-password?token={}", self.base_url, token);
 
-        let subject = "Reset your Oppskrift password";
+        let subject = "Réinitialise ton mot de passe Oppskrift";
         let body = format!(
             r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Reset your password</title>
+    <title>Réinitialise ton mot de passe</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <h1 style="color: #333;">Reset your password</h1>
-    <p>We received a request to reset your Oppskrift password. Click the button below to choose a new password:</p>
+    <h1 style="color: #333;">Réinitialise ton mot de passe</h1>
+    <p>Nous avons reçu une demande de réinitialisation de ton mot de passe Oppskrift. Clique sur le bouton ci-dessous pour en choisir un nouveau :</p>
     <p style="margin: 30px 0;">
         <a href="{link}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            Reset Password
+            Réinitialiser le mot de passe
         </a>
     </p>
     <p style="color: #666; font-size: 14px;">
-        Or copy and paste this link into your browser:<br>
+        Ou copie-colle ce lien dans ton navigateur :<br>
         <a href="{link}" style="color: #2563eb;">{link}</a>
     </p>
     <p style="color: #666; font-size: 14px;">
-        This link will expire in 1 hour.
+        Ce lien expirera dans 1 heure.
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 12px;">
-        If you didn't request a password reset, you can safely ignore this email.
-        Your password will not be changed.
+        Si tu n'as pas demandé de réinitialisation, tu peux ignorer cet e-mail.
+        Ton mot de passe ne sera pas modifié.
     </p>
 </body>
 </html>"#,
@@ -178,24 +178,24 @@ impl EmailService {
 
     /// Send password changed notification
     pub async fn send_password_changed_notification(&self, to: &str) -> Result<(), EmailError> {
-        let subject = "Your Oppskrift password was changed";
+        let subject = "Ton mot de passe Oppskrift a été modifié";
         let body = r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Password changed</title>
+    <title>Mot de passe modifié</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <h1 style="color: #333;">Password Changed</h1>
-    <p>Your Oppskrift password was recently changed.</p>
-    <p>If you made this change, you can safely ignore this email.</p>
+    <h1 style="color: #333;">Mot de passe modifié</h1>
+    <p>Ton mot de passe Oppskrift a récemment été modifié.</p>
+    <p>Si tu es à l'origine de ce changement, tu peux ignorer cet e-mail.</p>
     <p style="color: #dc2626; font-weight: bold;">
-        If you did not change your password, please secure your account immediately
-        by resetting your password and reviewing your active sessions.
+        Si tu n'as pas modifié ton mot de passe, sécurise ton compte immédiatement
+        en réinitialisant ton mot de passe et en vérifiant tes sessions actives.
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 12px;">
-        This is an automated security notification from Oppskrift.
+        Ceci est une notification de sécurité automatique d'Oppskrift.
     </p>
 </body>
 </html>"#;
@@ -205,24 +205,24 @@ impl EmailService {
 
     /// Send 2FA enabled notification
     pub async fn send_2fa_enabled_notification(&self, to: &str) -> Result<(), EmailError> {
-        let subject = "Two-factor authentication enabled on Oppskrift";
+        let subject = "Authentification à deux facteurs activée sur Oppskrift";
         let body = r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>2FA Enabled</title>
+    <title>2FA activée</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <h1 style="color: #333;">Two-Factor Authentication Enabled</h1>
-    <p>Two-factor authentication has been enabled on your Oppskrift account.</p>
-    <p>From now on, you'll need to enter a code from your authenticator app when logging in.</p>
+    <h1 style="color: #333;">Authentification à deux facteurs activée</h1>
+    <p>L'authentification à deux facteurs a été activée sur ton compte Oppskrift.</p>
+    <p>Désormais, tu devras saisir un code de ton application d'authentification à chaque connexion.</p>
     <p style="color: #059669; font-weight: bold;">
-        Make sure you've saved your recovery codes in a safe place.
-        You'll need them if you lose access to your authenticator app.
+        Assure-toi d'avoir enregistré tes codes de récupération en lieu sûr.
+        Tu en auras besoin si tu perds l'accès à ton application d'authentification.
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 12px;">
-        If you did not enable 2FA, please secure your account immediately.
+        Si tu n'as pas activé la 2FA, sécurise ton compte immédiatement.
     </p>
 </body>
 </html>"#;
@@ -232,22 +232,22 @@ impl EmailService {
 
     /// Send 2FA disabled notification
     pub async fn send_2fa_disabled_notification(&self, to: &str) -> Result<(), EmailError> {
-        let subject = "Two-factor authentication disabled on Oppskrift";
+        let subject = "Authentification à deux facteurs désactivée sur Oppskrift";
         let body = r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>2FA Disabled</title>
+    <title>2FA désactivée</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <h1 style="color: #333;">Two-Factor Authentication Disabled</h1>
-    <p>Two-factor authentication has been disabled on your Oppskrift account.</p>
+    <h1 style="color: #333;">Authentification à deux facteurs désactivée</h1>
+    <p>L'authentification à deux facteurs a été désactivée sur ton compte Oppskrift.</p>
     <p style="color: #dc2626; font-weight: bold;">
-        Your account is now less secure. We recommend re-enabling 2FA for better protection.
+        Ton compte est désormais moins sécurisé. Nous te recommandons de réactiver la 2FA pour une meilleure protection.
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 12px;">
-        If you did not disable 2FA, please secure your account immediately.
+        Si tu n'as pas désactivé la 2FA, sécurise ton compte immédiatement.
     </p>
 </body>
 </html>"#;
@@ -261,26 +261,26 @@ impl EmailService {
         to: &str,
         deletion_date: chrono::DateTime<chrono::Utc>,
     ) -> Result<(), EmailError> {
-        let date_str = deletion_date.format("%Y-%m-%d %H:%M UTC").to_string();
-        let subject = "Your Oppskrift account deletion is scheduled";
+        let date_str = crate::core::helpers::format_fr_datetime(&deletion_date);
+        let subject = "La suppression de ton compte Oppskrift est programmée";
         let body = format!(
             r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Account Deletion Scheduled</title>
+    <title>Suppression de compte programmée</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <h1 style="color: #333;">Account Deletion Scheduled</h1>
-    <p>Your Oppskrift account is scheduled for deletion on <strong>{}</strong>.</p>
-    <p>If you change your mind, you can cancel the deletion by logging in before that date.</p>
+    <h1 style="color: #333;">Suppression de compte programmée</h1>
+    <p>La suppression de ton compte Oppskrift est programmée pour le <strong>{}</strong>.</p>
+    <p>Si tu changes d'avis, tu peux annuler la suppression en te connectant avant cette date.</p>
     <p style="color: #dc2626; font-weight: bold;">
-        After this date, your account and all associated data will be permanently deleted
-        and cannot be recovered.
+        Après cette date, ton compte et toutes les données associées seront définitivement supprimés
+        et ne pourront pas être récupérés.
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 12px;">
-        This is an automated notification from Oppskrift.
+        Ceci est une notification automatique d'Oppskrift.
     </p>
 </body>
 </html>"#,
@@ -292,22 +292,22 @@ impl EmailService {
 
     /// Send account deletion cancelled notification
     pub async fn send_deletion_cancelled_notification(&self, to: &str) -> Result<(), EmailError> {
-        let subject = "Your Oppskrift account deletion has been cancelled";
+        let subject = "La suppression de ton compte Oppskrift a été annulée";
         let body = r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Account Deletion Cancelled</title>
+    <title>Suppression de compte annulée</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <h1 style="color: #333;">Account Deletion Cancelled</h1>
-    <p>Your Oppskrift account deletion has been cancelled.</p>
+    <h1 style="color: #333;">Suppression de compte annulée</h1>
+    <p>La suppression de ton compte Oppskrift a été annulée.</p>
     <p style="color: #059669; font-weight: bold;">
-        Your account is now active again and all your data has been preserved.
+        Ton compte est de nouveau actif et toutes tes données ont été conservées.
     </p>
     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
     <p style="color: #999; font-size: 12px;">
-        This is an automated notification from Oppskrift.
+        Ceci est une notification automatique d'Oppskrift.
     </p>
 </body>
 </html>"#;

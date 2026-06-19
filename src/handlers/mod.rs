@@ -87,6 +87,69 @@ struct HomeTemplate {
     recent_recipes: Vec<RecipeSummary>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_home_page_is_french() {
+        let html = HomeTemplate {
+            recent_recipes: vec![],
+        }
+        .render()
+        .expect("home template renders");
+
+        assert!(html.contains("lang=\"fr\""), "html must declare lang=fr");
+        assert!(
+            !html.contains("lang=\"en\""),
+            "html must not declare lang=en"
+        );
+
+        for english in [
+            "Recipes",
+            "Search",
+            "Books",
+            "Tags",
+            "Feed",
+            "Sign In",
+            "About",
+            "Privacy",
+            "Terms",
+            "Federated",
+            "Cook, share",
+            "Create Account",
+        ] {
+            assert!(
+                !html.contains(english),
+                "home page should not contain English sentinel: {english:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_user_menu_is_french() {
+        let logged_in = UserMenuTemplate {
+            current_user: Some(CurrentUser {
+                id: uuid::Uuid::nil(),
+                display_name: "Alice".to_string(),
+            }),
+        }
+        .render()
+        .expect("user menu renders");
+        for english in ["My Profile", "Settings", "Sign Out", "Open user menu"] {
+            assert!(
+                !logged_in.contains(english),
+                "user menu should not contain English sentinel: {english:?}"
+            );
+        }
+
+        let logged_out = UserMenuTemplate { current_user: None }
+            .render()
+            .expect("user menu renders");
+        assert!(!logged_out.contains("Sign In"), "login link must be French");
+    }
+}
+
 /// Home page handler
 async fn home_page(State(state): State<AppState>) -> AppResult<Html<String>> {
     let params = PaginationParams {

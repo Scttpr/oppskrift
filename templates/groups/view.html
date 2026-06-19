@@ -1,13 +1,13 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}{{ group.group.name }} - Groups - Oppskrift{% endblock %}
+{% block title %}{{ group.group.name }} - Groupes - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
     {# Header #}
     <div class="mb-8">
         <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
-            <a href="/groups" class="hover:text-primary-600 dark:hover:text-primary-400">Groups</a>
+            <a href="/groups" class="hover:text-primary-600 dark:hover:text-primary-400">Groupes</a>
             <span>/</span>
             <span>{{ group.group.name }}</span>
         </div>
@@ -21,10 +21,10 @@
                 <p class="mt-2 text-gray-600 dark:text-gray-400">{{ desc }}</p>
                 {% endif %}
                 <div class="mt-2 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                    <span>{{ group.group.member_count }} member{% if group.group.member_count != 1 %}s{% endif %}</span>
+                    <span>{{ group.group.member_count }} membre{% if group.group.member_count != 1 %}s{% endif %}</span>
                     {% if group.group.is_owner %}
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
-                        Owner
+                        Propriétaire
                     </span>
                     {% endif %}
                 </div>
@@ -36,7 +36,7 @@
                     href="/groups/{{ group.group.id }}/edit"
                     class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
-                    Edit
+                    Modifier
                 </a>
             </div>
             {% else %}
@@ -45,7 +45,7 @@
                 class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
                 onclick="leaveGroup('{{ group.group.id }}')"
             >
-                Leave Group
+                Quitter le groupe
             </button>
             {% endif %}
         </div>
@@ -54,7 +54,7 @@
     {# Members Section #}
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Members</h2>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Membres</h2>
             {% if group.group.is_owner %}
             <button
                 type="button"
@@ -64,7 +64,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                Add Member
+                Ajouter un membre
             </button>
             {% endif %}
         </div>
@@ -103,7 +103,7 @@
                     class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                     onclick="removeMember('{{ group.group.id }}', '{{ member.user_id }}')"
                 >
-                    Remove
+                    Retirer
                 </button>
                 {% endif %}
             </li>
@@ -117,17 +117,17 @@
     <div class="flex items-center justify-center min-h-screen px-4">
         <div class="fixed inset-0 bg-black/50" onclick="hideAddMemberModal()"></div>
         <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Member</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Ajouter un membre</h3>
             <form onsubmit="addMember(event, '{{ group.group.id }}')">
                 <div class="mb-4">
                     <label for="user-search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Search User
+                        Rechercher un utilisateur
                     </label>
                     <input
                         type="text"
                         id="user-search"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                        placeholder="Enter username..."
+                        placeholder="Saisis un nom d'utilisateur…"
                     />
                     <input type="hidden" id="selected-user-id" />
                 </div>
@@ -137,13 +137,13 @@
                         class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
                         onclick="hideAddMemberModal()"
                     >
-                        Cancel
+                        Annuler
                     </button>
                     <button
                         type="submit"
                         class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
                     >
-                        Add
+                        Ajouter
                     </button>
                 </div>
             </form>
@@ -164,7 +164,7 @@ async function addMember(event, groupId) {
     event.preventDefault();
     const userId = document.getElementById('selected-user-id').value;
     if (!userId) {
-        alert('Please select a user');
+        alert('Sélectionne un utilisateur');
         return;
     }
 
@@ -179,15 +179,15 @@ async function addMember(event, groupId) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.message || 'Failed to add member');
+            alert(error.message || "Échec de l'ajout du membre");
         }
     } catch (e) {
-        alert('Failed to add member');
+        alert("Échec de l'ajout du membre");
     }
 }
 
 async function removeMember(groupId, userId) {
-    if (!confirm('Are you sure you want to remove this member?')) return;
+    if (!confirm('Es-tu sûr de vouloir retirer ce membre ?')) return;
 
     try {
         const response = await fetch(`/api/v1/groups/${groupId}/members/${userId}`, {
@@ -198,15 +198,15 @@ async function removeMember(groupId, userId) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.message || 'Failed to remove member');
+            alert(error.message || 'Échec du retrait du membre');
         }
     } catch (e) {
-        alert('Failed to remove member');
+        alert('Échec du retrait du membre');
     }
 }
 
 async function leaveGroup(groupId) {
-    if (!confirm('Are you sure you want to leave this group?')) return;
+    if (!confirm('Es-tu sûr de vouloir quitter ce groupe ?')) return;
 
     try {
         const response = await fetch(`/api/v1/groups/${groupId}/leave`, {
@@ -217,10 +217,10 @@ async function leaveGroup(groupId) {
             window.location.href = '/groups';
         } else {
             const error = await response.json();
-            alert(error.message || 'Failed to leave group');
+            alert(error.message || 'Échec de la sortie du groupe');
         }
     } catch (e) {
-        alert('Failed to leave group');
+        alert('Échec de la sortie du groupe');
     }
 }
 </script>

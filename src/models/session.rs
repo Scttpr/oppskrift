@@ -10,27 +10,27 @@ pub fn format_relative_time(dt: DateTime<Utc>) -> String {
     let diff = now.signed_duration_since(dt);
 
     if diff.num_seconds() < 60 {
-        "just now".to_string()
+        "à l'instant".to_string()
     } else if diff.num_minutes() < 60 {
         let mins = diff.num_minutes();
         if mins == 1 {
-            "1 minute ago".to_string()
+            "il y a 1 minute".to_string()
         } else {
-            format!("{} minutes ago", mins)
+            format!("il y a {} minutes", mins)
         }
     } else if diff.num_hours() < 24 {
         let hours = diff.num_hours();
         if hours == 1 {
-            "1 hour ago".to_string()
+            "il y a 1 heure".to_string()
         } else {
-            format!("{} hours ago", hours)
+            format!("il y a {} heures", hours)
         }
     } else if diff.num_days() < 30 {
         let days = diff.num_days();
         if days == 1 {
-            "1 day ago".to_string()
+            "il y a 1 jour".to_string()
         } else {
-            format!("{} days ago", days)
+            format!("il y a {} jours", days)
         }
     } else {
         dt.format("%Y-%m-%d").to_string()
@@ -56,11 +56,11 @@ impl SessionItemView {
             device_info: info
                 .device_info
                 .clone()
-                .unwrap_or_else(|| "Unknown device".to_string()),
+                .unwrap_or_else(|| "Appareil inconnu".to_string()),
             ip_address: info
                 .ip_address
                 .clone()
-                .unwrap_or_else(|| "Unknown".to_string()),
+                .unwrap_or_else(|| "Inconnu".to_string()),
             last_activity: format_relative_time(info.last_activity),
             created_at: info.created_at.format("%Y-%m-%d %H:%M UTC").to_string(),
             is_current: info.is_current,

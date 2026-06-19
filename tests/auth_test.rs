@@ -246,7 +246,7 @@ async fn test_login_wrong_password() {
         // Error message should be generic (no enumeration)
         assert_eq!(
             response.error_message(),
-            Some("Invalid email or password"),
+            Some("E-mail ou mot de passe incorrect"),
             "Error should be generic"
         );
     })
@@ -271,7 +271,7 @@ async fn test_login_nonexistent_email() {
         // Same error as wrong password (prevent enumeration)
         assert_eq!(
             response.error_message(),
-            Some("Invalid email or password"),
+            Some("E-mail ou mot de passe incorrect"),
             "Error should be generic (no enumeration)"
         );
     })
