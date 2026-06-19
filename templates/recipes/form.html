@@ -8,6 +8,17 @@
         {% if let Some(_) = recipe %}Modifier la recette{% else %}Créer une nouvelle recette{% endif %}
     </h1>
 
+    {# Draft restore banner (creation only, shown by JS when a saved draft exists) #}
+    {% if let Some(_) = recipe %}{% else %}
+    <div id="draft-banner" class="hidden mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center justify-between gap-4">
+        <p class="text-sm text-amber-800 dark:text-amber-200">Un brouillon non enregistré a été retrouvé.</p>
+        <div class="flex items-center gap-2 shrink-0">
+            <button type="button" id="draft-restore" class="px-3 py-1 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700">Restaurer</button>
+            <button type="button" id="draft-discard" class="px-3 py-1 text-sm text-amber-800 dark:text-amber-200 hover:underline">Ignorer</button>
+        </div>
+    </div>
+    {% endif %}
+
     <form
         id="recipe-form"
         method="post"
@@ -31,6 +42,7 @@
                     class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     aria-describedby="title-help"
                 />
+                <p id="title-error" class="hidden mt-1 text-sm text-red-600 dark:text-red-400"></p>
                 <p id="title-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     Donne un nom descriptif à ta recette (200 caractères max)
                 </p>
@@ -44,6 +56,7 @@
                     id="description"
                     name="description"
                     rows="3"
+                    maxlength="2000"
                     class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     aria-describedby="description-help"
                 >{% if let Some(r) = recipe %}{% if let Some(desc) = r.description %}{{ desc }}{% endif %}{% endif %}</textarea>
@@ -52,6 +65,68 @@
                 </p>
             </div>
         </section>
+
+        {# Ingredients & Instructions & Photo — creation only #}
+        {% if let Some(_) = recipe %}{% else %}
+        {# Ingredients #}
+        <section class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                    Ingrédients <span class="text-red-500" aria-hidden="true">*</span>
+                </h2>
+            </div>
+            <p id="ingredients-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+            <div id="ingredients-list" class="space-y-3"></div>
+            <button
+                type="button"
+                id="add-ingredient"
+                class="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+            >
+                + Ajouter un ingrédient
+            </button>
+        </section>
+
+        {# Instructions #}
+        <section class="space-y-4">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                Étapes <span class="text-red-500" aria-hidden="true">*</span>
+            </h2>
+            <p id="steps-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+            <div id="steps-list" class="space-y-3"></div>
+            <button
+                type="button"
+                id="add-step"
+                class="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+            >
+                + Ajouter une étape
+            </button>
+        </section>
+
+        {# Hero photo #}
+        <section class="space-y-4">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Photo</h2>
+            <div>
+                <label for="photo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Photo principale
+                </label>
+                <input
+                    type="file"
+                    id="photo"
+                    name="photo"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    class="mt-1 block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                    aria-describedby="photo-help"
+                />
+                <p id="photo-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Une belle photo de ton plat (8 Mo max). Tu pourras en ajouter d'autres ensuite.
+                </p>
+                <div id="photo-preview-wrapper" class="hidden mt-3">
+                    <img id="photo-preview" src="" alt="Aperçu de la photo" class="max-h-48 rounded-md border border-gray-200 dark:border-gray-700" />
+                    <button type="button" id="photo-remove" class="mt-2 text-sm text-red-600 hover:text-red-700 dark:text-red-400">Retirer la photo</button>
+                </div>
+            </div>
+        </section>
+        {% endif %}
 
         {# Time and Difficulty #}
         <section class="space-y-4">
@@ -67,6 +142,7 @@
                         id="prep_time_min"
                         name="prep_time_min"
                         min="0"
+                        max="1440"
                         value="{% if let Some(r) = recipe %}{% if let Some(pt) = r.prep_time_min %}{{ pt }}{% endif %}{% endif %}"
                         class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     />
@@ -81,6 +157,7 @@
                         id="cook_time_min"
                         name="cook_time_min"
                         min="0"
+                        max="1440"
                         value="{% if let Some(r) = recipe %}{% if let Some(ct) = r.cook_time_min %}{{ ct }}{% endif %}{% endif %}"
                         class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                     />
@@ -176,7 +253,7 @@
                             {% when crate::models::Visibility::Private %}
                             {% when crate::models::Visibility::FollowersOnly %}
                             {% endmatch %}
-                        {% when None %}checked
+                        {% when None %}
                         {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
@@ -194,7 +271,7 @@
                             {% when crate::models::Visibility::Private %}checked
                             {% when crate::models::Visibility::FollowersOnly %}
                             {% endmatch %}
-                        {% when None %}
+                        {% when None %}checked
                         {% endmatch %}
                         class="text-primary-600 focus:ring-primary-500"
                     />
@@ -219,6 +296,9 @@
                     <span class="text-gray-700 dark:text-gray-300">Abonnés uniquement</span>
                 </label>
             </div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Une recette publique est partagée avec d'autres instances du fédiverse et peut être difficile à retirer ensuite.
+            </p>
         </section>
 
         {# Form Errors #}
@@ -244,66 +324,430 @@
     </form>
 </div>
 
+{# Row templates (creation only) #}
+{% if let Some(_) = recipe %}{% else %}
+<template id="ingredient-template">
+    <div class="ingredient-row flex items-start gap-2">
+        <div class="flex flex-col gap-1 pt-1">
+            <button type="button" data-move="up" aria-label="Monter" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 leading-none">▲</button>
+            <button type="button" data-move="down" aria-label="Descendre" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 leading-none">▼</button>
+        </div>
+        <div class="flex-1 grid grid-cols-12 gap-2">
+            <input type="text" inputmode="decimal" data-field="quantity" placeholder="Qté" class="col-span-2 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <input type="text" maxlength="50" data-field="unit" placeholder="Unité" class="col-span-3 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <input type="text" maxlength="200" data-field="name" placeholder="Nom de l'ingrédient" class="col-span-7 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <p data-row-error class="hidden col-span-12 text-sm text-red-600 dark:text-red-400"></p>
+        </div>
+        <button type="button" data-remove aria-label="Retirer" class="pt-1 text-gray-400 hover:text-red-600">✕</button>
+    </div>
+</template>
+
+<template id="step-template">
+    <div class="step-row flex items-start gap-2">
+        <div class="flex flex-col gap-1 pt-1">
+            <button type="button" data-move="up" aria-label="Monter" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 leading-none">▲</button>
+            <button type="button" data-move="down" aria-label="Descendre" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 leading-none">▼</button>
+        </div>
+        <div class="flex-1 space-y-2">
+            <textarea rows="2" data-field="description" placeholder="Décris cette étape" class="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+            <div class="flex items-center gap-2">
+                <input type="number" min="0" data-field="duration" placeholder="Durée" class="w-28 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+                <span class="text-sm text-gray-500 dark:text-gray-400">minutes (facultatif)</span>
+            </div>
+            <p data-row-error class="hidden text-sm text-red-600 dark:text-red-400"></p>
+        </div>
+        <button type="button" data-remove aria-label="Retirer" class="pt-1 text-gray-400 hover:text-red-600">✕</button>
+    </div>
+</template>
+{% endif %}
+
 <script>
-document.getElementById('recipe-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
+(function () {
+    const form = document.getElementById('recipe-form');
     const errorDiv = document.getElementById('form-errors');
     const errorText = errorDiv.querySelector('p');
     const submitBtn = form.querySelector('button[type="submit"]');
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Enregistrement…';
-    errorDiv.classList.add('hidden');
-
-    const formData = new FormData(form);
     const isEdit = {% if let Some(_) = recipe %}true{% else %}false{% endif %};
     const recipeId = {% if let Some(r) = recipe %}'{{ r.id }}'{% else %}null{% endif %};
-    const url = isEdit ? `/api/v1/recipes/${recipeId}` : '/api/v1/recipes';
-    const method = isEdit ? 'PUT' : 'POST';
 
-    // Parse comma-separated tags into a trimmed, non-empty list
-    const tags = (formData.get('tags') || '')
-        .split(',')
-        .map(t => t.trim())
-        .filter(t => t.length > 0);
-
-    // Build JSON payload
-    const data = {
-        title: formData.get('title'),
-        description: formData.get('description') || null,
-        prep_time_min: formData.get('prep_time_min') ? parseInt(formData.get('prep_time_min')) : null,
-        cook_time_min: formData.get('cook_time_min') ? parseInt(formData.get('cook_time_min')) : null,
-        servings: formData.get('servings') || null,
-        difficulty: formData.get('difficulty') || null,
-        visibility: formData.get('visibility') || 'public',
-        tags: tags
-    };
-
-    try {
-        const response = await fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-            credentials: 'include'
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            window.location.href = `/recipes/${result.id}`;
-        } else {
-            errorText.textContent = result.error || "Échec de l'enregistrement de la recette";
-            errorDiv.classList.remove('hidden');
-            submitBtn.disabled = false;
-            submitBtn.textContent = isEdit ? 'Mettre à jour la recette' : 'Créer la recette';
-        }
-    } catch (err) {
-        errorText.textContent = 'Erreur réseau. Réessaie.';
+    function showError(msg) {
+        errorText.textContent = msg;
         errorDiv.classList.remove('hidden');
+    }
+    function hideError() {
+        errorDiv.classList.add('hidden');
+    }
+    function resetSubmit() {
         submitBtn.disabled = false;
         submitBtn.textContent = isEdit ? 'Mettre à jour la recette' : 'Créer la recette';
     }
-});
+
+    // Comma-separated tags → trimmed, non-empty list
+    function parseTags() {
+        return (form.querySelector('#tags').value || '')
+            .split(',')
+            .map(t => t.trim())
+            .filter(t => t.length > 0);
+    }
+
+    function baseRecipePayload() {
+        const get = (id) => form.querySelector('#' + id).value;
+        return {
+            title: get('title').trim(),
+            description: get('description') || null,
+            prep_time_min: get('prep_time_min') ? parseInt(get('prep_time_min'), 10) : null,
+            cook_time_min: get('cook_time_min') ? parseInt(get('cook_time_min'), 10) : null,
+            servings: get('servings') || null,
+            difficulty: get('difficulty') || null,
+            visibility: (form.querySelector('input[name="visibility"]:checked') || {}).value || 'private',
+            tags: parseTags()
+        };
+    }
+
+    // -- Edit flow: preserve existing metadata-only behaviour ------------------
+    if (isEdit) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Enregistrement…';
+            hideError();
+            try {
+                const response = await fetch(`/api/v1/recipes/${recipeId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(baseRecipePayload()),
+                    credentials: 'include'
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    window.location.href = `/recipes/${result.id}`;
+                } else {
+                    showError(result.message || result.error || "Échec de l'enregistrement de la recette");
+                    resetSubmit();
+                }
+            } catch (err) {
+                showError('Erreur réseau. Réessaie.');
+                resetSubmit();
+            }
+        });
+        return;
+    }
+
+    // -- Creation flow --------------------------------------------------------
+    const DRAFT_KEY = 'oppskrift:new-recipe-draft';
+    const ingredientsList = document.getElementById('ingredients-list');
+    const stepsList = document.getElementById('steps-list');
+    const ingredientTpl = document.getElementById('ingredient-template');
+    const stepTpl = document.getElementById('step-template');
+    const photoInput = document.getElementById('photo');
+    const photoPreview = document.getElementById('photo-preview');
+    const photoWrapper = document.getElementById('photo-preview-wrapper');
+
+    function clearRowError(row) {
+        const p = row.querySelector('[data-row-error]');
+        p.classList.add('hidden');
+        p.textContent = '';
+    }
+    function setRowError(row, msg) {
+        const p = row.querySelector('[data-row-error]');
+        p.textContent = msg;
+        p.classList.remove('hidden');
+    }
+
+    function wireRow(row, list) {
+        row.querySelector('[data-remove]').addEventListener('click', () => {
+            row.remove();
+            scheduleSave();
+        });
+        row.querySelectorAll('[data-move]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (btn.dataset.move === 'up' && row.previousElementSibling) {
+                    list.insertBefore(row, row.previousElementSibling);
+                } else if (btn.dataset.move === 'down' && row.nextElementSibling) {
+                    list.insertBefore(row.nextElementSibling, row);
+                }
+                scheduleSave();
+            });
+        });
+        row.querySelectorAll('[data-field]').forEach((input) => {
+            input.addEventListener('input', () => { clearRowError(row); scheduleSave(); });
+        });
+    }
+
+    function addIngredient(values) {
+        const row = ingredientTpl.content.firstElementChild.cloneNode(true);
+        if (values) {
+            row.querySelector('[data-field="quantity"]').value = values.quantity || '';
+            row.querySelector('[data-field="unit"]').value = values.unit || '';
+            row.querySelector('[data-field="name"]').value = values.name || '';
+        }
+        ingredientsList.appendChild(row);
+        wireRow(row, ingredientsList);
+        return row;
+    }
+
+    function addStep(values) {
+        const row = stepTpl.content.firstElementChild.cloneNode(true);
+        if (values) {
+            row.querySelector('[data-field="description"]').value = values.description || '';
+            row.querySelector('[data-field="duration"]').value = values.duration || '';
+        }
+        stepsList.appendChild(row);
+        wireRow(row, stepsList);
+        return row;
+    }
+
+    document.getElementById('add-ingredient').addEventListener('click', () => { addIngredient(); scheduleSave(); });
+    document.getElementById('add-step').addEventListener('click', () => { addStep(); scheduleSave(); });
+
+    // Photo preview
+    let photoUrl = null;
+    function revokePhotoUrl() {
+        if (photoUrl) { URL.revokeObjectURL(photoUrl); photoUrl = null; }
+    }
+    photoInput.addEventListener('change', () => {
+        revokePhotoUrl();
+        const file = photoInput.files[0];
+        if (file) {
+            photoUrl = URL.createObjectURL(file);
+            photoPreview.src = photoUrl;
+            photoWrapper.classList.remove('hidden');
+        } else {
+            photoWrapper.classList.add('hidden');
+        }
+    });
+    document.getElementById('photo-remove').addEventListener('click', () => {
+        revokePhotoUrl();
+        photoInput.value = '';
+        photoWrapper.classList.add('hidden');
+    });
+
+    // Collect rows (non-blank only), positions derived from DOM order
+    function collectIngredients() {
+        const out = [];
+        ingredientsList.querySelectorAll('.ingredient-row').forEach((row) => {
+            const quantity = row.querySelector('[data-field="quantity"]').value.trim();
+            const unit = row.querySelector('[data-field="unit"]').value.trim();
+            const name = row.querySelector('[data-field="name"]').value.trim();
+            if (!quantity && !unit && !name) return; // fully-blank row → skip
+            out.push({ row, quantity, unit, name });
+        });
+        return out;
+    }
+    function collectSteps() {
+        const out = [];
+        stepsList.querySelectorAll('.step-row').forEach((row) => {
+            const description = row.querySelector('[data-field="description"]').value.trim();
+            const duration = row.querySelector('[data-field="duration"]').value.trim();
+            if (!description && !duration) return; // fully-blank row → skip
+            out.push({ row, description, duration });
+        });
+        return out;
+    }
+
+    // -- Autosave (localStorage) ---------------------------------------------
+    // While a previously-saved draft is being offered for restore, suspend
+    // autosave so the stored draft isn't overwritten before the user chooses.
+    let draftPending = false;
+    let saveTimer = null;
+    function scheduleSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveDraft, 500);
+    }
+    function snapshot() {
+        const base = baseRecipePayload();
+        return {
+            title: base.title,
+            description: form.querySelector('#description').value,
+            prep_time_min: form.querySelector('#prep_time_min').value,
+            cook_time_min: form.querySelector('#cook_time_min').value,
+            servings: form.querySelector('#servings').value,
+            difficulty: form.querySelector('#difficulty').value,
+            tags: form.querySelector('#tags').value,
+            visibility: base.visibility,
+            ingredients: Array.from(ingredientsList.querySelectorAll('.ingredient-row')).map((row) => ({
+                quantity: row.querySelector('[data-field="quantity"]').value,
+                unit: row.querySelector('[data-field="unit"]').value,
+                name: row.querySelector('[data-field="name"]').value
+            })),
+            steps: Array.from(stepsList.querySelectorAll('.step-row')).map((row) => ({
+                description: row.querySelector('[data-field="description"]').value,
+                duration: row.querySelector('[data-field="duration"]').value
+            }))
+        };
+    }
+    function saveDraft() {
+        if (draftPending) return;
+        try { localStorage.setItem(DRAFT_KEY, JSON.stringify(snapshot())); } catch (e) {}
+    }
+    function clearDraft() {
+        try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    }
+    function applyDraft(d) {
+        form.querySelector('#title').value = d.title || '';
+        form.querySelector('#description').value = d.description || '';
+        form.querySelector('#prep_time_min').value = d.prep_time_min || '';
+        form.querySelector('#cook_time_min').value = d.cook_time_min || '';
+        form.querySelector('#servings').value = d.servings || '';
+        form.querySelector('#difficulty').value = d.difficulty || '';
+        form.querySelector('#tags').value = d.tags || '';
+        if (d.visibility) {
+            const radio = form.querySelector(`input[name="visibility"][value="${d.visibility}"]`);
+            if (radio) radio.checked = true;
+        }
+        ingredientsList.innerHTML = '';
+        (d.ingredients && d.ingredients.length ? d.ingredients : [null]).forEach(addIngredient);
+        stepsList.innerHTML = '';
+        (d.steps && d.steps.length ? d.steps : [null]).forEach(addStep);
+    }
+
+    // Draft restore banner
+    const banner = document.getElementById('draft-banner');
+    let savedDraft = null;
+    try { savedDraft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { savedDraft = null; }
+    if (savedDraft && banner) {
+        draftPending = true;
+        banner.classList.remove('hidden');
+        document.getElementById('draft-restore').addEventListener('click', () => {
+            applyDraft(savedDraft);
+            banner.classList.add('hidden');
+            draftPending = false;
+            saveDraft();
+        });
+        document.getElementById('draft-discard').addEventListener('click', () => {
+            clearDraft();
+            banner.classList.add('hidden');
+            draftPending = false;
+        });
+    }
+
+    form.addEventListener('input', scheduleSave);
+
+    // Seed one empty row of each on first load
+    addIngredient();
+    addStep();
+
+    // -- Validation -----------------------------------------------------------
+    function validate(ingredients, steps) {
+        let ok = true;
+        const titleErr = document.getElementById('title-error');
+        const titleInput = document.getElementById('title');
+        if (!titleInput.value.trim()) {
+            titleErr.textContent = 'Le titre est obligatoire.';
+            titleErr.classList.remove('hidden');
+            ok = false;
+        } else {
+            titleErr.classList.add('hidden');
+        }
+
+        const ingErr = document.getElementById('ingredients-error');
+        if (ingredients.length === 0) {
+            ingErr.textContent = 'Ajoute au moins un ingrédient.';
+            ingErr.classList.remove('hidden');
+            ok = false;
+        } else {
+            ingErr.classList.add('hidden');
+            ingredients.forEach((ing) => {
+                if (!ing.name) {
+                    setRowError(ing.row, "Le nom de l'ingrédient est obligatoire.");
+                    ok = false;
+                }
+            });
+        }
+
+        const stepErr = document.getElementById('steps-error');
+        if (steps.length === 0) {
+            stepErr.textContent = 'Ajoute au moins une étape.';
+            stepErr.classList.remove('hidden');
+            ok = false;
+        } else {
+            stepErr.classList.add('hidden');
+            steps.forEach((st) => {
+                if (!st.description) {
+                    setRowError(st.row, "La description de l'étape est obligatoire.");
+                    ok = false;
+                }
+            });
+        }
+        return ok;
+    }
+
+    // -- Submit (two-phase: recipe JSON, then hero photo) ---------------------
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideError();
+
+        const ingredients = collectIngredients();
+        const steps = collectSteps();
+        if (!validate(ingredients, steps)) {
+            showError('Corrige les champs en surbrillance.');
+            return;
+        }
+
+        const payload = baseRecipePayload();
+        payload.ingredients = ingredients.map((ing, i) => ({
+            position: i + 1,
+            quantity: ing.quantity ? ing.quantity : null,
+            unit: ing.unit || null,
+            name: ing.name,
+            notes: null
+        }));
+        payload.instructions = steps.map((st, i) => ({
+            step_number: i + 1,
+            description: st.description,
+            image_url: null,
+            duration_min: st.duration ? parseInt(st.duration, 10) : null
+        }));
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Enregistrement…';
+
+        let created;
+        try {
+            const response = await fetch('/api/v1/recipes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                credentials: 'include'
+            });
+            created = await response.json();
+            if (!response.ok) {
+                showError(created.message || created.error || "Échec de l'enregistrement de la recette");
+                resetSubmit();
+                return;
+            }
+        } catch (err) {
+            showError('Erreur réseau. Réessaie.');
+            resetSubmit();
+            return;
+        }
+
+        // Phase 2: upload hero photo (best-effort, non-fatal). The recipe already
+        // exists, so a photo failure is a soft notice, not lost work.
+        const file = photoInput.files[0];
+        if (file) {
+            submitBtn.textContent = 'Envoi de la photo…';
+            try {
+                const fd = new FormData();
+                fd.append('image', file);
+                fd.append('is_primary', 'true');
+                const imgResp = await fetch(`/api/v1/recipes/${created.id}/images`, {
+                    method: 'POST',
+                    body: fd,
+                    credentials: 'include'
+                });
+                if (!imgResp.ok) throw new Error('image upload failed');
+            } catch (err) {
+                clearDraft();
+                showError('Recette créée, mais l\'envoi de la photo a échoué. Tu pourras l\'ajouter depuis la page de la recette.');
+                setTimeout(() => { window.location.href = `/recipes/${created.id}`; }, 2500);
+                return;
+            }
+        }
+
+        clearDraft();
+        window.location.href = `/recipes/${created.id}`;
+    });
+})();
 </script>
 {% endblock %}
