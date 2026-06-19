@@ -82,25 +82,24 @@ async fn create_book(
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|e| AppError::BadRequest(format!("Failed to parse multipart: {}", e)))?
+        .map_err(|e| AppError::BadRequest(format!("Échec de l'analyse du formulaire : {}", e)))?
     {
         let name = field.name().unwrap_or("").to_string();
 
         match name.as_str() {
             "title" => {
-                title =
-                    Some(field.text().await.map_err(|e| {
-                        AppError::BadRequest(format!("Failed to read title: {}", e))
-                    })?);
+                title = Some(field.text().await.map_err(|e| {
+                    AppError::BadRequest(format!("Échec de la lecture du titre : {}", e))
+                })?);
             }
             "description" => {
                 description = Some(field.text().await.map_err(|e| {
-                    AppError::BadRequest(format!("Failed to read description: {}", e))
+                    AppError::BadRequest(format!("Échec de la lecture de la description : {}", e))
                 })?);
             }
             "visibility" => {
                 visibility = Some(field.text().await.map_err(|e| {
-                    AppError::BadRequest(format!("Failed to read visibility: {}", e))
+                    AppError::BadRequest(format!("Échec de la lecture de la visibilité : {}", e))
                 })?);
             }
             "cover_image" => {
@@ -108,7 +107,9 @@ async fn create_book(
                 let data = field
                     .bytes()
                     .await
-                    .map_err(|e| AppError::BadRequest(format!("Failed to read image: {}", e)))?
+                    .map_err(|e| {
+                        AppError::BadRequest(format!("Échec de la lecture de l'image : {}", e))
+                    })?
                     .to_vec();
 
                 if !data.is_empty() {
@@ -130,14 +131,15 @@ async fn create_book(
         }
     }
 
-    let title = title.ok_or_else(|| AppError::BadRequest("Le titre est obligatoire".to_string()))?;
+    let title =
+        title.ok_or_else(|| AppError::BadRequest("Le titre est obligatoire".to_string()))?;
 
     let visibility_enum = match visibility.as_deref() {
         Some("public") | None => Some(crate::models::Visibility::Public),
         Some("private") => Some(crate::models::Visibility::Private),
         Some(other) => {
             return Err(AppError::BadRequest(format!(
-                "Invalid visibility: {}",
+                "Visibilité invalide : {}",
                 other
             )))
         }

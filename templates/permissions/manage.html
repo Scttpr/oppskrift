@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Share {{ resource_title }} - Oppskrift{% endblock %}
+{% block title %}Partager {{ resource_title }} - Oppskrift{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
@@ -11,34 +11,34 @@
                 {{ resource_title }}
             </a>
             <span>/</span>
-            <span>Share Settings</span>
+            <span>Paramètres de partage</span>
         </div>
 
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-            Share Settings
+            Paramètres de partage
         </h1>
         <p class="mt-2 text-gray-600 dark:text-gray-400">
-            Manage who can view or edit "{{ resource_title }}"
+            Gère qui peut voir ou modifier « {{ resource_title }} »
         </p>
     </div>
 
     {# Share with User Form #}
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Share with User</h2>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Partager avec un utilisateur</h2>
         </div>
         <form class="p-6" onsubmit="shareWithUser(event)">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-2 relative">
                     <label for="share-username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Username
+                        Nom d'utilisateur
                     </label>
                     <input
                         type="text"
                         id="share-username"
                         autocomplete="off"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                        placeholder="Search by username..."
+                        placeholder="Rechercher par nom d'utilisateur…"
                         oninput="searchUsers(this.value)"
                         onfocus="showSearchResults()"
                     />
@@ -72,10 +72,10 @@
                         id="share-user-level"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                     >
-                        <option value="view">View</option>
-                        <option value="edit">Edit</option>
+                        <option value="view">Lecture</option>
+                        <option value="edit">Modification</option>
                         {% if resource_type == "book" %}
-                        <option value="contributor">Contributor</option>
+                        <option value="contributor">Contributeur</option>
                         {% endif %}
                     </select>
                 </div>
@@ -85,7 +85,7 @@
                 class="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 id="share-user-btn"
             >
-                Share
+                Partager
             </button>
         </form>
     </div>
@@ -94,13 +94,13 @@
     {% if !user_groups.is_empty() %}
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Share with Group</h2>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Partager avec un groupe</h2>
         </div>
         <form class="p-6" onsubmit="shareWithGroup(event)">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-2">
                     <label for="share-group-id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Group
+                        Groupe
                     </label>
                     <select
                         id="share-group-id"
@@ -119,10 +119,10 @@
                         id="share-group-level"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                     >
-                        <option value="view">View</option>
-                        <option value="edit">Edit</option>
+                        <option value="view">Lecture</option>
+                        <option value="edit">Modification</option>
                         {% if resource_type == "book" %}
-                        <option value="contributor">Contributor</option>
+                        <option value="contributor">Contributeur</option>
                         {% endif %}
                     </select>
                 </div>
@@ -131,7 +131,7 @@
                 type="submit"
                 class="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
             >
-                Share with Group
+                Partager avec un groupe
             </button>
         </form>
     </div>
@@ -140,12 +140,12 @@
     {# Current Permissions #}
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Current Permissions</h2>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Permissions actuelles</h2>
         </div>
 
         {% if permissions.is_empty() %}
         <div class="p-6 text-center text-gray-500 dark:text-gray-400">
-            <p>No one else has access to this {{ resource_type }} yet.</p>
+            <p>Personne d'autre n'a encore accès à cet élément.</p>
         </div>
         {% else %}
         <ul class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -173,7 +173,7 @@
                             {{ perm.subject_display_name }}
                         </span>
                         <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                            <span class="capitalize">{{ perm.subject_type }}</span>
+                            <span>{{ perm.subject_type.label_fr() }}</span>
                             <span>-</span>
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                                 {% match perm.permission_level %}
@@ -182,7 +182,7 @@
                                 {% when crate::models::PermissionLevel::Contributor %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
                                 {% endmatch %}
                             ">
-                                {{ perm.permission_level }}
+                                {{ perm.permission_level.label_fr() }}
                             </span>
                         </div>
                     </div>
@@ -193,7 +193,7 @@
                     class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                     onclick="revokePermission('{{ perm.id }}')"
                 >
-                    Revoke
+                    Révoquer
                 </button>
             </li>
             {% endfor %}
@@ -207,7 +207,7 @@
             href="/{{ resource_type }}s/{{ resource_id }}"
             class="text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
         >
-            &larr; Back to {{ resource_type }}
+            &larr; Retour
         </a>
     </div>
 </div>
@@ -233,13 +233,13 @@ async function searchUsers(query) {
     searchTimeout = setTimeout(async () => {
         try {
             const response = await fetch(`/api/v1/users/search?q=${encodeURIComponent(query)}&limit=10`);
-            if (!response.ok) throw new Error('Search failed');
+            if (!response.ok) throw new Error('Échec de la recherche');
 
             const users = await response.json();
             displaySearchResults(users);
         } catch (e) {
             console.error('Search error:', e);
-            resultsDiv.innerHTML = '<div class="p-3 text-sm text-gray-500 dark:text-gray-400">Search failed</div>';
+            resultsDiv.innerHTML = '<div class="p-3 text-sm text-gray-500 dark:text-gray-400">Échec de la recherche</div>';
             resultsDiv.classList.remove('hidden');
         }
     }, 300);
@@ -249,7 +249,7 @@ function displaySearchResults(users) {
     const resultsDiv = document.getElementById('user-search-results');
 
     if (users.length === 0) {
-        resultsDiv.innerHTML = '<div class="p-3 text-sm text-gray-500 dark:text-gray-400">No users found</div>';
+        resultsDiv.innerHTML = '<div class="p-3 text-sm text-gray-500 dark:text-gray-400">Aucun utilisateur trouvé</div>';
         resultsDiv.classList.remove('hidden');
         return;
     }
@@ -330,7 +330,7 @@ async function shareWithUser(event) {
     const level = document.getElementById('share-user-level').value;
 
     if (!userId) {
-        alert('Please search and select a user');
+        alert('Recherche et sélectionne un utilisateur');
         return;
     }
 
@@ -368,15 +368,15 @@ async function grantPermission(subjectType, subjectId, subjectDomain, level) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.message || 'Failed to share');
+            alert(error.message || 'Échec du partage');
         }
     } catch (e) {
-        alert('Failed to share');
+        alert('Échec du partage');
     }
 }
 
 async function revokePermission(permId) {
-    if (!confirm('Are you sure you want to revoke this permission?')) return;
+    if (!confirm('Es-tu sûr de vouloir révoquer cette permission ?')) return;
 
     try {
         const response = await fetch(`/api/v1/${resourceType}s/${resourceId}/permissions/${permId}`, {
@@ -387,10 +387,10 @@ async function revokePermission(permId) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.message || 'Failed to revoke permission');
+            alert(error.message || 'Échec de la révocation de la permission');
         }
     } catch (e) {
-        alert('Failed to revoke permission');
+        alert('Échec de la révocation de la permission');
     }
 }
 </script>

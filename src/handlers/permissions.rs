@@ -47,7 +47,7 @@ async fn recipe_share_page(
 
     // Verify user owns this recipe
     if !PermissionService::is_owner(&state.db, auth.id, ResourceType::Recipe, id).await? {
-        return Err(AppError::NotFound("Recipe not found".to_string()));
+        return Err(AppError::NotFound("Recette introuvable".to_string()));
     }
 
     let recipe = RecipeService::get_by_id(&state.db, id).await?;
@@ -99,7 +99,7 @@ async fn book_share_page(
 
     // Verify user owns this book
     if !PermissionService::is_owner(&state.db, auth.id, ResourceType::Book, id).await? {
-        return Err(AppError::NotFound("Book not found".to_string()));
+        return Err(AppError::NotFound("Livre introuvable".to_string()));
     }
 
     let book = BookService::get_by_id(&state.db, id).await?;
