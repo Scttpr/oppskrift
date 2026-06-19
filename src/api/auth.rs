@@ -125,13 +125,13 @@ async fn register(
         .await
         .map_err(|e| match e {
             crate::services::AuthError::EmailExists => {
-                AppError::Conflict("Email already registered".to_string())
+                AppError::Conflict("Cette adresse e-mail est déjà enregistrée".to_string())
             }
             crate::services::AuthError::UsernameExists => {
-                AppError::Conflict("Username already taken".to_string())
+                AppError::Conflict("Ce nom d'utilisateur est déjà pris".to_string())
             }
             crate::services::AuthError::UsernameReserved => {
-                AppError::BadRequest("Username is reserved".to_string())
+                AppError::BadRequest("Ce nom d'utilisateur est réservé".to_string())
             }
             crate::services::AuthError::InvalidPassword(msg) => AppError::Validation(msg),
             crate::services::AuthError::Database(e) => {
@@ -175,13 +175,13 @@ async fn confirm_email(
         .await
         .map_err(|e| match e {
             crate::services::AuthError::InvalidToken => {
-                AppError::BadRequest("Invalid or expired confirmation token".to_string())
+                AppError::BadRequest("Jeton de confirmation invalide ou expiré".to_string())
             }
             crate::services::AuthError::AlreadyVerified => {
-                AppError::Conflict("Email already verified".to_string())
+                AppError::Conflict("Adresse e-mail déjà vérifiée".to_string())
             }
             crate::services::AuthError::UserNotFound => {
-                AppError::BadRequest("Invalid confirmation token".to_string())
+                AppError::BadRequest("Jeton de confirmation invalide".to_string())
             }
             e => {
                 tracing::error!(error = %e, "Email confirmation failed");
@@ -190,7 +190,7 @@ async fn confirm_email(
         })?;
 
     Ok(Json(EmailConfirmationResponse {
-        message: "Email confirmed successfully. You can now log in.".to_string(),
+        message: "E-mail confirmé. Tu peux maintenant te connecter.".to_string(),
         verified: true,
     }))
 }
@@ -235,11 +235,13 @@ async fn resend_confirmation(
             );
         }
         Err(crate::services::AuthError::AlreadyVerified) => {
-            return Err(AppError::Conflict("Email already verified".to_string()));
+            return Err(AppError::Conflict(
+                "Adresse e-mail déjà vérifiée".to_string(),
+            ));
         }
         Err(crate::services::AuthError::TooManyRequests) => {
             return Err(AppError::BadRequest(
-                "Please wait before requesting another confirmation email".to_string(),
+                "Patiente avant de demander un nouvel e-mail de confirmation".to_string(),
             ));
         }
         Err(e) => {
@@ -249,7 +251,7 @@ async fn resend_confirmation(
     }
 
     Ok(Json(serde_json::json!({
-        "message": "If an account exists with this email, a confirmation link has been sent."
+        "message": "Si un compte existe avec cette adresse, un lien de confirmation a été envoyé."
     })))
 }
 
@@ -335,13 +337,13 @@ async fn login(
 
         match e {
             AuthError::InvalidCredentials => {
-                AppError::Unauthorized("Invalid email or password".to_string())
+                AppError::Unauthorized("E-mail ou mot de passe incorrect".to_string())
             }
             AuthError::AccountLocked(until) => {
-                AppError::Forbidden(format!("Account locked until {}", until))
+                AppError::Forbidden(format!("Compte verrouillé jusqu'au {}", until))
             }
             AuthError::EmailNotVerified => {
-                AppError::Forbidden("Please verify your email before logging in".to_string())
+                AppError::Forbidden("Vérifie ton adresse e-mail avant de te connecter".to_string())
             }
             e => {
                 tracing::error!(error = %e, "Login failed");
@@ -388,7 +390,7 @@ async fn login(
                 Json(serde_json::json!({
                     "requires_2fa": true,
                     "partial_token": partial_token,
-                    "message": "Two-factor authentication required"
+                    "message": "Authentification à deux facteurs requise"
                 })),
             )
                 .into_response())
@@ -425,7 +427,7 @@ async fn logout(
     Ok((
         AppendHeaders([(SET_COOKIE, cookie)]),
         Json(LogoutResponse {
-            message: "Logged out successfully".to_string(),
+            message: "Déconnexion réussie".to_string(),
         }),
     ))
 }
@@ -468,10 +470,10 @@ async fn verify_2fa(
         .await
         .map_err(|e| match e {
             AuthError::InvalidToken => {
-                AppError::BadRequest("Invalid or expired verification token".to_string())
+                AppError::BadRequest("Jeton de vérification invalide ou expiré".to_string())
             }
             AuthError::InvalidTwoFactorCode => {
-                AppError::Unauthorized("Invalid two-factor code".to_string())
+                AppError::Unauthorized("Code à deux facteurs invalide".to_string())
             }
             e => {
                 tracing::error!(error = %e, "2FA verification failed");
@@ -587,7 +589,7 @@ async fn reset_password(
         .await
         .map_err(|e| match e {
             AuthError::InvalidToken => {
-                AppError::BadRequest("Invalid or expired reset token".to_string())
+                AppError::BadRequest("Jeton de réinitialisation invalide ou expiré".to_string())
             }
             AuthError::InvalidPassword(msg) => AppError::Validation(msg),
             e => {

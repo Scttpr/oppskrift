@@ -1,10 +1,10 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Email Confirmed - Oppskrift{% endblock %}
+{% block title %}E-mail confirmé - Oppskrift{% endblock %}
 
 {% block user_menu %}
 <a href="/login" class="text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-    Sign In
+    Connexion
 </a>
 {% endblock %}
 
@@ -17,12 +17,12 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>
         </div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Email Confirmed!</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">E-mail confirmé !</h1>
         <p class="text-gray-600 dark:text-gray-400 mb-6">
-            Your email address has been verified. You can now log in to your account.
+            Ton adresse e-mail a été vérifiée. Tu peux maintenant te connecter à ton compte.
         </p>
         <a href="/login" class="inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-            Go to Login
+            Aller à la connexion
         </a>
         {% else %}
         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
@@ -30,16 +30,16 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
         </div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Confirmation Failed</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Échec de la confirmation</h1>
         <p class="text-gray-600 dark:text-gray-400 mb-6">
             {{ error_message }}
         </p>
         <div class="space-y-3">
             <a href="/login" class="block w-full py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                Go to Login
+                Aller à la connexion
             </a>
             <a href="/register" class="block w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                Register New Account
+                Créer un nouveau compte
             </a>
         </div>
         {% endif %}
