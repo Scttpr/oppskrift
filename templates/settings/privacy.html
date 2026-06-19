@@ -3,7 +3,7 @@
 {% block settings_content %}
 <section aria-labelledby="privacy-heading">
     <h2 id="privacy-heading" class="text-lg font-medium text-gray-900 dark:text-white mb-6">
-        Privacy Settings
+        Paramètres de confidentialité
     </h2>
 
     {# Federation Toggle (FR-009, FR-010) #}
@@ -11,17 +11,17 @@
         <div class="flex items-start justify-between">
             <div class="flex-grow mr-4">
                 <h3 id="federation-label" class="text-sm font-medium text-gray-900 dark:text-white">
-                    ActivityPub Federation
+                    Fédération ActivityPub
                 </h3>
                 <p id="federation-description" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    When enabled, your profile and public recipes can be discovered and followed by users on other ActivityPub-compatible platforms (such as Mastodon, Lemmy, or other Oppskrift instances).
+                    Lorsqu'elle est activée, ton profil et tes recettes publiques peuvent être découverts et suivis par des utilisateurs d'autres plateformes compatibles ActivityPub (comme Mastodon, Lemmy ou d'autres instances Oppskrift).
                 </p>
                 <div class="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
                     <p class="text-xs text-gray-600 dark:text-gray-300">
-                        <strong>When enabled:</strong> Your profile appears in WebFinger lookups and can be followed from other federated platforms.
+                        <strong>Activée :</strong> ton profil apparaît dans les recherches WebFinger et peut être suivi depuis d'autres plateformes fédérées.
                     </p>
                     <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                        <strong>When disabled:</strong> Your profile is hidden from federation. Existing followers on other instances will no longer receive your updates.
+                        <strong>Désactivée :</strong> ton profil est masqué de la fédération. Les abonnés existants sur d'autres instances ne recevront plus tes mises à jour.
                     </p>
                 </div>
             </div>
@@ -59,12 +59,12 @@
                 <svg class="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                 </svg>
-                <span class="text-green-700 dark:text-green-400">Federation is enabled</span>
+                <span class="text-green-700 dark:text-green-400">La fédération est activée</span>
                 {% else %}
                 <svg class="w-4 h-4 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
                 </svg>
-                <span class="text-gray-500 dark:text-gray-400">Federation is disabled</span>
+                <span class="text-gray-500 dark:text-gray-400">La fédération est désactivée</span>
                 {% endif %}
             </div>
         </div>
@@ -73,10 +73,10 @@
     {# Data Export Section (FR-012) #}
     <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
         <h3 class="text-sm font-medium text-gray-900 dark:text-white">
-            Export Your Data
+            Exporter tes données
         </h3>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Download a copy of your personal data, including your profile information, recipes, books, and activity history. The export is provided in JSON format.
+            Télécharge une copie de tes données personnelles, dont les informations de ton profil, tes recettes, tes livres et ton historique d'activité. L'export est fourni au format JSON.
         </p>
 
         <div class="mt-4">
@@ -89,13 +89,13 @@
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                     </svg>
-                    Download My Data
+                    Télécharger mes données
                 </button>
             </form>
         </div>
 
         <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
-            Note: You can request one export per hour. Large exports may take a moment to prepare.
+            Remarque : tu peux demander un export par heure. Les exports volumineux peuvent prendre un instant à préparer.
         </p>
     </div>
 </section>
