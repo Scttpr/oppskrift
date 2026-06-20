@@ -147,3 +147,91 @@ async fn test_access_denied_writes_audit_row() {
     })
     .await;
 }
+
+/// The grant and its audit entry share one transaction: if the audit write
+/// fails, the grant must roll back. We force the audit insert to fail with a
+/// `BEFORE INSERT` trigger scoped to this test's unique `resource_id` (so it
+/// never touches other tests' audit writes), then assert no permission row
+/// survived.
+#[tokio::test]
+async fn test_grant_rolls_back_when_audit_write_fails() {
+    run_test(|mut ctx| async move {
+        let (owner_id, owner_session) = ctx.create_and_login("owner").await;
+        let (grantee_id, _grantee_session) = ctx.create_and_login("grantee").await;
+        let recipe_id = ctx
+            .create_recipe(owner_id, "Audited Recipe", "private")
+            .await;
+
+        // Fail only the audit insert for this recipe's grants.
+        let trigger = format!("test_fail_audit_{}", recipe_id.simple());
+        sqlx::query(&format!(
+            r#"
+            CREATE OR REPLACE FUNCTION {trigger}() RETURNS trigger AS $$
+            BEGIN
+                IF NEW.resource_id = '{recipe_id}'::uuid THEN
+                    RAISE EXCEPTION 'injected audit failure';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+            "#
+        ))
+        .execute(&ctx.db)
+        .await
+        .expect("create trigger function");
+        sqlx::query(&format!(
+            "CREATE TRIGGER {trigger} BEFORE INSERT ON permission_audit_log \
+             FOR EACH ROW EXECUTE FUNCTION {trigger}()"
+        ))
+        .execute(&ctx.db)
+        .await
+        .expect("create trigger");
+
+        let grant = ctx
+            .post_with_session(
+                &format!("/api/v1/recipes/{}/permissions", recipe_id),
+                serde_json::json!({
+                    "subject_type": "user",
+                    "subject_id": grantee_id,
+                    "permission_level": "view"
+                }),
+                &owner_session,
+            )
+            .await;
+        assert!(
+            !grant.is_success(),
+            "grant must fail when its audit write fails, got {}",
+            grant.status
+        );
+
+        // Rollback: neither the grant nor the audit row may survive.
+        let perms: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM permissions WHERE resource_id = $1")
+                .bind(recipe_id)
+                .fetch_one(&ctx.db)
+                .await
+                .expect("count permissions");
+        assert_eq!(perms, 0, "the grant must have rolled back");
+
+        let audits: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM permission_audit_log WHERE resource_id = $1")
+                .bind(recipe_id)
+                .fetch_one(&ctx.db)
+                .await
+                .expect("count audit rows");
+        assert_eq!(audits, 0, "no audit row should be committed");
+
+        // Cleanup the injected trigger.
+        sqlx::query(&format!(
+            "DROP TRIGGER IF EXISTS {trigger} ON permission_audit_log"
+        ))
+        .execute(&ctx.db)
+        .await
+        .ok();
+        sqlx::query(&format!("DROP FUNCTION IF EXISTS {trigger}()"))
+            .execute(&ctx.db)
+            .await
+            .ok();
+    })
+    .await;
+}
