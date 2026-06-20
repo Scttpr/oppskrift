@@ -10,7 +10,7 @@ use axum::{
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::middleware::{AuthUser, OptionalAuthUser};
+use crate::api::middleware::{AuthUser, OptionalAuthUser, OptionalViewer};
 use crate::core::audit::AuditEvent;
 use crate::core::csrf::{generate_csrf_token, validate_csrf_token};
 use crate::core::error::{AppError, AppResult};
@@ -52,15 +52,11 @@ struct BookListTemplate {
 async fn list_books_page(
     State(state): State<AppState>,
     Query(params): Query<PaginationParams>,
-    auth: OptionalAuthUser,
+    viewer: OptionalViewer,
 ) -> AppResult<Html<String>> {
     let books_page = BookService::list_public(&state.db, &params).await?;
 
-    let user = if let Some(auth_user) = auth.0 {
-        UserService::get_by_id(&state.db, auth_user.id).await.ok()
-    } else {
-        None
-    };
+    let user = viewer.0.map(|v| v.user);
 
     let template = BookListTemplate {
         books: books_page.data,

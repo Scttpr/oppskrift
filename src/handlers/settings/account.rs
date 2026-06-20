@@ -14,7 +14,7 @@ use validator::Validate;
 use super::{
     create_auth_service, create_request_context, generate_csrf, validate_csrf, CsrfOnlyForm,
 };
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::{AuthUser, Viewer};
 use crate::core::audit::AuditEvent;
 use crate::core::error::AppResult;
 use crate::core::helpers::mask_email;
@@ -40,9 +40,9 @@ struct AccountTemplate {
 /// Account settings page
 pub(crate) async fn account_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -63,7 +63,7 @@ pub(crate) async fn account_page(
         flash_error: None,
         masked_email,
         email_verified: user.email_verified,
-        csrf_token: generate_csrf(&state, auth.session_id),
+        csrf_token: generate_csrf(&state, viewer.session_id),
     };
 
     crate::core::render(&template)
@@ -102,10 +102,10 @@ struct EmailChangeTemplate {
 /// Email change page (GET)
 pub(crate) async fn email_change_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -131,15 +131,15 @@ pub(crate) async fn email_change(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
-    auth: AuthUser,
+    viewer: Viewer,
     Form(form): Form<ChangeEmailForm>,
 ) -> AppResult<Html<String>> {
     // Validate CSRF token
-    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+    validate_csrf(&state, &form.csrf_token, viewer.session_id)?;
 
-    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), viewer.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -176,12 +176,12 @@ pub(crate) async fn email_change(
     // Call auth service - use generic message to prevent enumeration (T036)
     let auth_service = create_auth_service(&state);
     let _ = auth_service
-        .change_email(auth.id, &form.new_email, &form.password, &ctx)
+        .change_email(viewer.id, &form.new_email, &form.password, &ctx)
         .await;
 
     // Log email change request (T039)
     AuditEvent::new("auth.email.change.request")
-        .with_user(auth.id)
+        .with_user(viewer.id)
         .with_context(&ctx)
         .persist(&state.db)
         .await;
@@ -234,10 +234,10 @@ struct DeleteAccountTemplate {
 /// Delete account page (GET)
 pub(crate) async fn delete_account_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user

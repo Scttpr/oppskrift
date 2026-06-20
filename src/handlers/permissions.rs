@@ -11,10 +11,10 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::Viewer;
 use crate::core::error::{AppError, AppResult};
 use crate::models::{GroupWithMeta, PermissionWithDisplay, ResourceType, User};
-use crate::services::{BookService, GroupService, PermissionService, RecipeService, UserService};
+use crate::services::{BookService, GroupService, PermissionService, RecipeService};
 use crate::AppState;
 
 /// Permission management routes
@@ -41,23 +41,23 @@ struct RecipeShareTemplate {
 async fn recipe_share_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
 
     // Verify user owns this recipe
-    if !PermissionService::is_owner(&state.db, auth.id, ResourceType::Recipe, id).await? {
+    if !PermissionService::is_owner(&state.db, viewer.id, ResourceType::Recipe, id).await? {
         return Err(AppError::NotFound("Recette introuvable".to_string()));
     }
 
     let recipe = RecipeService::get_by_id(&state.db, id).await?;
     let permissions =
-        PermissionService::list_permissions(&state.db, auth.id, ResourceType::Recipe, id).await?;
+        PermissionService::list_permissions(&state.db, viewer.id, ResourceType::Recipe, id).await?;
 
     // Get user's groups for sharing options
     let (user_groups, _) = GroupService::list_for_user(
         &state.db,
-        auth.id,
+        viewer.id,
         crate::models::GroupFilter::Owned,
         1,
         100,
@@ -93,23 +93,23 @@ struct BookShareTemplate {
 async fn book_share_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
 
     // Verify user owns this book
-    if !PermissionService::is_owner(&state.db, auth.id, ResourceType::Book, id).await? {
+    if !PermissionService::is_owner(&state.db, viewer.id, ResourceType::Book, id).await? {
         return Err(AppError::NotFound("Livre introuvable".to_string()));
     }
 
     let book = BookService::get_by_id(&state.db, id).await?;
     let permissions =
-        PermissionService::list_permissions(&state.db, auth.id, ResourceType::Book, id).await?;
+        PermissionService::list_permissions(&state.db, viewer.id, ResourceType::Book, id).await?;
 
     // Get user's groups for sharing options
     let (user_groups, _) = GroupService::list_for_user(
         &state.db,
-        auth.id,
+        viewer.id,
         crate::models::GroupFilter::Owned,
         1,
         100,

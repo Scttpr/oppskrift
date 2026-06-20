@@ -12,10 +12,10 @@ use axum::{
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::Viewer;
 use crate::core::error::{AppError, AppResult};
 use crate::models::{GroupDetail, GroupFilter, GroupWithMeta, User};
-use crate::services::{GroupService, UserService};
+use crate::services::GroupService;
 use crate::AppState;
 
 /// Group page routes
@@ -56,13 +56,13 @@ struct GroupListTemplate {
 /// Group list page handler
 async fn list_groups_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
     Query(params): Query<GroupListParams>,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
     let page_size = 20i64;
     let (groups, total) =
-        GroupService::list_for_user(&state.db, auth.id, params.filter, params.page, page_size)
+        GroupService::list_for_user(&state.db, viewer.id, params.filter, params.page, page_size)
             .await?;
 
     let total_pages = (total + page_size - 1) / page_size;
@@ -89,8 +89,8 @@ struct NewGroupTemplate {
 }
 
 /// New group page handler
-async fn new_group_page(State(state): State<AppState>, auth: AuthUser) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+async fn new_group_page(viewer: Viewer) -> AppResult<Html<String>> {
+    let user = viewer.user;
 
     let template = NewGroupTemplate { group: None, user };
 
@@ -110,16 +110,16 @@ struct GroupViewTemplate {
 async fn view_group_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
 
     // Check membership
-    if !GroupService::is_member(&state.db, id, auth.id).await? {
+    if !GroupService::is_member(&state.db, id, viewer.id).await? {
         return Err(AppError::NotFound("Groupe introuvable".to_string()));
     }
 
-    let group = GroupService::get_detail(&state.db, id, auth.id).await?;
+    let group = GroupService::get_detail(&state.db, id, viewer.id).await?;
 
     let template = GroupViewTemplate { group, user };
 
@@ -139,10 +139,10 @@ struct EditGroupTemplate {
 async fn edit_group_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let group = GroupService::get_with_meta(&state.db, id, auth.id).await?;
+    let user = viewer.user;
+    let group = GroupService::get_with_meta(&state.db, id, viewer.id).await?;
 
     // Only owner can edit
     if !group.is_owner {

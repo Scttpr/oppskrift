@@ -13,10 +13,10 @@ use serde::Deserialize;
 use super::{
     create_auth_service, create_request_context, create_totp_service, generate_csrf, validate_csrf,
 };
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::Viewer;
 use crate::core::error::{AppError, AppResult};
 use crate::core::request_id::RequestId;
-use crate::services::{TotpError, UserService};
+use crate::services::TotpError;
 use crate::AppState;
 
 /// 2FA setup page template
@@ -46,10 +46,10 @@ pub struct TwoFaEnableForm {
 /// 2FA setup page (GET) - Shows QR code for authenticator app
 pub(crate) async fn twofa_setup_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -80,7 +80,7 @@ pub(crate) async fn twofa_setup_page(
     })?;
 
     let setup = totp_service
-        .setup_2fa(auth.id, email)
+        .setup_2fa(viewer.id, email)
         .await
         .map_err(|e| match e {
             TotpError::AlreadyEnabled => AppError::Conflict(
@@ -112,14 +112,14 @@ pub(crate) async fn twofa_enable(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
-    auth: AuthUser,
+    viewer: Viewer,
     Form(form): Form<TwoFaEnableForm>,
 ) -> AppResult<Html<String>> {
     // Validate CSRF token
-    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+    validate_csrf(&state, &form.csrf_token, viewer.session_id)?;
 
-    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), viewer.session_id);
+    let user = viewer.user;
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -128,11 +128,11 @@ pub(crate) async fn twofa_enable(
 
     // Validate TOTP code format
     if form.totp_code.len() != 6 || !form.totp_code.chars().all(|c| c.is_ascii_digit()) {
-        let csrf_token = generate_csrf(&state, auth.session_id);
+        let csrf_token = generate_csrf(&state, viewer.session_id);
         let totp_service = create_totp_service(&state)?;
         let empty_email = String::new();
         let email = user.email.as_ref().unwrap_or(&empty_email);
-        let setup = totp_service.setup_2fa(auth.id, email).await.ok();
+        let setup = totp_service.setup_2fa(viewer.id, email).await.ok();
 
         let template = TwoFaSetupTemplate {
             active_tab: "security",
@@ -152,7 +152,7 @@ pub(crate) async fn twofa_enable(
     let totp_service = create_totp_service(&state)?;
 
     match totp_service
-        .enable_2fa(auth.id, &form.totp_code, &ctx)
+        .enable_2fa(viewer.id, &form.totp_code, &ctx)
         .await
     {
         Ok(recovery_codes) => {
@@ -178,8 +178,8 @@ pub(crate) async fn twofa_enable(
             // Re-generate QR code for retry
             let empty_email = String::new();
             let email = user.email.as_ref().unwrap_or(&empty_email);
-            let setup = totp_service.setup_2fa(auth.id, email).await.ok();
-            let csrf_token = generate_csrf(&state, auth.session_id);
+            let setup = totp_service.setup_2fa(viewer.id, email).await.ok();
+            let csrf_token = generate_csrf(&state, viewer.session_id);
 
             let template = TwoFaSetupTemplate {
                 active_tab: "security",
@@ -230,10 +230,10 @@ struct TwoFaRecoveryTemplate {
 /// 2FA recovery codes page (GET)
 pub(crate) async fn twofa_recovery_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -249,7 +249,7 @@ pub(crate) async fn twofa_recovery_page(
 
     let totp_service = create_totp_service(&state)?;
     let (total, remaining, generated_at) = totp_service
-        .get_recovery_codes_status(auth.id)
+        .get_recovery_codes_status(viewer.id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to get recovery codes status");
@@ -285,15 +285,15 @@ pub(crate) async fn twofa_regenerate_codes(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
-    auth: AuthUser,
+    viewer: Viewer,
     Form(form): Form<TwoFaRegenerateForm>,
 ) -> AppResult<Html<String>> {
     // Validate CSRF token
-    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+    validate_csrf(&state, &form.csrf_token, viewer.session_id)?;
 
-    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), viewer.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -318,7 +318,7 @@ pub(crate) async fn twofa_regenerate_codes(
     if !password_valid {
         let totp_service = create_totp_service(&state)?;
         let (total, remaining, generated_at) = totp_service
-            .get_recovery_codes_status(auth.id)
+            .get_recovery_codes_status(viewer.id)
             .await
             .unwrap_or((8, 8, None));
 
@@ -341,7 +341,7 @@ pub(crate) async fn twofa_regenerate_codes(
     // Regenerate codes
     let totp_service = create_totp_service(&state)?;
     let response = totp_service
-        .regenerate_recovery_codes(auth.id, &ctx)
+        .regenerate_recovery_codes(viewer.id, &ctx)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to regenerate recovery codes");
@@ -388,10 +388,10 @@ pub struct TwoFaDisableForm {
 /// 2FA disable page (GET)
 pub(crate) async fn twofa_disable_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -422,15 +422,15 @@ pub(crate) async fn twofa_disable(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
-    auth: AuthUser,
+    viewer: Viewer,
     Form(form): Form<TwoFaDisableForm>,
 ) -> Result<Response, AppError> {
     // Validate CSRF token
-    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+    validate_csrf(&state, &form.csrf_token, viewer.session_id)?;
 
-    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), viewer.session_id);
+    let user = viewer.user;
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -468,7 +468,7 @@ pub(crate) async fn twofa_disable(
     // Verify TOTP/recovery code and disable
     let totp_service = create_totp_service(&state)?;
 
-    match totp_service.disable_2fa(auth.id, &form.code, &ctx).await {
+    match totp_service.disable_2fa(viewer.id, &form.code, &ctx).await {
         Ok(()) => {
             // Redirect to security page with success message
             Ok(Redirect::to("/settings/security").into_response())

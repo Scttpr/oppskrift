@@ -14,7 +14,7 @@ use validator::Validate;
 use super::{
     contains_dangerous_content, create_request_context, generate_csrf, sanitize_text, validate_csrf,
 };
-use crate::api::middleware::AuthUser;
+use crate::api::middleware::Viewer;
 use crate::core::audit::AuditEvent;
 use crate::core::error::AppResult;
 use crate::core::helpers::mask_email;
@@ -82,11 +82,8 @@ struct ProfileTemplate {
 }
 
 /// Profile settings page (T021)
-pub(crate) async fn profile_page(
-    State(state): State<AppState>,
-    auth: AuthUser,
-) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+pub(crate) async fn profile_page(viewer: Viewer) -> AppResult<Html<String>> {
+    let user = viewer.user;
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -200,9 +197,9 @@ struct ProfileEditTemplate {
 /// Profile edit page handler (GET)
 pub(crate) async fn profile_edit_page(
     State(state): State<AppState>,
-    auth: AuthUser,
+    viewer: Viewer,
 ) -> AppResult<Html<String>> {
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let user = viewer.user;
 
     let deletion_pending = user.deletion_requested_at.is_some();
     let deletion_date = user
@@ -210,7 +207,7 @@ pub(crate) async fn profile_edit_page(
         .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
     // Generate CSRF token (T028)
-    let csrf_token = generate_csrf(&state, auth.session_id);
+    let csrf_token = generate_csrf(&state, viewer.session_id);
 
     let template = ProfileEditTemplate {
         active_tab: "profile",
@@ -231,14 +228,14 @@ pub(crate) async fn profile_update(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     request_id: Option<axum::Extension<RequestId>>,
-    auth: AuthUser,
+    viewer: Viewer,
     Form(mut form): Form<UpdateProfileForm>,
 ) -> AppResult<Html<String>> {
     // Validate CSRF token
-    validate_csrf(&state, &form.csrf_token, auth.session_id)?;
+    validate_csrf(&state, &form.csrf_token, viewer.session_id)?;
 
-    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), auth.session_id);
-    let user = UserService::get_by_id(&state.db, auth.id).await?;
+    let ctx = create_request_context(addr, request_id.as_ref().map(|e| &e.0), viewer.session_id);
+    let user = viewer.user;
 
     // Sanitize input (T027)
     form.sanitize();
@@ -276,7 +273,7 @@ pub(crate) async fn profile_update(
             .deletion_requested_at
             .map(|dt| crate::core::helpers::format_fr_date(&(dt + chrono::Duration::days(30))));
 
-        let csrf_token = generate_csrf(&state, auth.session_id);
+        let csrf_token = generate_csrf(&state, viewer.session_id);
 
         let template = ProfileEditTemplate {
             active_tab: "profile",
@@ -302,11 +299,11 @@ pub(crate) async fn profile_update(
 
     // Update user profile
     let update_data = form.to_update_user();
-    UserService::update(&state.db, auth.id, update_data).await?;
+    UserService::update(&state.db, viewer.id, update_data).await?;
 
     // Log profile update (T031 - RISK-004-005)
     AuditEvent::new("settings.profile.update")
-        .with_user(auth.id)
+        .with_user(viewer.id)
         .with_context(&ctx)
         .with_metadata(
             "fields_updated",
@@ -318,7 +315,7 @@ pub(crate) async fn profile_update(
     // Redirect to profile page with success message (T030)
     // Note: In a real app, we'd use session-based flash messages
     // For now, we'll re-render the view page with success
-    let updated_user = UserService::get_by_id(&state.db, auth.id).await?;
+    let updated_user = UserService::get_by_id(&state.db, viewer.id).await?;
 
     let deletion_pending = updated_user.deletion_requested_at.is_some();
     let deletion_date = updated_user
