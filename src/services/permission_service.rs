@@ -186,8 +186,8 @@ impl PermissionService {
                 .maybe_user(user_id)
                 .with_target(resource_type.as_str(), resource_id)
                 .with_level(&required_level.to_string().to_lowercase())
-                .persist(pool)
-                .await;
+                .record(pool)
+                .await?;
 
             // Return 404 to hide resource existence
             let resource_name = match resource_type {
@@ -296,8 +296,8 @@ impl PermissionService {
                 request.subject_id,
             )
             .with_level(&request.permission_level.to_string().to_lowercase())
-            .persist(pool)
-            .await;
+            .record(pool)
+            .await?;
 
         Ok(permission)
     }
@@ -356,8 +356,8 @@ impl PermissionService {
                 permission.subject_id,
             )
             .with_level(&permission.permission_level.to_string().to_lowercase())
-            .persist(pool)
-            .await;
+            .record(pool)
+            .await?;
 
         Ok(())
     }

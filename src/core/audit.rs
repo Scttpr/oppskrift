@@ -6,6 +6,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::request_id::RequestContext;
+use crate::core::error::AppResult;
 
 /// Structured audit event for security logging
 #[derive(Debug, Serialize)]
@@ -161,9 +162,9 @@ impl AuditEvent {
         self
     }
 
-    /// Log the event using tracing
-    pub fn log(self) {
-        let json = serde_json::to_string(&self).unwrap_or_default();
+    /// Emit the event to tracing at its configured level.
+    fn emit(&self) {
+        let json = serde_json::to_string(self).unwrap_or_default();
         match self.level.as_str() {
             "warn" => tracing::warn!(audit = %json, "audit event"),
             "error" => tracing::error!(audit = %json, "audit event"),
@@ -171,61 +172,20 @@ impl AuditEvent {
         }
     }
 
-    /// Log the event and persist to database for user-visible security history
+    /// Log the event using tracing
+    pub fn log(self) {
+        self.emit();
+    }
+
+    /// Log the event and persist to database for user-visible security history.
     ///
-    /// This should be used for auth-related events that users should be able to see.
-    /// Falls back to just logging if persistence fails.
+    /// This should be used for auth-related events that users should be able to
+    /// see. Best-effort: falls back to just logging if persistence fails, since
+    /// a failed audit write must not break the action being audited. For the
+    /// immutable permission audit trail, use [`record`](Self::record) instead.
     pub async fn persist(self, pool: &PgPool) {
         // Log to tracing first
-        let json = serde_json::to_string(&self).unwrap_or_default();
-        match self.level.as_str() {
-            "warn" => tracing::warn!(audit = %json, "audit event"),
-            "error" => tracing::error!(audit = %json, "audit event"),
-            _ => tracing::info!(audit = %json, "audit event"),
-        }
-
-        // Permission/access events cross into the relational audit trail
-        // (immutable, partitioned) rather than the self-centric security log.
-        let permission_event_type = match self.event.as_str() {
-            "permission.granted" => Some("permission_granted"),
-            "permission.revoked" => Some("permission_revoked"),
-            "access.denied" => Some("access_denied"),
-            _ => None,
-        };
-        if let Some(event_type) = permission_event_type {
-            let details = self
-                .metadata
-                .clone()
-                .unwrap_or_else(|| serde_json::json!({}));
-            let result = sqlx::query(
-                r#"
-                INSERT INTO permission_audit_log (
-                    event_type, actor_id, resource_type, resource_id,
-                    subject_type, subject_id, permission_level, details
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                "#,
-            )
-            .bind(event_type)
-            .bind(self.user_id)
-            .bind(&self.target_type)
-            .bind(self.target_id)
-            .bind(&self.subject_type)
-            .bind(self.subject_id)
-            .bind(&self.permission_level)
-            .bind(&details)
-            .execute(pool)
-            .await;
-            if let Err(e) = result {
-                tracing::error!(
-                    error = %e,
-                    event = %self.event,
-                    trace_id = %self.trace_id,
-                    "Failed to persist permission audit event"
-                );
-            }
-            return;
-        }
+        self.emit();
 
         // Map event name to DB enum (e.g., "auth.login.success" -> "login_success")
         let db_event_type = match self.event.as_str() {
@@ -316,6 +276,49 @@ impl AuditEvent {
                 );
             }
         }
+    }
+
+    /// Log the event and record it to the immutable permission audit trail.
+    ///
+    /// For permission/access events. Unlike [`persist`](Self::persist), a write
+    /// failure propagates: `permission_audit_log` is a compliance record, so a
+    /// dropped entry is an error rather than something to swallow.
+    pub async fn record(self, pool: &PgPool) -> AppResult<()> {
+        self.emit();
+
+        // Preserve the stored event_type values of the prior log_audit() path.
+        let event_type = match self.event.as_str() {
+            "permission.granted" => "permission_granted",
+            "permission.revoked" => "permission_revoked",
+            "access.denied" => "access_denied",
+            other => other,
+        };
+        let details = self
+            .metadata
+            .clone()
+            .unwrap_or_else(|| serde_json::json!({}));
+
+        sqlx::query(
+            r#"
+            INSERT INTO permission_audit_log (
+                event_type, actor_id, resource_type, resource_id,
+                subject_type, subject_id, permission_level, details
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            "#,
+        )
+        .bind(event_type)
+        .bind(self.user_id)
+        .bind(&self.target_type)
+        .bind(self.target_id)
+        .bind(&self.subject_type)
+        .bind(self.subject_id)
+        .bind(&self.permission_level)
+        .bind(&details)
+        .execute(pool)
+        .await?;
+
+        Ok(())
     }
 }
 
