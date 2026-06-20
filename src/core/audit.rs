@@ -29,6 +29,14 @@ pub struct AuditEvent {
     pub target_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_id: Option<Uuid>,
+    /// Subject a permission is granted to (permission/access events only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subject_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subject_id: Option<Uuid>,
+    /// Permission level in play (permission/access events only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permission_level: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
 }
@@ -48,6 +56,9 @@ impl AuditEvent {
             ip: None,
             target_type: None,
             target_id: None,
+            subject_type: None,
+            subject_id: None,
+            permission_level: None,
             metadata: None,
         }
     }
@@ -75,6 +86,25 @@ impl AuditEvent {
     /// Add user ID to the event
     pub fn with_user(mut self, user_id: Uuid) -> Self {
         self.user_id = Some(user_id);
+        self
+    }
+
+    /// Add optional user ID to the event
+    pub fn maybe_user(mut self, user_id: Option<Uuid>) -> Self {
+        self.user_id = user_id;
+        self
+    }
+
+    /// Add the subject a permission applies to (permission/access events)
+    pub fn with_subject(mut self, subject_type: &str, subject_id: Option<Uuid>) -> Self {
+        self.subject_type = Some(subject_type.to_string());
+        self.subject_id = subject_id;
+        self
+    }
+
+    /// Add the permission level in play (permission/access events)
+    pub fn with_level(mut self, level: &str) -> Self {
+        self.permission_level = Some(level.to_string());
         self
     }
 
@@ -152,6 +182,49 @@ impl AuditEvent {
             "warn" => tracing::warn!(audit = %json, "audit event"),
             "error" => tracing::error!(audit = %json, "audit event"),
             _ => tracing::info!(audit = %json, "audit event"),
+        }
+
+        // Permission/access events cross into the relational audit trail
+        // (immutable, partitioned) rather than the self-centric security log.
+        let permission_event_type = match self.event.as_str() {
+            "permission.granted" => Some("permission_granted"),
+            "permission.revoked" => Some("permission_revoked"),
+            "access.denied" => Some("access_denied"),
+            _ => None,
+        };
+        if let Some(event_type) = permission_event_type {
+            let details = self
+                .metadata
+                .clone()
+                .unwrap_or_else(|| serde_json::json!({}));
+            let result = sqlx::query(
+                r#"
+                INSERT INTO permission_audit_log (
+                    event_type, actor_id, resource_type, resource_id,
+                    subject_type, subject_id, permission_level, details
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                "#,
+            )
+            .bind(event_type)
+            .bind(self.user_id)
+            .bind(&self.target_type)
+            .bind(self.target_id)
+            .bind(&self.subject_type)
+            .bind(self.subject_id)
+            .bind(&self.permission_level)
+            .bind(&details)
+            .execute(pool)
+            .await;
+            if let Err(e) = result {
+                tracing::error!(
+                    error = %e,
+                    event = %self.event,
+                    trace_id = %self.trace_id,
+                    "Failed to persist permission audit event"
+                );
+            }
+            return;
         }
 
         // Map event name to DB enum (e.g., "auth.login.success" -> "login_success")

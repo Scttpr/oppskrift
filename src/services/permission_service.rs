@@ -22,10 +22,11 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::core::audit::AuditEvent;
 use crate::core::error::{AppError, AppResult};
 use crate::models::{
-    CreateAuditLog, GrantPermissionRequest, Permission, PermissionLevel, PermissionWithDisplay,
-    ResourceType, SubjectType, Visibility,
+    GrantPermissionRequest, Permission, PermissionLevel, PermissionWithDisplay, ResourceType,
+    SubjectType, Visibility,
 };
 
 /// Service for permission-related operations
@@ -181,16 +182,12 @@ impl PermissionService {
 
         if !result.has_permission {
             // Log access denied
-            Self::log_audit(
-                pool,
-                CreateAuditLog::access_denied(
-                    user_id,
-                    resource_type.as_str(),
-                    resource_id,
-                    &required_level.to_string().to_lowercase(),
-                ),
-            )
-            .await?;
+            AuditEvent::new("access.denied")
+                .maybe_user(user_id)
+                .with_target(resource_type.as_str(), resource_id)
+                .with_level(&required_level.to_string().to_lowercase())
+                .persist(pool)
+                .await;
 
             // Return 404 to hide resource existence
             let resource_name = match resource_type {
@@ -291,18 +288,16 @@ impl PermissionService {
         })?;
 
         // Audit log
-        Self::log_audit(
-            pool,
-            CreateAuditLog::permission_granted(
-                granter_id,
-                resource_type_str,
-                resource_id,
+        AuditEvent::new("permission.granted")
+            .with_user(granter_id)
+            .with_target(resource_type_str, resource_id)
+            .with_subject(
                 &request.subject_type.to_string().to_lowercase(),
                 request.subject_id,
-                &request.permission_level.to_string().to_lowercase(),
-            ),
-        )
-        .await?;
+            )
+            .with_level(&request.permission_level.to_string().to_lowercase())
+            .persist(pool)
+            .await;
 
         Ok(permission)
     }
@@ -353,18 +348,16 @@ impl PermissionService {
             .await?;
 
         // Audit log
-        Self::log_audit(
-            pool,
-            CreateAuditLog::permission_revoked(
-                revoker_id,
-                &permission.resource_type,
-                permission.resource_id,
+        AuditEvent::new("permission.revoked")
+            .with_user(revoker_id)
+            .with_target(&permission.resource_type, permission.resource_id)
+            .with_subject(
                 &permission.subject_type.to_string().to_lowercase(),
                 permission.subject_id,
-                &permission.permission_level.to_string().to_lowercase(),
-            ),
-        )
-        .await?;
+            )
+            .with_level(&permission.permission_level.to_string().to_lowercase())
+            .persist(pool)
+            .await;
 
         Ok(())
     }
@@ -598,35 +591,6 @@ impl PermissionService {
         .await?;
 
         Ok(result)
-    }
-
-    // =========================================================================
-    // Audit Logging (T020)
-    // =========================================================================
-
-    /// Log an audit event
-    pub async fn log_audit(pool: &PgPool, log: CreateAuditLog) -> AppResult<()> {
-        sqlx::query!(
-            r#"
-            INSERT INTO permission_audit_log (
-                event_type, actor_id, resource_type, resource_id,
-                subject_type, subject_id, permission_level, details
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            "#,
-            log.event_type.as_str(),
-            log.actor_id,
-            log.resource_type,
-            log.resource_id,
-            log.subject_type,
-            log.subject_id,
-            log.permission_level,
-            log.details
-        )
-        .execute(pool)
-        .await?;
-
-        Ok(())
     }
 
     // =========================================================================

@@ -60,7 +60,7 @@ pub use user::{
 };
 
 // ABAC Authorization models
-pub use audit::{AuditEventType, CreateAuditLog, PermissionAuditLog};
+pub use audit::PermissionAuditLog;
 pub use book_contribution::{
     AddContributionRequest, BookContribution, BookContributionWithDisplay,
 };
