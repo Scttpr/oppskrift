@@ -283,7 +283,14 @@ impl AuditEvent {
     /// For permission/access events. Unlike [`persist`](Self::persist), a write
     /// failure propagates: `permission_audit_log` is a compliance record, so a
     /// dropped entry is an error rather than something to swallow.
-    pub async fn record(self, pool: &PgPool) -> AppResult<()> {
+    ///
+    /// Accepts any executor, so the audit write can join the same transaction as
+    /// the mutation it records — pass `&mut *tx` to make the two atomic, or a
+    /// `&PgPool` for a standalone write.
+    pub async fn record<'e, E>(self, executor: E) -> AppResult<()>
+    where
+        E: sqlx::PgExecutor<'e>,
+    {
         self.emit();
 
         // Preserve the stored event_type values of the prior log_audit() path.
@@ -315,7 +322,7 @@ impl AuditEvent {
         .bind(self.subject_id)
         .bind(&self.permission_level)
         .bind(&details)
-        .execute(pool)
+        .execute(executor)
         .await?;
 
         Ok(())

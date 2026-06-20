@@ -251,6 +251,9 @@ impl PermissionService {
         let id = Uuid::new_v4();
         let resource_type_str = resource_type.as_str();
 
+        // Insert the grant and its audit entry atomically.
+        let mut tx = pool.begin().await?;
+
         let permission = sqlx::query_as!(
             Permission,
             r#"
@@ -275,7 +278,7 @@ impl PermissionService {
             request.permission_level as PermissionLevel,
             granter_id
         )
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await
         .map_err(|e| match e {
             sqlx::Error::Database(ref db_err)
@@ -296,8 +299,10 @@ impl PermissionService {
                 request.subject_id,
             )
             .with_level(&request.permission_level.to_string().to_lowercase())
-            .record(pool)
+            .record(&mut *tx)
             .await?;
+
+        tx.commit().await?;
 
         Ok(permission)
     }
@@ -321,6 +326,9 @@ impl PermissionService {
             )));
         }
 
+        // Read, delete, and audit atomically.
+        let mut tx = pool.begin().await?;
+
         // Get permission details for audit log before deleting
         let permission = sqlx::query_as!(
             Permission,
@@ -338,13 +346,13 @@ impl PermissionService {
             resource_type.as_str(),
             resource_id
         )
-        .fetch_optional(pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| AppError::NotFound("Permission not found".to_string()))?;
 
         // Delete the permission
         sqlx::query!("DELETE FROM permissions WHERE id = $1", permission_id)
-            .execute(pool)
+            .execute(&mut *tx)
             .await?;
 
         // Audit log
@@ -356,8 +364,10 @@ impl PermissionService {
                 permission.subject_id,
             )
             .with_level(&permission.permission_level.to_string().to_lowercase())
-            .record(pool)
+            .record(&mut *tx)
             .await?;
+
+        tx.commit().await?;
 
         Ok(())
     }
