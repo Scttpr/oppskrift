@@ -1,13 +1,13 @@
 use askama::Template;
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Query, State},
     response::Html,
     routing::get,
     Router,
 };
 use uuid::Uuid;
 
-use crate::api::middleware::{AuthUser, OptionalViewer};
+use crate::api::middleware::{Authorized, Edit, OptionalViewer, View};
 use crate::core::error::AppResult;
 use crate::core::pagination::{PaginatedResponse, PaginationMeta, PaginationParams};
 use crate::core::schema_org::SchemaOrgRecipe;
@@ -141,11 +141,16 @@ struct RecipeViewTemplate {
 /// View recipe page handler
 async fn view_recipe_page(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    viewer: OptionalViewer,
+    authz: Authorized<Recipe, View>,
 ) -> AppResult<Html<String>> {
-    let viewer_id = viewer.0.as_ref().map(|v| v.id);
-    let recipe = RecipeService::get_by_id_authorized(&state.db, id, viewer_id).await?;
+    let Authorized {
+        resource: recipe,
+        viewer,
+        is_owner,
+        ..
+    } = authz;
+    let id = recipe.id;
+    let viewer_id = viewer.as_ref().map(|v| v.id);
     let author = UserService::get_by_id(&state.db, recipe.author_id)
         .await
         .ok();
@@ -167,10 +172,8 @@ async fn view_recipe_page(
     );
     let schema_json = serde_json::to_string_pretty(&schema).unwrap_or_default();
 
-    let is_owner = viewer_id == Some(recipe.author_id);
-
     // Fetch current user, their books, and saved status
-    let (user, user_books, recipe_in_book_ids, is_saved) = if let Some(v) = viewer.0 {
+    let (user, user_books, recipe_in_book_ids, is_saved) = if let Some(v) = viewer {
         let books = BookService::list_by_owner(&state.db, v.id)
             .await
             .unwrap_or_default();
@@ -215,11 +218,10 @@ struct EditRecipeTemplate {
 /// Edit recipe page handler
 async fn edit_recipe_page(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    auth: AuthUser,
+    authz: Authorized<Recipe, Edit>,
 ) -> AppResult<Html<String>> {
-    RecipeService::require_edit_permission(&state.db, id, auth.id).await?;
-    let recipe = RecipeService::get_by_id(&state.db, id).await?;
+    let recipe = authz.resource;
+    let id = recipe.id;
     let tags = TagService::get_recipe_tags(&state.db, id)
         .await?
         .into_iter()

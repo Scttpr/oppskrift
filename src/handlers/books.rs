@@ -10,7 +10,7 @@ use axum::{
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::api::middleware::{AuthUser, OptionalAuthUser, OptionalViewer};
+use crate::api::middleware::{AuthUser, Authorized, Edit, OptionalViewer, View};
 use crate::core::audit::AuditEvent;
 use crate::core::csrf::{generate_csrf_token, validate_csrf_token};
 use crate::core::error::{AppError, AppResult};
@@ -132,20 +132,22 @@ struct BookViewTemplate {
 /// View book page handler (T030)
 async fn view_book_page(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
     Query(params): Query<PaginationParams>,
-    auth: OptionalAuthUser,
+    authz: Authorized<RecipeBook, View>,
 ) -> AppResult<Html<String>> {
-    let viewer_id = auth.0.as_ref().map(|u| u.id);
-    let book = BookService::get_by_id_authorized(&state.db, id, viewer_id).await?;
+    let Authorized {
+        resource: book,
+        viewer,
+        is_owner,
+        ..
+    } = authz;
+    let id = book.id;
     let owner = UserService::get_by_id(&state.db, book.owner_id).await.ok();
     let recipes_page = BookService::get_recipes_in_book(&state.db, id, &params).await?;
 
-    let is_owner = viewer_id == Some(book.owner_id);
-
     // Generate CSRF token if logged in
-    let csrf_token = if let Some(ref auth_user) = auth.0 {
-        generate_csrf_token(auth_user.session_id, &state.csrf_secret)
+    let csrf_token = if let Some(ref v) = viewer {
+        generate_csrf_token(v.session_id, &state.csrf_secret)
             .map(|t| t.token)
             .unwrap_or_default()
     } else {
@@ -209,15 +211,10 @@ struct EditBookTemplate {
 }
 
 /// Edit book page handler
-async fn edit_book_page(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    auth: AuthUser,
-) -> AppResult<Html<String>> {
-    BookService::require_edit_permission(&state.db, id, auth.id).await?;
-    let book = BookService::get_by_id(&state.db, id).await?;
-
-    let template = EditBookTemplate { book: Some(book) };
+async fn edit_book_page(authz: Authorized<RecipeBook, Edit>) -> AppResult<Html<String>> {
+    let template = EditBookTemplate {
+        book: Some(authz.resource),
+    };
 
     crate::core::render(&template)
 }
